@@ -1,12 +1,14 @@
 OUT_DIR   = ./build
 
-TF_INC = $(shell python -c 'import tensorflow as tf; print(tf.sysconfig.get_include())')
-TF_LIB = $(shell python -c 'import tensorflow as tf; print(tf.sysconfig.get_lib())')
+TF_INC = $(shell python3 -c 'import tensorflow as tf; print(tf.sysconfig.get_include())')
+TF_LIB = $(shell python3 -c 'import tensorflow as tf; print(tf.sysconfig.get_lib())')
+$(warning  $(TF_INC))
+
 TF_NSYNC = $(TF_INC)/external/nsync/public
 TF_SHAD = $(TF_INC)/tensorflow/core/util
 CUDA_HOME = /usr/local/cuda
 
-GPUFLAGS = -I $(TF_INC) -I$(TF_NSYNC) -I$(CUDA_HOME)/include -I/usr/local -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC
+GPUFLAGS = -I $(TF_INC) -I$(TF_NSYNC) -I$(CUDA_HOME)/include -I/usr/local -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC -DNDEBUG
 CFLAGS = -I $(TF_INC) -I$(TF_NSYNC) -I$(TF_SHAD) -fPIC -L$(CUDA_HOME)/lib -L$(CUDA_HOME)/lib64 -lcudart -L$(TF_LIB) -ltensorflow_framework
 
 all: flow_warp.so

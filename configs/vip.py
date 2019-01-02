@@ -2,17 +2,16 @@
 Written by Qixian Zhou
 """
 
-import math
-import random
 import os
-import numpy as np
+import random
+
 import cv2
-import scipy
-import scipy.io as sio
-from config import Config
+import numpy as np
 import skimage.io
 import skimage.transform
-import utils
+
+from utils.util import Dataset
+from configs.config import Config
 
 
 class ParsingRCNNModelConfig(Config):
@@ -41,7 +40,7 @@ class ParsingRCNNModelConfig(Config):
     # If True, pad images with zeros such that they're (max_dim by max_dim)
     IMAGE_PADDING = True  # currently, the False option is not supported
 
-    # Image mean (RGB)
+    # Image me an (RGB)
     MEAN_PIXEL = np.array([123.7, 116.8, 103.9])
 
     STEPS_PER_EPOCH = 1000
@@ -61,7 +60,6 @@ class ParsingRCNNModelConfig(Config):
     # are based on a deeplab backbone.
     BACKBONE_STRIDES = [4, 8, 16, 16, 32]
 
-
     # How many anchors per image to use for RPN training
     RPN_TRAIN_ANCHORS_PER_IMAGE = 256
     # Non-max suppression threshold to filter RPN proposals.
@@ -78,7 +76,6 @@ class ParsingRCNNModelConfig(Config):
     # If 1 then anchors are created for each cell in the backbone feature map.
     # If 2, then anchors are created for every other cell, and so on.
     RPN_ANCHOR_STRIDE = 1
-
 
     # ROIs kept after non-maximum supression (training and inference)
     PRE_NMS_ROIS_TRAINING = 12000
@@ -126,8 +123,7 @@ class ParsingRCNNModelConfig(Config):
     USE_RPN_ROIS = True
 
     # parsing part class num
-    NUM_PART_CLASS = 1 + 19 #background + classes
-
+    NUM_PART_CLASS = 1 + 19  # background + classes
 
 
 class VideoModelConfig(ParsingRCNNModelConfig):
@@ -136,11 +132,13 @@ class VideoModelConfig(ParsingRCNNModelConfig):
     RECURRENT_UNIT = "gru"
     assert RECURRENT_UNIT in ["gru", "lstm"]
 
-class VIPDataset(utils.Dataset):
+
+class VIPDataset(Dataset):
     """Generates the shapes synthetic dataset. The dataset consists of simple
     shapes (triangles, squares, circles) placed randomly on a blank surface.
     The images are generated on the fly. No file access required.
     """
+
     def add_parsing_class(self, source, class_id, class_name):
         # Does the class exist already?
         for info in self.parsing_class_info:
@@ -154,11 +152,10 @@ class VIPDataset(utils.Dataset):
             "name": class_name,
         })
 
-
     def load_vip(self, dataset_dir, subset):
         # Add classes
-        self.add_class("VIP", 1, "person")
-        self.add_parsing_class("VIP", 1, "hat")
+        self.add_class("VIP", 1, "person")  # self.class_info.append
+        self.add_parsing_class("VIP", 1, "hat")  # self.parsing_class_info.append
         self.add_parsing_class("VIP", 2, "hair")
         self.add_parsing_class("VIP", 3, "gloves")
         self.add_parsing_class("VIP", 4, "sun-glasses")
@@ -184,16 +181,16 @@ class VIPDataset(utils.Dataset):
         # Generate random specifications of images (i.e. color and
         # list of shapes sizes and locations). This is more compact than
         # actual images. Images are generated on the fly in load_image().
-        rfp = open(os.path.join(dataset_dir, 'lists', '%s_id.txt'%subset), 'r')
+        rfp = open(os.path.join(dataset_dir, 'lists', '%s_id.txt' % subset), 'r')
         for line in rfp.readlines():
             image_id = line.strip()
-            self.add_image("VIP", image_id=image_id, 
-                           path=os.path.join(image_dir, '%s.jpg'%image_id), 
-                           front_frame_list=os.path.join(dataset_dir, 'front_frame_list', '%s.txt'%image_id),
-                           behind_frame_list=os.path.join(dataset_dir, 'behind_frame_list', '%s.txt'%image_id),
-                           inst_anno=os.path.join(dataset_dir, 'Human_ids', '%s.png'%image_id),
-                           part_anno=os.path.join(dataset_dir, 'Category_ids', '%s.png'%image_id),
-                           part_rev_anno=os.path.join(dataset_dir, 'Category_rev_ids', '%s.png'%image_id))
+            self.add_image("VIP", image_id=image_id,
+                           path=os.path.join(image_dir, '%s.jpg' % image_id),
+                           front_frame_list=os.path.join(dataset_dir, 'front_frame_list', '%s.txt' % image_id),
+                           behind_frame_list=os.path.join(dataset_dir, 'behind_frame_list', '%s.txt' % image_id),
+                           inst_anno=os.path.join(dataset_dir, 'Human_ids', '%s.png' % image_id),
+                           part_anno=os.path.join(dataset_dir, 'Category_ids', '%s.png' % image_id),
+                           part_rev_anno=os.path.join(dataset_dir, 'Category_rev_ids', '%s.png' % image_id))
 
     def load_keys(self, image_id, key_range, key_num):
         image_info = self.image_info[image_id]
@@ -208,19 +205,19 @@ class VIPDataset(utils.Dataset):
         adjacent_frames_dir = image_dir.replace("Images", "adjacent_frames")
         frame_ind = int(image_dir.split('/')[-1])
 
-        if len(front_frame_ids)>0:
+        if len(front_frame_ids) > 0:
             most_left_ind = int(front_frame_ids[-1])
         else:
             most_left_ind = frame_ind
-        if len(behind_frame_ids)>0:
+        if len(behind_frame_ids) > 0:
             most_right_ind = int(behind_frame_ids[-1])
         else:
             most_right_ind = frame_ind
-        #print(most_left_ind, frame_ind, most_right_ind)
-        new_key_left = max(most_left_ind, frame_ind - int(key_range//2))
-        new_key_right = min(most_right_ind, frame_ind + (key_range - 1- int(key_range//2) ) )
+        # print(most_left_ind, frame_ind, most_right_ind)
+        new_key_left = max(most_left_ind, frame_ind - int(key_range // 2))
+        new_key_right = min(most_right_ind, frame_ind + (key_range - 1 - int(key_range // 2)))
         sel_pool = []
-        for i in range(new_key_left, new_key_right+1):
+        for i in range(new_key_left, new_key_right + 1):
             if i != frame_ind:
                 sel_pool.append([i, 1])
             else:
@@ -228,18 +225,19 @@ class VIPDataset(utils.Dataset):
         sel = random.choice(sel_pool)
         new_key_ind = sel[0]
         identity_ind = sel[1]
-        #print("new key ind", new_key_ind)
+        # print("new key ind", new_key_ind)
         keys = []
         most_left_key_ind = new_key_ind - key_range * (key_num - 1)
         most_right_key_ind = new_key_ind + key_range * (key_num - 1)
         get_left = True
-        #print(most_left_key_ind, most_right_key_ind)
+        # print(most_left_key_ind, most_right_key_ind)
         if random.randint(0, 1):
             # if <most_left_ind, get right keys
             if most_left_key_ind < most_left_ind:
                 get_left = False
                 if most_right_key_ind > most_right_ind:
-                    raise Exception("There is not enough adjacent frames, right_key %d VS right_limit %d"%(most_right_key_ind, most_right_ind)) 
+                    raise Exception("There is not enough adjacent frames, right_key %d VS right_limit %d" % (
+                    most_right_key_ind, most_right_ind))
             else:
                 get_left = True
         else:
@@ -247,31 +245,32 @@ class VIPDataset(utils.Dataset):
             if most_right_key_ind > most_right_ind:
                 get_left = True
                 if most_left_key_ind < most_left_ind:
-                    raise Exception("There is not enough adjacent frames left_key %d VS left_limit %d"%(most_left_key_ind, most_left_ind)) 
+                    raise Exception("There is not enough adjacent frames left_key %d VS left_limit %d" % (
+                    most_left_key_ind, most_left_ind))
             else:
                 get_left = False
         if get_left:
             if identity_ind == 0:
                 tmp_path = image_info['path']
             else:
-                tmp_path = '%s/%012d.jpg'%(adjacent_frames_dir, new_key_ind)
+                tmp_path = '%s/%012d.jpg' % (adjacent_frames_dir, new_key_ind)
             tmp_key = skimage.io.imread(tmp_path)
             keys.append(tmp_key)
             for i in range(1, key_num):
                 tmp_ind = new_key_ind - i * key_range
-                tmp_path = '%s/%012d.jpg'%(adjacent_frames_dir, tmp_ind)
+                tmp_path = '%s/%012d.jpg' % (adjacent_frames_dir, tmp_ind)
                 tmp_key = skimage.io.imread(tmp_path)
                 keys.append(tmp_key)
         else:
             if identity_ind == 0:
                 tmp_path = image_info['path']
             else:
-                tmp_path = '%s/%012d.jpg'%(adjacent_frames_dir, new_key_ind)
+                tmp_path = '%s/%012d.jpg' % (adjacent_frames_dir, new_key_ind)
             tmp_key = skimage.io.imread(tmp_path)
             keys.append(tmp_key)
             for i in range(1, key_num):
                 tmp_ind = new_key_ind + i * key_range
-                tmp_path = '%s/%012d.jpg'%(adjacent_frames_dir, tmp_ind)
+                tmp_path = '%s/%012d.jpg' % (adjacent_frames_dir, tmp_ind)
                 tmp_key = skimage.io.imread(tmp_path)
                 keys.append(tmp_key)
 
@@ -290,19 +289,19 @@ class VIPDataset(utils.Dataset):
         adjacent_frames_dir = image_dir.replace("Images", "adjacent_frames")
         frame_ind = int(image_dir.split('/')[-1])
 
-        if len(front_frame_ids)>0:
+        if len(front_frame_ids) > 0:
             most_left_ind = int(front_frame_ids[-1])
         else:
             most_left_ind = frame_ind
-        if len(behind_frame_ids)>0:
+        if len(behind_frame_ids) > 0:
             most_right_ind = int(behind_frame_ids[-1])
         else:
             most_right_ind = frame_ind
-        #print(most_left_ind, frame_ind, most_right_ind)
-        new_key_left = max(most_left_ind, frame_ind - int(key_range//2))
-        new_key_right = min(most_right_ind, frame_ind + (key_range - 1- int(key_range//2) ) )
+        # print(most_left_ind, frame_ind, most_right_ind)
+        new_key_left = max(most_left_ind, frame_ind - int(key_range // 2))
+        new_key_right = min(most_right_ind, frame_ind + (key_range - 1 - int(key_range // 2)))
         sel_pool = []
-        for i in range(new_key_left, new_key_right+1):
+        for i in range(new_key_left, new_key_right + 1):
             if i != frame_ind:
                 sel_pool.append([i, 1])
             else:
@@ -319,7 +318,8 @@ class VIPDataset(utils.Dataset):
         if most_left_key_ind < most_left_ind:
             get_left = False
             if most_right_key_ind > most_right_ind:
-                raise Exception("There is not enough adjacent frames, right_key %d VS right_limit %d"%(most_right_key_ind, most_right_ind)) 
+                raise Exception("There is not enough adjacent frames, right_key %d VS right_limit %d" % (
+                most_right_key_ind, most_right_ind))
         else:
             get_left = True
 
@@ -327,29 +327,28 @@ class VIPDataset(utils.Dataset):
             if identity_ind == 0:
                 tmp_path = image_info['path']
             else:
-                tmp_path = '%s/%012d.jpg'%(adjacent_frames_dir, new_key_ind)
+                tmp_path = '%s/%012d.jpg' % (adjacent_frames_dir, new_key_ind)
             tmp_key = skimage.io.imread(tmp_path)
             keys.append(tmp_key)
             for i in range(1, key_num):
                 tmp_ind = new_key_ind - i * key_range
-                tmp_path = '%s/%012d.jpg'%(adjacent_frames_dir, tmp_ind)
+                tmp_path = '%s/%012d.jpg' % (adjacent_frames_dir, tmp_ind)
                 tmp_key = skimage.io.imread(tmp_path)
                 keys.append(tmp_key)
         else:
             if identity_ind == 0:
                 tmp_path = image_info['path']
             else:
-                tmp_path = '%s/%012d.jpg'%(adjacent_frames_dir, new_key_ind)
+                tmp_path = '%s/%012d.jpg' % (adjacent_frames_dir, new_key_ind)
             tmp_key = skimage.io.imread(tmp_path)
             keys.append(tmp_key)
             for i in range(1, key_num):
                 tmp_ind = new_key_ind + i * key_range
-                tmp_path = '%s/%012d.jpg'%(adjacent_frames_dir, tmp_ind)
+                tmp_path = '%s/%012d.jpg' % (adjacent_frames_dir, tmp_ind)
                 tmp_key = skimage.io.imread(tmp_path)
                 keys.append(tmp_key)
 
         return keys, identity_ind
-
 
     def load_mask(self, image_id):
         """Load instance masks for the given image.
@@ -371,6 +370,9 @@ class VIPDataset(utils.Dataset):
         instance_masks = []
 
         gt_inst_data = cv2.imread(image_info["inst_anno"], cv2.IMREAD_GRAYSCALE)
+        # img_path="'/home/sk49/workspace/dataset/VIP/Human_ids/videos88/000000001676.png'"
+        # gt_inst_data = cv2.imread(image_info["inst_anno"])
+        # gt_inst_data = cv2.imread(img_path)
         # get all instance label list
         unique_inst = np.unique(gt_inst_data)
         background_ind = np.where(unique_inst == 0)[0]
@@ -420,4 +422,3 @@ class VIPDataset(utils.Dataset):
         image_info = self.image_info[image_id]
         gt_part_data = cv2.imread(image_info["part_rev_anno"], cv2.IMREAD_GRAYSCALE)
         return gt_part_data.astype(np.uint8)
-

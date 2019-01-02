@@ -1,7 +1,9 @@
 import tensorflow as tf
+import os
 
+print(os.getcwd())
 _flow_warp_ops = tf.load_op_library(
-    tf.resource_loader.get_path_to_datafile("./ops/build/flow_warp.so"))
+    tf.resource_loader.get_path_to_datafile(os.path.join(os.getcwd(), "ops/build/flow_warp.so")))
 
 
 def flow_warp(image, flow):

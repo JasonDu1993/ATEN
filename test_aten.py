@@ -2,21 +2,12 @@ import os
 import sys
 sys.path.insert(0, os.getcwd())
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
-import sys
-import random
-import math
-import numpy as np
-import skimage.io
-import skimage.transform
-import matplotlib
-import matplotlib.pyplot as plt
-from flowlib import *
-import vip
-import utils
-import time
+from utils.flowlib import *
+from configs import vip
 
-import aten_model as modellib
-import visualize
+from models import aten_model as modellib
+from utils import visualize
+
 
 class InferenceConfig(vip.VideoModelConfig):
     # Set batch size to 1 since we'll be running inference on
@@ -27,13 +18,13 @@ class InferenceConfig(vip.VideoModelConfig):
     RECURRENT_UNIT = "gru"
 
 config = InferenceConfig()
-DATASET_DIR = "/your/path/to/vip/VIP"
+DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
 
 # Root directory of the project
 ROOT_DIR = os.getcwd()
 MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Directory of images to run detection on
-MODEL_PATH = "./models/aten_p2l3.h5"
+MODEL_PATH = "./checkpoints/aten_p2l3.h5"
 IMAGE_DIR = DATASET_DIR + "/Images"
 FRONT_FRAME_LIST_DIR = DATASET_DIR + "/front_frame_list"
 BEHIND_FRAME_LIST_DIR = DATASET_DIR + "/behind_frame_list"
@@ -75,5 +66,5 @@ for i in range(len(image_ids)):
     r = model.detect([cur_frame,], [key1,], [key2,], [key3,], [identity_ind,])[0]
     # print("detect out ", r['class_ids'].shape[0], "person")
     visualize.vis_insts(cur_frame, path, im_name, r['rois'], r['masks'], r['class_ids'], r['scores'])
-    visualize.write_inst_part_result(path, cur_frame.shape[0], cur_frame.shape[1], im_name, 
-        r['rois'], r['masks'], r['scores'], r['global_parsing'])
+    visualize.write_inst_part_result(path, cur_frame.shape[0], cur_frame.shape[1], im_name,
+                                     r['rois'], r['masks'], r['scores'], r['global_parsing'])

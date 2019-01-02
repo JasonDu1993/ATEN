@@ -1,34 +1,13 @@
-import os
-import sys
-import glob
-import random
-import math
-import datetime
-import itertools
-import json
-import re
-import cv2
-import scipy.io as sio
-import logging
-from collections import OrderedDict
-import numpy as np
+import scipy.misc
 import scipy.misc
 import scipy.ndimage
-import tensorflow as tf
-import keras
-import keras.backend as K
-import keras.layers as KL
-import keras.initializers as KI
-import keras.engine as KE
-import keras.models as KM
-from keras.activations import softmax
 import skimage.transform
-from parsing_rcnn_model import *
-from flow_warp import flow_warp
-import utils
+
+from models.parsing_rcnn_model import *
+from utils.flow_warp import flow_warp
 
 # Requires TensorFlow 1.3+ and Keras 2.0.8+.
-from distutils.version import LooseVersion
+
 assert LooseVersion(tf.__version__) >= LooseVersion("1.3")
 assert LooseVersion(keras.__version__) >= LooseVersion('2.0.8')
 
@@ -318,14 +297,14 @@ def load_image_gt(dataset, config, image_id, augment=False,
     part_rev = dataset.load_reverse_part(image_id)
     shape = image.shape
 
-    image, window, scale, padding = utils.resize_image(
+    image, window, scale, padding = util.resize_image(
         image,
         min_dim=config.IMAGE_MIN_DIM,
         max_dim=config.IMAGE_MAX_DIM,
         padding=config.IMAGE_PADDING)
-    mask = utils.resize_mask(mask, scale, padding)
-    part = utils.resize_part(part, scale, padding[:2])
-    part_rev = utils.resize_part(part_rev, scale, padding[:2])
+    mask = util.resize_mask(mask, scale, padding)
+    part = util.resize_part(part, scale, padding[:2])
+    part_rev = util.resize_part(part_rev, scale, padding[:2])
 
     # process nearby frame
     h, w = keys[0].shape[:2]
@@ -345,7 +324,7 @@ def load_image_gt(dataset, config, image_id, augment=False,
     # Bounding boxes. Note that some boxes might be all zeros
     # if the corresponding mask got cropped out.
     # bbox: [num_instances, (y1, x1, y2, x2)]
-    bbox = utils.extract_bboxes(mask)
+    bbox = util.extract_bboxes(mask)
 
     # Active classes
     # Different datasets have different classes, so track the
@@ -356,7 +335,7 @@ def load_image_gt(dataset, config, image_id, augment=False,
 
     # Resize masks to smaller size to reduce memory usage
     if use_mini_mask:
-        mask = utils.minimize_mask(bbox, mask, config.MINI_MASK_SHAPE)
+        mask = util.minimize_mask(bbox, mask, config.MINI_MASK_SHAPE)
 
     # Image meta data
     image_meta = compose_image_meta(image_id, shape, window, active_class_ids)
@@ -405,14 +384,13 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
     image_index = -1
     image_ids = np.copy(dataset.image_ids)
     error_count = 0
-
     # Anchors
     # [anchor_count, (y1, x1, y2, x2)]
-    anchors = utils.generate_anchors(config.RPN_ANCHOR_SCALES,
-                                     config.RPN_ANCHOR_RATIOS,
-                                     config.BACKBONE_SHAPES[0],
-                                     config.BACKBONE_STRIDES[0],
-                                     config.RPN_ANCHOR_STRIDE)
+    anchors = util.generate_anchors(config.RPN_ANCHOR_SCALES,
+                                    config.RPN_ANCHOR_RATIOS,
+                                    config.BACKBONE_SHAPES[0],
+                                    config.BACKBONE_STRIDES[0],
+                                    config.RPN_ANCHOR_STRIDE)
 
     # Keras requires a generator to run indefinately.
     while True:
@@ -954,7 +932,7 @@ class ATEN_PARSING_RCNN():
             name='mrcnn_share_recog_conv2')(mrcnn_feature_map)
 
         # Generate Anchors
-        self.anchors = utils.generate_anchors(config.RPN_ANCHOR_SCALES,
+        self.anchors = util.generate_anchors(config.RPN_ANCHOR_SCALES,
                                              config.RPN_ANCHOR_RATIOS,
                                              config.BACKBONE_SHAPES[0],
                                              config.BACKBONE_STRIDES[0],
@@ -1075,7 +1053,7 @@ class ATEN_PARSING_RCNN():
 
         # Add multi-GPU support.
         if config.GPU_COUNT > 1:
-            from parallel_model import ParallelModel
+            from utils.parallel_model import ParallelModel
             model = ParallelModel(model, config.GPU_COUNT)
 
         return model
@@ -1407,7 +1385,7 @@ class ATEN_PARSING_RCNN():
         for image in images:
             # Resize image to fit the model expected size
             # TODO: move resizing to mold_image()
-            molded_image, window, scale, padding = utils.resize_image(
+            molded_image, window, scale, padding = util.resize_image(
                 image,
                 min_dim=self.config.IMAGE_MIN_DIM,
                 max_dim=self.config.IMAGE_MAX_DIM,
@@ -1482,7 +1460,7 @@ class ATEN_PARSING_RCNN():
         full_masks = []
         for i in range(N):
             # Convert neural network mask to full size mask
-            full_mask = utils.unmold_mask(masks[i], boxes[i], image_shape)
+            full_mask = util.unmold_mask(masks[i], boxes[i], image_shape)
             full_masks.append(full_mask)
         full_masks = np.stack(full_masks, axis=-1)\
             if full_masks else np.empty((0,) + masks.shape[1:3])

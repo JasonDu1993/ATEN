@@ -1,33 +1,23 @@
-import os
-import sys
-import glob
-import random
-import math
 import datetime
-import itertools
-import json
-import re
-import cv2
-import scipy.io as sio
 import logging
-from collections import OrderedDict
-import numpy as np
-import scipy.misc
-import scipy.ndimage
-import tensorflow as tf
-import keras
-import keras.backend as K
-import keras.layers as KL
-import keras.initializers as KI
-import keras.engine as KE
-import keras.models as KM
-from keras.activations import softmax
-import skimage.transform
-
-import utils
-
+import os
+import random
+import re
 # Requires TensorFlow 1.3+ and Keras 2.0.8+.
 from distutils.version import LooseVersion
+
+import keras
+import keras.backend as K
+import keras.engine as KE
+import keras.layers as KL
+import keras.models as KM
+import numpy as np
+import skimage.transform
+import tensorflow as tf
+
+from keras.utils.vis_utils import plot_model
+from utils import util
+
 assert LooseVersion(tf.__version__) >= LooseVersion("1.3")
 assert LooseVersion(keras.__version__) >= LooseVersion('2.0.8')
 
@@ -57,11 +47,14 @@ class BatchNorm(KL.BatchNormalization):
     Batch normalization has a negative effect on training if batches are small
     so we disable it here.
     """
+
     def __init__(self, training=True, **kwargs):
         super(BatchNorm, self).__init__(**kwargs)
         self.training = training
+
     def call(self, inputs, training=None):
         return super(self.__class__, self).call(inputs, training=self.training)
+
 
 def identity_block(input_tensor, kernel_size, filters, stage, block,
                    use_bias=True, roi_res=False):
@@ -81,13 +74,12 @@ def identity_block(input_tensor, kernel_size, filters, stage, block,
         conv_name_base = 'mrcnn_class_' + conv_name_base
         bn_name_base = 'mrcnn_class_' + bn_name_base
 
-
-    x = KL.Conv2D(nb_filter1, (1, 1), name=conv_name_base + '2a', 
+    x = KL.Conv2D(nb_filter1, (1, 1), name=conv_name_base + '2a',
                   use_bias=use_bias)(input_tensor)
     x = BatchNorm(axis=-1, name=bn_name_base + '2a')(x)
     x = KL.Activation('relu')(x)
 
-    x = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), padding='same', 
+    x = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), padding='same',
                   name=conv_name_base + '2b', use_bias=use_bias)(x)
     x = BatchNorm(axis=-1, name=bn_name_base + '2b')(x)
     x = KL.Activation('relu')(x)
@@ -121,28 +113,28 @@ def conv_block(input_tensor, kernel_size, filters, stage, block,
         conv_name_base = 'mrcnn_class_' + conv_name_base
         bn_name_base = 'mrcnn_class_' + bn_name_base
 
-
-    x = KL.Conv2D(nb_filter1, (1, 1), strides=strides, 
+    x = KL.Conv2D(nb_filter1, (1, 1), strides=strides,
                   name=conv_name_base + '2a', use_bias=use_bias)(input_tensor)
     x = BatchNorm(axis=-1, name=bn_name_base + '2a')(x)
     x = KL.Activation('relu')(x)
 
-    x = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), padding='same', 
+    x = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), padding='same',
                   name=conv_name_base + '2b', use_bias=use_bias)(x)
     x = BatchNorm(axis=-1, name=bn_name_base + '2b')(x)
     x = KL.Activation('relu')(x)
 
-    x = KL.Conv2D(nb_filter3, (1, 1), name=conv_name_base + '2c', 
+    x = KL.Conv2D(nb_filter3, (1, 1), name=conv_name_base + '2c',
                   use_bias=use_bias)(x)
     x = BatchNorm(axis=-1, name=bn_name_base + '2c')(x)
 
-    shortcut = KL.Conv2D(nb_filter3, (1, 1), strides=strides, 
-                  name=conv_name_base + '1', use_bias=use_bias)(input_tensor)
+    shortcut = KL.Conv2D(nb_filter3, (1, 1), strides=strides,
+                         name=conv_name_base + '1', use_bias=use_bias)(input_tensor)
     shortcut = BatchNorm(axis=-1, name=bn_name_base + '1')(shortcut)
 
     x = KL.Add()([x, shortcut])
     x = KL.Activation('relu')(x)
     return x
+
 
 # Atrous-Convolution version of residual blocks
 def atrous_identity_block(input_tensor, kernel_size, filters, stage,
@@ -162,18 +154,17 @@ def atrous_identity_block(input_tensor, kernel_size, filters, stage,
         conv_name_base = 'mrcnn_mask_' + conv_name_base
         bn_name_base = 'mrcnn_mask_' + bn_name_base
 
-
-    x = KL.Conv2D(nb_filter1, (1, 1), name=conv_name_base + '2a',  
+    x = KL.Conv2D(nb_filter1, (1, 1), name=conv_name_base + '2a',
                   use_bias=use_bias)(input_tensor)
     x = BatchNorm(axis=-1, name=bn_name_base + '2a')(x)
     x = KL.Activation('relu')(x)
 
-    x = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), dilation_rate=atrous_rate,  
-                      padding='same', name=conv_name_base + '2b', use_bias=use_bias)(x)
+    x = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), dilation_rate=atrous_rate,
+                  padding='same', name=conv_name_base + '2b', use_bias=use_bias)(x)
     x = BatchNorm(axis=-1, name=bn_name_base + '2b')(x)
     x = KL.Activation('relu')(x)
 
-    x = KL.Conv2D(nb_filter3, (1, 1), name=conv_name_base + '2c',  
+    x = KL.Conv2D(nb_filter3, (1, 1), name=conv_name_base + '2c',
                   use_bias=use_bias)(x)
     x = BatchNorm(axis=-1, name=bn_name_base + '2c')(x)
 
@@ -181,8 +172,9 @@ def atrous_identity_block(input_tensor, kernel_size, filters, stage,
     x = KL.Activation('relu')(x)
     return x
 
-def atrous_conv_block(input_tensor, kernel_size, filters, stage, 
-                     block, strides=(1, 1), atrous_rate=(2, 2), use_bias=True, roi_res=False):
+
+def atrous_conv_block(input_tensor, kernel_size, filters, stage,
+                      block, strides=(1, 1), atrous_rate=(2, 2), use_bias=True, roi_res=False):
     '''conv_block is the block that has a conv layer at shortcut
     # Arguments
         kernel_size: defualt 3, the kernel size of middle conv layer at main path
@@ -198,28 +190,28 @@ def atrous_conv_block(input_tensor, kernel_size, filters, stage,
         conv_name_base = 'mrcnn_mask_' + conv_name_base
         bn_name_base = 'mrcnn_mask_' + bn_name_base
 
-
-    x = KL.Conv2D(nb_filter1, (1, 1), strides=strides, 
+    x = KL.Conv2D(nb_filter1, (1, 1), strides=strides,
                   name=conv_name_base + '2a', use_bias=use_bias)(input_tensor)
     x = BatchNorm(axis=-1, name=bn_name_base + '2a')(x)
     x = KL.Activation('relu')(x)
 
-    x = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), padding='same', dilation_rate=atrous_rate, 
+    x = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), padding='same', dilation_rate=atrous_rate,
                   name=conv_name_base + '2b', use_bias=use_bias)(x)
     x = BatchNorm(axis=-1, name=bn_name_base + '2b')(x)
     x = KL.Activation('relu')(x)
 
-    x = KL.Conv2D(nb_filter3, (1, 1), name=conv_name_base + '2c',  
+    x = KL.Conv2D(nb_filter3, (1, 1), name=conv_name_base + '2c',
                   use_bias=use_bias)(x)
     x = BatchNorm(axis=-1, name=bn_name_base + '2c')(x)
 
-    shortcut = KL.Conv2D(nb_filter3, (1, 1), strides=strides,  
-                        name=conv_name_base + '1', use_bias=use_bias)(input_tensor)
+    shortcut = KL.Conv2D(nb_filter3, (1, 1), strides=strides,
+                         name=conv_name_base + '1', use_bias=use_bias)(input_tensor)
     shortcut = BatchNorm(axis=-1, name=bn_name_base + '1')(shortcut)
 
     x = KL.Add()([x, shortcut])
     x = KL.Activation('relu')(x)
     return x
+
 
 def deeplab_resnet(img_input, architecture):
     """
@@ -228,8 +220,8 @@ def deeplab_resnet(img_input, architecture):
 
     # Stage 1
     x = KL.ZeroPadding2D((3, 3))(img_input)
-    x = KL.Conv2D(64, (7, 7), strides=(2, 2), 
-        name='conv1', use_bias=False)(x)
+    x = KL.Conv2D(64, (7, 7), strides=(2, 2),
+                  name='conv1', use_bias=False)(x)
     x = BatchNorm(axis=-1, name='bn_conv1')(x)
     x = KL.Activation('relu')(x)
     C1 = x = KL.MaxPooling2D((3, 3), strides=(2, 2), padding="same")(x)
@@ -246,8 +238,8 @@ def deeplab_resnet(img_input, architecture):
     # Stage 4
     x = conv_block(x, 3, [256, 256, 1024], stage=4, block='a', use_bias=False)
     block_count = {"resnet50": 5, "resnet101": 22}[architecture]
-    for i in range(1, block_count+1):
-        x = identity_block(x, 3, [256, 256, 1024], stage=4, block='b%d'%i, use_bias=False)
+    for i in range(1, block_count + 1):
+        x = identity_block(x, 3, [256, 256, 1024], stage=4, block='b%d' % i, use_bias=False)
     C4 = x
     # Stage 5
     x = atrous_conv_block(x, 3, [512, 512, 2048], stage=5, block='a', atrous_rate=(2, 2), use_bias=False)
@@ -255,6 +247,7 @@ def deeplab_resnet(img_input, architecture):
     C5 = x = atrous_identity_block(x, 3, [512, 512, 2048], stage=5, block='c', atrous_rate=(2, 2), use_bias=False)
 
     return [C1, C5]
+
 
 ############################################################
 #  Proposal Layer
@@ -341,28 +334,28 @@ class ProposalLayer(KE.Layer):
         pre_nms_limit = min(self.pre_proposal_count, self.anchors.shape[0])
         ix = tf.nn.top_k(scores, pre_nms_limit, sorted=True,
                          name="top_anchors").indices
-        scores = utils.batch_slice([scores, ix], lambda x, y: tf.gather(x, y),
-                                   self.config.IMAGES_PER_GPU)
-        deltas = utils.batch_slice([deltas, ix], lambda x, y: tf.gather(x, y),
-                                   self.config.IMAGES_PER_GPU)
-        anchors = utils.batch_slice(ix, lambda x: tf.gather(anchors, x),
-                                    self.config.IMAGES_PER_GPU,
-                                    names=["pre_nms_anchors"])
+        scores = util.batch_slice([scores, ix], lambda x, y: tf.gather(x, y),
+                                  self.config.IMAGES_PER_GPU)
+        deltas = util.batch_slice([deltas, ix], lambda x, y: tf.gather(x, y),
+                                  self.config.IMAGES_PER_GPU)
+        anchors = util.batch_slice(ix, lambda x: tf.gather(anchors, x),
+                                   self.config.IMAGES_PER_GPU,
+                                   names=["pre_nms_anchors"])
 
         # Apply deltas to anchors to get refined anchors.
         # [batch, N, (y1, x1, y2, x2)]
-        boxes = utils.batch_slice([anchors, deltas],
-                                  lambda x, y: apply_box_deltas_graph(x, y),
-                                  self.config.IMAGES_PER_GPU,
-                                  names=["refined_anchors"])
+        boxes = util.batch_slice([anchors, deltas],
+                                 lambda x, y: apply_box_deltas_graph(x, y),
+                                 self.config.IMAGES_PER_GPU,
+                                 names=["refined_anchors"])
 
         # Clip to image boundaries. [batch, N, (y1, x1, y2, x2)]
         height, width = self.config.IMAGE_SHAPE[:2]
         window = np.array([0, 0, height, width]).astype(np.float32)
-        boxes = utils.batch_slice(boxes,
-                                  lambda x: clip_boxes_graph(x, window),
-                                  self.config.IMAGES_PER_GPU,
-                                  names=["refined_anchors_clipped"])
+        boxes = util.batch_slice(boxes,
+                                 lambda x: clip_boxes_graph(x, window),
+                                 self.config.IMAGES_PER_GPU,
+                                 names=["refined_anchors_clipped"])
 
         # Filter out small boxes
         # According to Xinlei Chen's paper, this reduces detection accuracy
@@ -381,8 +374,9 @@ class ProposalLayer(KE.Layer):
             padding = tf.maximum(self.proposal_count - tf.shape(proposals)[0], 0)
             proposals = tf.pad(proposals, [(0, padding), (0, 0)])
             return proposals
-        proposals = utils.batch_slice([normalized_boxes, scores], nms,
-                                      self.config.IMAGES_PER_GPU)
+
+        proposals = util.batch_slice([normalized_boxes, scores], nms,
+                                     self.config.IMAGES_PER_GPU)
         return proposals
 
     def compute_output_shape(self, input_shape):
@@ -396,6 +390,7 @@ class ProposalLayer(KE.Layer):
 def log2_graph(x):
     """Implementatin of Log2. TF doesn't have a native implemenation."""
     return tf.log(x) / tf.log(2.0)
+
 
 def roi_crop_and_resize(image, boxes, box_ind, crop_shape):
     """
@@ -465,9 +460,10 @@ def roi_align_graph(featuremap, boxes, box_inds, output_shape):
     ret = roi_crop_and_resize(
         featuremap, boxes,
         box_inds,
-        [output_shape[0]*2, output_shape[1]*2])
+        [output_shape[0] * 2, output_shape[1] * 2])
     ret = tf.nn.avg_pool(ret, [1, 2, 2, 1], [1, 2, 2, 1], padding='SAME')
     return ret
+
 
 class PyramidROIAlign(KE.Layer):
     """Implements ROI Pooling on multiple levels of the feature pyramid.
@@ -561,7 +557,8 @@ class PyramidROIAlign(KE.Layer):
         return pooled
 
     def compute_output_shape(self, input_shape):
-        return input_shape[0][:2] + self.pool_shape + (input_shape[1][-1], )
+        return input_shape[0][:2] + self.pool_shape + (input_shape[1][-1],)
+
 
 class ROIAlign(KE.Layer):
     """Implements ROI Pooling on multiple levels of the feature pyramid.
@@ -612,7 +609,8 @@ class ROIAlign(KE.Layer):
         return pooled
 
     def compute_output_shape(self, input_shape):
-        return input_shape[0][0:2] + self.pool_shape + (input_shape[1][-1], )
+        return input_shape[0][0:2] + self.pool_shape + (input_shape[1][-1],)
+
 
 ############################################################
 #  Detection Target Layer
@@ -693,7 +691,7 @@ def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config)
     # 1. Positive ROIs are those with >= 0.5 IoU with a GT box
     positive_roi_bool = (roi_iou_max >= 0.5)
     positive_indices = tf.where(positive_roi_bool)[:, 0]
-    
+
     # 2. Negative ROIs are those with < 0.5 with every GT box. Skip crowds.
     negative_indices = tf.where(roi_iou_max < 0.5)[:, 0]
 
@@ -718,7 +716,7 @@ def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config)
     roi_gt_class_ids = tf.gather(gt_class_ids, roi_gt_box_assignment)
 
     # Compute bbox refinement for positive ROIs
-    deltas = utils.box_refinement_graph(positive_rois, roi_gt_boxes)
+    deltas = util.box_refinement_graph(positive_rois, roi_gt_boxes)
     deltas /= config.BBOX_STD_DEV
 
     # Assign positive ROIs to GT masks
@@ -806,7 +804,7 @@ class DetectionTargetLayer(KE.Layer):
         # Slice the batch and run a graph for each slice
         # TODO: Rename target_bbox to target_deltas for clarity
         names = ["rois", "target_class_ids", "target_bbox", "target_mask"]
-        outputs = utils.batch_slice(
+        outputs = util.batch_slice(
             [proposals, gt_class_ids, gt_boxes, gt_masks],
             lambda w, x, y, z: detection_targets_graph(
                 w, x, y, z, self.config),
@@ -864,7 +862,7 @@ def refine_detections(rois, probs, deltas, window, config):
     deltas_specific = deltas[np.arange(deltas.shape[0]), class_ids]
     # Apply bounding box deltas
     # Shape: [boxes, (y1, x1, y2, x2)] in normalized coordinates
-    refined_rois = utils.apply_box_deltas(
+    refined_rois = util.apply_box_deltas(
         rois, deltas_specific * config.BBOX_STD_DEV)
     # Convert coordiates to image domain
     # TODO: better to keep them normalized until later
@@ -893,7 +891,7 @@ def refine_detections(rois, probs, deltas, window, config):
         # Pick detections of this class
         ixs = np.where(pre_nms_class_ids == class_id)[0]
         # Apply NMS
-        class_keep = utils.non_max_suppression(
+        class_keep = util.non_max_suppression(
             pre_nms_rois[ixs], pre_nms_scores[ixs],
             config.DETECTION_NMS_THRESHOLD)
         # Map indicies
@@ -1048,7 +1046,7 @@ def fpn_classifier_graph(rois, feature_map,
     # ROI Pooling
     # Shape: [batch_size, num_boxes, pool_height, pool_width, channels]
     x = ROIAlign([pool_size, pool_size], image_shape,
-                        name="roi_align_classifier")([rois, feature_map])
+                 name="roi_align_classifier")([rois, feature_map])
 
     # Two 1024 FC layers (implemented with Conv2D for consistency)
     x = KL.TimeDistributed(KL.Conv2D(1024, (pool_size, pool_size), padding="valid"),
@@ -1094,7 +1092,7 @@ def build_fpn_mask_graph(rois, feature_map,
     # ROI Pooling
     # Shape: [batch_size, num_boxes, pool_height, pool_width, channels]
     x = ROIAlign([pool_size, pool_size], image_shape,
-                        name="roi_align_mask")([rois, feature_map])
+                 name="roi_align_mask")([rois, feature_map])
 
     # Conv layers
     x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"),
@@ -1127,98 +1125,101 @@ def build_fpn_mask_graph(rois, feature_map,
                            name="mrcnn_mask_pascal")(x)
 
     conv4_fc = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"),
-                           name="mrcnn_mask_conv4_fc")(conv3)
+                                  name="mrcnn_mask_conv4_fc")(conv3)
     conv4_fc = KL.TimeDistributed(BatchNorm(axis=3),
-                           name='mrcnn_mask_bn4_fc')(conv4_fc)
+                                  name='mrcnn_mask_bn4_fc')(conv4_fc)
     conv4_fc = KL.Activation('relu')(conv4_fc)
     conv5_fc = KL.TimeDistributed(KL.Conv2D(128, (3, 3), padding="same"),
-                           name="mrcnn_mask_conv5_fc")(conv4_fc)
+                                  name="mrcnn_mask_conv5_fc")(conv4_fc)
     conv5_fc = KL.TimeDistributed(BatchNorm(axis=3),
-                           name='mrcnn_mask_bn5_fc')(conv5_fc)
+                                  name='mrcnn_mask_bn5_fc')(conv5_fc)
     conv5_fc = KL.Activation('relu')(conv5_fc)
 
-    fc = KL.TimeDistributed(KL.Conv2D(784*num_classes, (pool_size, pool_size), name="mrcnn_mask_fc"))(conv5_fc)
+    fc = KL.TimeDistributed(KL.Conv2D(784 * num_classes, (pool_size, pool_size), name="mrcnn_mask_fc"))(conv5_fc)
 
     x1 = KL.Lambda(lambda x: tf.reshape(x[0], tf.shape(x[1])))([fc, x])
 
     final_mask = KL.Add()([x, x1])
     return final_mask
 
+
 def arbitrary_size_pooling(feature_map):
-    b1 = tf.reduce_mean(feature_map, axis = 1, keep_dims=True)
-    b2 = tf.reduce_mean(b1, axis = 2, keep_dims=True)
+    b1 = tf.reduce_mean(feature_map, axis=1, keep_dims=True)
+    b2 = tf.reduce_mean(b1, axis=2, keep_dims=True)
     return b2
 
-def global_parsing_encoder(feature_map):
 
-    x1 = KL.Conv2D(256, (1, 1), padding='same', 
-                      name='mrcnn_global_parsing_encoder_c1')(feature_map)
+def global_parsing_encoder(feature_map):
+    x1 = KL.Conv2D(256, (1, 1), padding='same',
+                   name='mrcnn_global_parsing_encoder_c1')(feature_map)
     # x1 = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn1')(x1)
     x1 = KL.Activation('relu')(x1)
 
-    x2 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(6, 6), 
-                      name='mrcnn_global_parsing_encoder_c2')(feature_map)
+    x2 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(6, 6),
+                   name='mrcnn_global_parsing_encoder_c2')(feature_map)
     # x2 = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn2')(x2)
     x2 = KL.Activation('relu')(x2)
 
-    x3 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(12, 12), 
-                      name='mrcnn_global_parsing_encoder_c3')(feature_map)
+    x3 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(12, 12),
+                   name='mrcnn_global_parsing_encoder_c3')(feature_map)
     # x3 = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn3')(x3)
     x3 = KL.Activation('relu')(x3)
 
-    x4 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(18, 18), 
-                      name='mrcnn_global_parsing_encoder_c4')(feature_map)
+    x4 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(18, 18),
+                   name='mrcnn_global_parsing_encoder_c4')(feature_map)
     # x4 = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn4')(x4)
     x4 = KL.Activation('relu')(x4)
 
     x0 = KL.Lambda(lambda x: arbitrary_size_pooling(x))(feature_map)
-    x0 = KL.Conv2D(256, (1, 1), padding='same', 
-                      name='mrcnn_global_parsing_encoder_c0')(x0)
+    x0 = KL.Conv2D(256, (1, 1), padding='same',
+                   name='mrcnn_global_parsing_encoder_c0')(x0)
     # x0 = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn0')(x0)
     x0 = KL.Activation('relu')(x0)
     x0 = KL.Lambda(lambda x: tf.image.resize_bilinear(
-              x[0], tf.shape(x[1])[1:3], align_corners=True))([x0, feature_map])
+        x[0], tf.shape(x[1])[1:3], align_corners=True))([x0, feature_map])
 
     x = KL.Lambda(lambda x: tf.concat(x, axis=-1))([x0, x1, x2, x3, x4])
-    x = KL.Conv2D(256, (1, 1), padding='same', 
-                      name='mrcnn_global_parsing_encoder_conconv')(x)
+    x = KL.Conv2D(256, (1, 1), padding='same',
+                  name='mrcnn_global_parsing_encoder_conconv')(x)
     # x = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn')(x)
     x = KL.Activation('relu')(x)
 
     return x
 
+
 def global_parsing_decoder(feature_map, low_feature_map):
     # navie upsample from 1/16(32) to 1/4(128), fit the low_feature_map
     top = KL.Lambda(lambda x: tf.image.resize_bilinear(
-              x[0], tf.shape(x[1])[1:3], align_corners=True))([feature_map, low_feature_map])
+        x[0], tf.shape(x[1])[1:3], align_corners=True))([feature_map, low_feature_map])
     # low dim of low_feature_map by 1*1 conv
     low = KL.Conv2D(48, (1, 1), padding='same',
-              name='mrcnn_global_parsing_decoder_conv1')(low_feature_map)
+                    name='mrcnn_global_parsing_decoder_conv1')(low_feature_map)
     low = KL.Activation('relu')(low)
 
     # x = KL.Concatenate(axis=-1)([top, low])
     x = KL.Lambda(lambda x: tf.concat(x, axis=-1))([top, low])
     x = KL.Conv2D(256, (3, 3), padding='same',
-              name='mrcnn_global_parsing_decoder_conv2')(x)
+                  name='mrcnn_global_parsing_decoder_conv2')(x)
     x = KL.Activation('relu')(x)
     x = KL.Conv2D(256, (3, 3), padding='same',
-              name='mrcnn_global_parsing_decoder_conv3')(x)
+                  name='mrcnn_global_parsing_decoder_conv3')(x)
     x = KL.Activation('relu')(x)
     return x
-    
+
+
 def global_parsing_graph(feature_map, num_classes):
+    x1 = KL.Conv2D(num_classes, (3, 3), padding='same', dilation_rate=(6, 6),
+                   name='mrcnn_global_parsing_c1')(feature_map)
 
-    x1 = KL.Conv2D(num_classes, (3, 3), padding='same', dilation_rate=(6, 6), 
-                      name='mrcnn_global_parsing_c1')(feature_map)
+    x2 = KL.Conv2D(num_classes, (3, 3), padding='same', dilation_rate=(12, 12),
+                   name='mrcnn_global_parsing_c2')(feature_map)
 
-    x2 = KL.Conv2D(num_classes, (3, 3), padding='same', dilation_rate=(12, 12), 
-                      name='mrcnn_global_parsing_c2')(feature_map)
-
-    x3 = KL.Conv2D(num_classes, (3, 3), padding='same', dilation_rate=(18, 18), 
-                      name='mrcnn_global_parsing_c3')(feature_map)
+    x3 = KL.Conv2D(num_classes, (3, 3), padding='same', dilation_rate=(18, 18),
+                   name='mrcnn_global_parsing_c3')(feature_map)
 
     x = KL.Add()([x1, x2, x3])
     return x
+
 
 ############################################################
 #  Loss Functions
@@ -1230,7 +1231,7 @@ def smooth_l1_loss(y_true, y_pred):
     """
     diff = K.abs(y_true - y_pred)
     less_than_one = K.cast(K.less(diff, 1.0), "float32")
-    loss = (less_than_one * 0.5 * diff**2) + (1 - less_than_one) * (diff - 0.5)
+    loss = (less_than_one * 0.5 * diff ** 2) + (1 - less_than_one) * (diff - 0.5)
     return loss
 
 
@@ -1286,7 +1287,7 @@ def rpn_bbox_loss_graph(config, target_bbox, rpn_match, rpn_bbox):
     #       to reduce code duplication
     diff = K.abs(target_bbox - rpn_bbox)
     less_than_one = K.cast(K.less(diff, 1.0), "float32")
-    loss = (less_than_one * 0.5 * diff**2) + (1 - less_than_one) * (diff - 0.5)
+    loss = (less_than_one * 0.5 * diff ** 2) + (1 - less_than_one) * (diff - 0.5)
 
     loss = K.switch(tf.size(loss) > 0, K.mean(loss), tf.constant(0.0))
     return loss
@@ -1396,6 +1397,7 @@ def mrcnn_mask_loss_graph(target_masks, target_class_ids, pred_masks):
     loss = K.reshape(loss, [1, 1])
     return loss
 
+
 def mrcnn_global_parsing_loss_graph(num_classes, gt_parsing_map, predict_parsing_map):
     """
     gt_parsing_map: [batch, image_height, image_width] of uint8
@@ -1407,8 +1409,8 @@ def mrcnn_global_parsing_loss_graph(num_classes, gt_parsing_map, predict_parsing
     pred_shape = tf.shape(predict_parsing_map)
 
     raw_gt = tf.expand_dims(gt_parsing_map, -1)
-    #raw_gt = tf.image.resize_nearest_neighbor(raw_gt, pred_shape[1:3])
-    raw_gt = tf.reshape(raw_gt, [-1,])
+    # raw_gt = tf.image.resize_nearest_neighbor(raw_gt, pred_shape[1:3])
+    raw_gt = tf.reshape(raw_gt, [-1, ])
     raw_gt = tf.cast(raw_gt, tf.int32)
 
     raw_prediction = tf.reshape(predict_parsing_map, [-1, pred_shape[-1]])
@@ -1419,14 +1421,14 @@ def mrcnn_global_parsing_loss_graph(num_classes, gt_parsing_map, predict_parsing
     prediction = tf.gather(raw_prediction, indices)
 
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                        labels=gt, logits=prediction)
+        labels=gt, logits=prediction)
     loss = tf.reduce_mean(loss)
     loss = tf.reshape(loss, [1, 1])
     return loss
 
 
 def post_processing_graph(parts, input_image):
-    parts = tf.image.resize_bilinear(parts, tf.shape(input_image)[1:3,])
+    parts = tf.image.resize_bilinear(parts, tf.shape(input_image)[1:3, ])
     parts = tf.nn.softmax(parts)
     return parts
 
@@ -1460,13 +1462,13 @@ def load_image_gt(dataset, config, image_id, augment=False,
     part_rev = dataset.load_reverse_part(image_id)
     shape = image.shape
 
-    image, window, scale, padding = utils.resize_image(
+    image, window, scale, padding = util.resize_image(
         image,
         max_dim=config.IMAGE_MAX_DIM,
         padding=config.IMAGE_PADDING)
-    mask = utils.resize_mask(mask, scale, padding)
-    part = utils.resize_part(part, scale, padding[:2])
-    part_rev = utils.resize_part(part_rev, scale, padding[:2])
+    mask = util.resize_mask(mask, scale, padding)
+    part = util.resize_part(part, scale, padding[:2])
+    part_rev = util.resize_part(part_rev, scale, padding[:2])
     # Random horizontal flips.
     if augment:
         if random.randint(0, 1):
@@ -1478,7 +1480,7 @@ def load_image_gt(dataset, config, image_id, augment=False,
     # Bounding boxes. Note that some boxes might be all zeros
     # if the corresponding mask got cropped out.
     # bbox: [num_instances, (y1, x1, y2, x2)]
-    bbox = utils.extract_bboxes(mask)
+    bbox = util.extract_bboxes(mask)
 
     # Active classes
     # Different datasets have different classes, so track the
@@ -1489,11 +1491,12 @@ def load_image_gt(dataset, config, image_id, augment=False,
 
     # Resize masks to smaller size to reduce memory usage
     if use_mini_mask:
-        mask = utils.minimize_mask(bbox, mask, config.MINI_MASK_SHAPE)
+        mask = util.minimize_mask(bbox, mask, config.MINI_MASK_SHAPE)
 
     # Image meta data
     image_meta = compose_image_meta(image_id, shape, window, active_class_ids)
     return image, image_meta, class_ids, bbox, mask, part
+
 
 def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
     """Given the anchors and GT boxes, compute overlaps and identify positive
@@ -1513,9 +1516,8 @@ def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
     # RPN bounding boxes: [max anchors per image, (dy, dx, log(dh), log(dw))]
     rpn_bbox = np.zeros((config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4))
 
-
     # Compute overlaps [num_anchors, num_gt_boxes]
-    overlaps = utils.compute_overlaps(anchors, gt_boxes)
+    overlaps = util.compute_overlaps(anchors, gt_boxes)
 
     # Match anchors to GT Boxes
     # If an anchor overlaps a GT box with IoU >= 0.7 then it's positive.
@@ -1588,6 +1590,7 @@ def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
 
     return rpn_match, rpn_bbox
 
+
 def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
                    batch_size=1, detection_targets=False):
     """A generator that returns images and corresponding target class ids,
@@ -1633,11 +1636,11 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
 
     # Anchors
     # [anchor_count, (y1, x1, y2, x2)]
-    anchors = utils.generate_anchors(config.RPN_ANCHOR_SCALES,
-                                     config.RPN_ANCHOR_RATIOS,
-                                     config.BACKBONE_SHAPES[0],
-                                     config.BACKBONE_STRIDES[0],
-                                     config.RPN_ANCHOR_STRIDE)
+    anchors = util.generate_anchors(config.RPN_ANCHOR_SCALES,
+                                    config.RPN_ANCHOR_RATIOS,
+                                    config.BACKBONE_SHAPES[0],
+                                    config.BACKBONE_STRIDES[0],
+                                    config.RPN_ANCHOR_STRIDE)
 
     # Keras requires a generator to run indefinately.
     while True:
@@ -1667,7 +1670,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
                 rpn_rois = generate_random_rois(
                     image.shape, random_rois, gt_class_ids, gt_boxes)
                 if detection_targets:
-                    rois, mrcnn_class_ids, mrcnn_bbox, mrcnn_mask, mrcnn_part =\
+                    rois, mrcnn_class_ids, mrcnn_bbox, mrcnn_mask, mrcnn_part = \
                         build_detection_targets(
                             rpn_rois, gt_class_ids, gt_boxes, gt_masks, gt_parts, config)
 
@@ -1794,7 +1797,7 @@ class PARSING_RCNN():
 
         # Image size must be dividable by 2 multiple times
         h, w = config.IMAGE_SHAPE[:2]
-        if h / 2**4 != int(h / 2**4) or w / 2**4 != int(w / 2**4):
+        if h / 2 ** 4 != int(h / 2 ** 4) or w / 2 ** 4 != int(w / 2 ** 4):
             raise Exception("Image size must be dividable by 2 at least 4 times "
                             "to avoid fractions when downscaling and upscaling.")
 
@@ -1834,8 +1837,8 @@ class PARSING_RCNN():
                     name="input_gt_masks", dtype=bool)
             # 4. GT Part
             input_gt_part = KL.Input(
-                    shape=[config.IMAGE_SHAPE[0], config.IMAGE_SHAPE[1]],
-                    name="input_gt_part", dtype=tf.uint8)
+                shape=[config.IMAGE_SHAPE[0], config.IMAGE_SHAPE[1]],
+                name="input_gt_part", dtype=tf.uint8)
 
         # Build the shared convolutional layers.
         # Bottom-up Layers
@@ -1847,34 +1850,34 @@ class PARSING_RCNN():
         # global parsing branch
         global_parsing_map = global_parsing_graph(fine_feature, config.NUM_PART_CLASS)
 
-        rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same', 
-            name='mrcnn_share_rpn_conv1')(fine_feature)
-        rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same', 
-            name='mrcnn_share_rpn_conv2')(rpn_feature_map)
+        rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
+                                    name='mrcnn_share_rpn_conv1')(fine_feature)
+        rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
+                                    name='mrcnn_share_rpn_conv2')(rpn_feature_map)
 
-        mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same', 
-            name='mrcnn_share_recog_conv1')(fine_feature)
-        mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same', 
-            name='mrcnn_share_recog_conv2')(mrcnn_feature_map)
+        mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
+                                      name='mrcnn_share_recog_conv1')(fine_feature)
+        mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
+                                      name='mrcnn_share_recog_conv2')(mrcnn_feature_map)
 
         # Generate Anchors
-        self.anchors = utils.generate_anchors(config.RPN_ANCHOR_SCALES,
+        self.anchors = util.generate_anchors(config.RPN_ANCHOR_SCALES,
                                              config.RPN_ANCHOR_RATIOS,
                                              config.BACKBONE_SHAPES[0],
                                              config.BACKBONE_STRIDES[0],
                                              config.RPN_ANCHOR_STRIDE)
 
         # RPN Model
-        rpn_class_logits, rpn_class, rpn_bbox = rpn_graph(rpn_feature_map, 
-                                                    len(config.RPN_ANCHOR_RATIOS) * len(config.RPN_ANCHOR_SCALES),
-                                                    config.RPN_ANCHOR_STRIDE)
+        rpn_class_logits, rpn_class, rpn_bbox = rpn_graph(rpn_feature_map,
+                                                          len(config.RPN_ANCHOR_RATIOS) * len(config.RPN_ANCHOR_SCALES),
+                                                          config.RPN_ANCHOR_STRIDE)
 
         # Generate proposals
         # Proposals are [batch, N, (y1, x1, y2, x2)] in normalized coordinates
         # and zero padded.
-        proposal_count = config.POST_NMS_ROIS_TRAINING if mode == "training"\
+        proposal_count = config.POST_NMS_ROIS_TRAINING if mode == "training" \
             else config.POST_NMS_ROIS_INFERENCE
-        pre_proposal_count = config.PRE_NMS_ROIS_TRAINING if mode == "training"\
+        pre_proposal_count = config.PRE_NMS_ROIS_TRAINING if mode == "training" \
             else config.PRE_NMS_ROIS_INFERENCE
         rpn_rois = ProposalLayer(proposal_count=proposal_count,
                                  pre_proposal_count=pre_proposal_count,
@@ -1895,13 +1898,13 @@ class PARSING_RCNN():
             # Subsamples proposals and generates target outputs for training
             # Note that proposal class IDs, gt_boxes, and gt_masks are zero
             # padded. Equally, returned rois and targets are zero padded.
-            rois, target_class_ids, target_bbox, target_mask =\
+            rois, target_class_ids, target_bbox, target_mask = \
                 DetectionTargetLayer(config, name="proposal_targets")([
                     target_rois, input_gt_class_ids, gt_boxes, input_gt_masks])
 
             # Network Heads
             # TODO: verify that this handles zero padded ROIs
-            mrcnn_class_logits, mrcnn_class, mrcnn_bbox =\
+            mrcnn_class_logits, mrcnn_class, mrcnn_bbox = \
                 fpn_classifier_graph(rois, mrcnn_feature_map, config.IMAGE_SHAPE,
                                      config.POOL_SIZE, config.NUM_CLASSES)
 
@@ -1913,7 +1916,8 @@ class PARSING_RCNN():
             # TODO: clean up (use tf.identify if necessary)
             output_rois = KL.Lambda(lambda x: x * 1, name="output_rois")(rois)
 
-            global_parsing_loss = KL.Lambda(lambda x: mrcnn_global_parsing_loss_graph(config.NUM_PART_CLASS, *x), name="mrcnn_global_parsing_loss")(
+            global_parsing_loss = KL.Lambda(lambda x: mrcnn_global_parsing_loss_graph(config.NUM_PART_CLASS, *x),
+                                            name="mrcnn_global_parsing_loss")(
                 [input_gt_part, global_parsing_map])
 
             # Losses
@@ -1930,19 +1934,20 @@ class PARSING_RCNN():
 
             # Model
             inputs = [input_image, input_image_meta,
-                      input_rpn_match, input_rpn_bbox, input_gt_class_ids, input_gt_boxes, input_gt_masks, input_gt_part]
+                      input_rpn_match, input_rpn_bbox, input_gt_class_ids, input_gt_boxes, input_gt_masks,
+                      input_gt_part]
             if not config.USE_RPN_ROIS:
                 inputs.append(input_rois)
             outputs = [rpn_class_logits, rpn_class, rpn_bbox,
                        mrcnn_class_logits, mrcnn_class, mrcnn_bbox, mrcnn_mask,
                        rpn_rois, output_rois,
-                       rpn_class_loss, rpn_bbox_loss, class_loss, bbox_loss, mask_loss, 
+                       rpn_class_loss, rpn_bbox_loss, class_loss, bbox_loss, mask_loss,
                        global_parsing_loss]
             model = KM.Model(inputs, outputs, name='parsing_rcnn')
         else:
             # Network Heads
             # Proposal classifier and BBox regressor heads
-            mrcnn_class_logits, mrcnn_class, mrcnn_bbox =\
+            mrcnn_class_logits, mrcnn_class, mrcnn_bbox = \
                 fpn_classifier_graph(rpn_rois, mrcnn_feature_map, config.IMAGE_SHAPE,
                                      config.POOL_SIZE, config.NUM_CLASSES)
 
@@ -1964,21 +1969,25 @@ class PARSING_RCNN():
                                               config.MASK_POOL_SIZE,
                                               config.NUM_CLASSES)
 
-
             # global parsing branch
             global_parsing_prob = KL.Lambda(lambda x: post_processing_graph(*x))([global_parsing_map, input_image])
 
-
             model = KM.Model([input_image, input_image_meta],
                              [detections, mrcnn_class, mrcnn_bbox,
-                                 mrcnn_mask, rpn_rois, rpn_class, rpn_bbox, global_parsing_prob],
+                              mrcnn_mask, rpn_rois, rpn_class, rpn_bbox, global_parsing_prob],
                              name='parsing_rcnn')
 
         # Add multi-GPU support.
         if config.GPU_COUNT > 1:
-            from parallel_model import ParallelModel
+            from utils.parallel_model import ParallelModel
             model = ParallelModel(model, config.GPU_COUNT)
-
+        import platform
+        sys = platform.system()
+        if sys == "Windows":
+            if self.mode == "training":
+                plot_model(model, "aten_training.jpg")
+            else:
+                plot_model(model, "aten_inference.png")
         return model
 
     def find_last(self):
@@ -2013,8 +2022,11 @@ class PARSING_RCNN():
         exlude: list of layer names to excluce
         """
         import h5py
-        from keras.engine import topology
-
+        import keras
+        if keras.__version__ > "2.1.3":
+            from keras.engine import saving as s
+        else:
+            from keras.engine import topology as s
         if exclude_pattern:
             by_name = True
 
@@ -2027,27 +2039,25 @@ class PARSING_RCNN():
         # In multi-GPU training, we wrap the model. Get layers
         # of the inner model because they have the weights.
         keras_model = self.keras_model
-        layers = keras_model.inner_model.layers if hasattr(keras_model, "inner_model")\
+        layers = keras_model.inner_model.layers if hasattr(keras_model, "inner_model") \
             else keras_model.layers
 
         # exclude some layers
         if exclude_pattern:
-            layers = filter(lambda l: exclude_pattern.match(l.name)==None, layers)
+            layers = filter(lambda l: exclude_pattern.match(l.name) == None, layers)
 
         layers_name = [l.name for l in layers]
         print("load model", filepath)
 
         if by_name:
-            topology.load_weights_from_hdf5_group_by_name(f, layers)
+            s.load_weights_from_hdf5_group_by_name(f, layers)
         else:
-            topology.load_weights_from_hdf5_group(f, layers)
+            s.load_weights_from_hdf5_group(f, layers)
         if hasattr(f, 'close'):
             f.close()
 
         # Update the log directory
         self.set_log_dir(filepath)
-
-
 
     def compile(self, learning_rate, momentum):
         """Gets the model ready for training. Adds losses, regularization, and
@@ -2061,7 +2071,7 @@ class PARSING_RCNN():
         self.keras_model._losses = []
         self.keras_model._per_input_losses = {}
         loss_names = ["rpn_class_loss", "rpn_bbox_loss",
-                      "mrcnn_class_loss", "mrcnn_bbox_loss", "mrcnn_mask_loss", 
+                      "mrcnn_class_loss", "mrcnn_bbox_loss", "mrcnn_mask_loss",
                       "mrcnn_global_parsing_loss"]
         for name in loss_names:
             layer = self.keras_model.get_layer(name)
@@ -2079,7 +2089,7 @@ class PARSING_RCNN():
 
         # Compile
         self.keras_model.compile(optimizer=optimizer, loss=[
-                                 None] * len(self.keras_model.outputs))
+                                                               None] * len(self.keras_model.outputs))
 
         # Add metrics for losses
         for name in loss_names:
@@ -2089,7 +2099,6 @@ class PARSING_RCNN():
             self.keras_model.metrics_names.append(name)
             self.keras_model.metrics_tensors.append(tf.reduce_mean(
                 layer.output, keep_dims=True))
-
 
     def set_trainable(self, layer_regex, keras_model=None, indent=0, verbose=1):
         """Sets model layers as trainable if their names match
@@ -2103,7 +2112,7 @@ class PARSING_RCNN():
 
         # In multi-GPU training, we wrap the model. Get layers
         # of the inner model because they have the weights.
-        layers = keras_model.inner_model.layers if hasattr(keras_model, "inner_model")\
+        layers = keras_model.inner_model.layers if hasattr(keras_model, "inner_model") \
             else keras_model.layers
 
         for layer in layers:
@@ -2153,14 +2162,24 @@ class PARSING_RCNN():
                 self.epoch = int(m.group(6)) + 1
 
         # Directory for training logs
-        self.log_dir = os.path.join(self.model_dir, "{}{:%Y%m%dT%H%M}".format(
-            self.config.NAME.lower(), now))
+        self.log_dir = os.path.join(self.model_dir, "{}".format(self.config.NAME.lower()))
 
         # Path to save after each epoch. Include placeholders that get filled by Keras.
-        self.checkpoint_path = os.path.join(self.log_dir, "parsing_rcnn_{}_*epoch*.h5".format(
-            self.config.NAME.lower()))
-        self.checkpoint_path = self.checkpoint_path.replace(
-            "*epoch*", "{epoch:04d}")
+        # self.checkpoint_path = os.path.join(self.log_dir, "checkpoints",
+        #                                     "parsing_rcnn_" + self.config.NAME.lower() +
+        #                                     "_epoch{epoch:03d}_loss{loss:.3f}_valloss{val_loss:.3f}.h5")
+        self.checkpoint_path = os.path.join(self.log_dir, "checkpoints",
+                                            "parsing_rcnn_" + self.config.NAME.lower() +
+                                            "_epoch{epoch:03d}.h5")
+        if not os.path.exists(os.path.dirname(self.checkpoint_path)):
+            os.makedirs(os.path.dirname(self.checkpoint_path))
+
+        self.log_path = os.path.join(self.log_dir, "logs", "parsing_rcnn_{}_{:%Y%m%dT%H%M}.csv".format(
+            self.config.NAME.lower(), now))
+        if not os.path.exists(os.path.dirname(self.log_path)):
+            os.makedirs(os.path.dirname(self.log_path))
+
+        self.tensorboard_dir = os.path.join(self.log_dir, "tensorboard")
 
     def train(self, train_dataset, val_dataset, learning_rate, epochs, layers, period):
         """Train the model.
@@ -2202,24 +2221,29 @@ class PARSING_RCNN():
 
         # Data generators
         print("get train generator")
-        train_generator = data_generator(train_dataset, self.config, shuffle=True, 
+        train_generator = data_generator(train_dataset, self.config, shuffle=True,
                                          batch_size=self.config.BATCH_SIZE)
         print("get val generator")
-        val_generator = data_generator(val_dataset, self.config, shuffle=True, 
+        val_generator = data_generator(val_dataset, self.config, shuffle=True,
                                        batch_size=self.config.BATCH_SIZE)
 
         # Callbacks
         callbacks = [
-            keras.callbacks.TensorBoard(log_dir=self.log_dir,
+            keras.callbacks.TensorBoard(log_dir=self.tensorboard_dir,
                                         histogram_freq=0, write_graph=True, write_images=False),
-            keras.callbacks.ModelCheckpoint(self.checkpoint_path, period=period,
-                                            verbose=0, save_weights_only=True),
+            # keras.callbacks.ModelCheckpoint(self.checkpoint_path, period=period,
+            #                                 verbose=0, save_weights_only=True),
+            keras.callbacks.ModelCheckpoint(self.checkpoint_path, verbose=0, save_best_only=True,
+                                            save_weights_only=True),
+            keras.callbacks.CSVLogger(self.log_path),
+            keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, verbose=1),
+            keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=12, verbose=1),
         ]
 
         # Train
         log("\nStarting at epoch {}. LR={}\n".format(self.epoch, learning_rate))
         log("Checkpoint Path: {}".format(self.checkpoint_path))
-        self.set_trainable(layers)
+        self.set_trainable(layers, verbose=0)
         self.compile(learning_rate, self.config.LEARNING_MOMENTUM)
 
         self.keras_model.fit_generator(
@@ -2230,15 +2254,11 @@ class PARSING_RCNN():
             callbacks=callbacks,
             validation_data=next(val_generator),
             validation_steps=self.config.VALIDATION_STEPS,
-            max_queue_size=100,
-            workers=max(self.config.BATCH_SIZE // 2, 2),
-            use_multiprocessing=True,
+            # max_queue_size=100,
+            # workers=max(self.config.BATCH_SIZE // 2, 2),
+            # use_multiprocessing=True,
         )
         self.epoch = max(self.epoch, epochs)
-
-
-
-
 
     def ancestor(self, tensor, name, checked=None):
         """Finds the ancestor of a TF tensor in the computation graph.
@@ -2307,7 +2327,7 @@ class PARSING_RCNN():
         for image in images:
             # Resize image to fit the model expected size
             # TODO: move resizing to mold_image()
-            molded_image, window, scale, padding = utils.resize_image(
+            molded_image, window, scale, padding = util.resize_image(
                 image,
                 min_dim=self.config.IMAGE_MIN_DIM,
                 max_dim=self.config.IMAGE_MAX_DIM,
@@ -2382,9 +2402,9 @@ class PARSING_RCNN():
         full_masks = []
         for i in range(N):
             # Convert neural network mask to full size mask
-            full_mask = utils.unmold_mask(masks[i], boxes[i], image_shape)
+            full_mask = util.unmold_mask(masks[i], boxes[i], image_shape)
             full_masks.append(full_mask)
-        full_masks = np.stack(full_masks, axis=-1)\
+        full_masks = np.stack(full_masks, axis=-1) \
             if full_masks else np.empty((0,) + masks.shape[1:3])
 
         global_parsing = mrcnn_global_parsing[window[0]:window[2], window[1]:window[3], :]
@@ -2418,13 +2438,13 @@ class PARSING_RCNN():
             log("image_metas", image_metas)
         # Run object detection
         detections, mrcnn_class, mrcnn_bbox, mrcnn_mask, \
-            rois, rpn_class, rpn_bbox, mrcnn_global_parsing_prob =\
+        rois, rpn_class, rpn_bbox, mrcnn_global_parsing_prob = \
             self.keras_model.predict([molded_images, image_metas], verbose=0)
         # Process detections
         results = []
         for i, image in enumerate(images):
-            final_rois, final_class_ids, final_scores, final_masks, final_globals =\
-                self.unmold_detections(detections[i], mrcnn_mask[i], mrcnn_global_parsing_prob[i], 
+            final_rois, final_class_ids, final_scores, final_masks, final_globals = \
+                self.unmold_detections(detections[i], mrcnn_mask[i], mrcnn_global_parsing_prob[i],
                                        image.shape, windows[i])
             results.append({
                 "rois": final_rois,
@@ -2434,7 +2454,6 @@ class PARSING_RCNN():
                 "global_parsing": final_globals
             })
         return results
-
 
 
 ############################################################
@@ -2454,9 +2473,9 @@ def compose_image_meta(image_id, image_shape, window, active_class_ids):
         where not all classes are present in all datasets.
     """
     meta = np.array(
-        [image_id] +            # size=1
-        list(image_shape) +     # size=3
-        list(window) +          # size=4 (y1, x1, y2, x2) in image cooredinates
+        [image_id] +  # size=1
+        list(image_shape) +  # size=3
+        list(window) +  # size=4 (y1, x1, y2, x2) in image cooredinates
         list(active_class_ids)  # size=num_classes
     )
     return meta
@@ -2469,7 +2488,7 @@ def parse_image_meta(meta):
     """
     image_id = meta[:, 0]
     image_shape = meta[:, 1:4]
-    window = meta[:, 4:8]   # (y1, x1, y2, x2) window of image in in pixels
+    window = meta[:, 4:8]  # (y1, x1, y2, x2) window of image in in pixels
     active_class_ids = meta[:, 8:]
     return image_id, image_shape, window, active_class_ids
 

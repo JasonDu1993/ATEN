@@ -73,21 +73,24 @@ def apply_mask(image, mask, color, alpha=0.5):
                                   image[:, :, c])
     return image
 
+
 def apply_parsing(image, part, color_map, alpha=0.7):
     """Apply the given parsing to the image.
     """
     assert image.shape[0] == part.shape[0] and image.shape[1] == part.shape[1]
     coordinates = np.where(part > 0)
     for i in range(len(coordinates[0])):
-        image[coordinates[0][i], coordinates[1][i], :] = color_map[part[coordinates[0][i], coordinates[1][i]]] * alpha + image[coordinates[0][i], coordinates[1][i], :] * (1 - alpha)
+        image[coordinates[0][i], coordinates[1][i], :] = color_map[part[
+            coordinates[0][i], coordinates[1][i]]] * alpha + image[coordinates[0][i], coordinates[1][i], :] * (
+        1 - alpha)
     return image
+
 
 def display_parsing(image, parsing, figsize=(16, 16), ax=None):
     """
     parsing: [height, width]
     figsize: (optional) the size of the image.
     """
-
 
     if not ax:
         _, ax = plt.subplots(1, figsize=figsize)
@@ -104,8 +107,9 @@ def display_parsing(image, parsing, figsize=(16, 16), ax=None):
     masked_image = image.astype(np.uint32).copy()
 
     masked_image = apply_parsing(masked_image, parsing, colors)
-    
+
     ax.imshow(masked_image.astype(np.uint8))
+
 
 def display_instances(image, boxes, masks, class_ids, class_names,
                       scores=None, title="",
@@ -178,21 +182,23 @@ def display_instances(image, boxes, masks, class_ids, class_names,
             ax.add_patch(p)
     ax.imshow(masked_image.astype(np.uint8))
 
+
 def get_color_map(n=256):
     color_map = np.zeros((n, 3))
     for i in range(n):
         r = b = g = 0
         cid = i
         for j in range(0, 8):
-            r = np.bitwise_or(r, np.left_shift(np.unpackbits(np.array([cid], dtype=np.uint8))[-1], 7-j))
-            g = np.bitwise_or(g, np.left_shift(np.unpackbits(np.array([cid], dtype=np.uint8))[-2], 7-j))
-            b = np.bitwise_or(b, np.left_shift(np.unpackbits(np.array([cid], dtype=np.uint8))[-3], 7-j))
+            r = np.bitwise_or(r, np.left_shift(np.unpackbits(np.array([cid], dtype=np.uint8))[-1], 7 - j))
+            g = np.bitwise_or(g, np.left_shift(np.unpackbits(np.array([cid], dtype=np.uint8))[-2], 7 - j))
+            b = np.bitwise_or(b, np.left_shift(np.unpackbits(np.array([cid], dtype=np.uint8))[-3], 7 - j))
             cid = np.right_shift(cid, 3)
 
         color_map[i][0] = r
         color_map[i][1] = g
         color_map[i][2] = b
     return color_map
+
 
 def write_global_result(res_dir, height, width, image_id, global_parsing_prob):
     """
@@ -211,15 +217,16 @@ def write_global_result(res_dir, height, width, image_id, global_parsing_prob):
     forground_map = (global_parsing > 0)
     global_parsing_max_prob = np.multiply(global_parsing_max_prob, forground_map)
 
-    global_parsing_map = np.zeros( (height, width, 3), dtype = np.uint8)
+    global_parsing_map = np.zeros((height, width, 3), dtype=np.uint8)
 
     coo = np.where(global_parsing > 0)
 
     for k in range(len(coo[0])):
         global_parsing_map[coo[0][k], coo[1][k], :] = c_map[global_parsing[coo[0][k], coo[1][k]]][::-1]
-    cv2.imwrite(os.path.join(res_dir, "color/global_%s.png"%image_id), global_parsing_map)
-    cv2.imwrite(os.path.join(res_dir, "gray/global_%s.png"%image_id), global_parsing)
+    cv2.imwrite(os.path.join(res_dir, "color/global_%s.png" % image_id), global_parsing_map)
+    cv2.imwrite(os.path.join(res_dir, "gray/global_%s.png" % image_id), global_parsing)
     return global_parsing, global_parsing_max_prob
+
 
 def write_inst_result(res_dir, height, width, image_id, boxes, masks, scores, nms_like_thre=0.7):
     """
@@ -235,11 +242,11 @@ def write_inst_result(res_dir, height, width, image_id, boxes, masks, scores, nm
     c_map = get_color_map()
     masks = np.transpose(masks, (2, 0, 1))
     N = boxes.shape[0]
-    color_map = np.zeros( (height, width, 3), dtype=np.uint8)
-    gray_map = np.zeros( (height, width), dtype = np.uint8)
+    color_map = np.zeros((height, width, 3), dtype=np.uint8)
+    gray_map = np.zeros((height, width), dtype=np.uint8)
     inst_count = 1
     scores_boxes = []
-    wfp = open(os.path.join(res_dir, 'gray', 'scores_%s.txt'%image_id), 'w')
+    wfp = open(os.path.join(res_dir, 'gray', 'scores_%s.txt' % image_id), 'w')
     for i in range(N):
         mask = masks[i]
         box = boxes[i]
@@ -259,17 +266,19 @@ def write_inst_result(res_dir, height, width, image_id, boxes, masks, scores, nm
 
         # write score and bbox
         scores_boxes.append([score, box[0], box[1], box[2], box[3]])
-        wfp.write('%f %d %d %d %d\n'%(score, box[0], box[1], box[2], box[3]))
+        wfp.write('%f %d %d %d %d\n' % (score, box[0], box[1], box[2], box[3]))
         for k in range(len(coo[0])):
             gray_map[coo[0][k], coo[1][k]] = inst_count
             color_map[coo[0][k], coo[1][k], :] = c_map[inst_count][::-1]
         inst_count += 1
-    cv2.imwrite(os.path.join(res_dir, "color/inst_%s.png"%image_id), color_map)
-    cv2.imwrite(os.path.join(res_dir, "gray/inst_%s.png"%image_id), gray_map)
+    cv2.imwrite(os.path.join(res_dir, "color/inst_%s.png" % image_id), color_map)
+    cv2.imwrite(os.path.join(res_dir, "gray/inst_%s.png" % image_id), gray_map)
     wfp.close()
     return gray_map, scores_boxes
 
-def write_inst_part_result(res_dir, height, width, image_id, boxes, masks, scores, global_parsing_prob, nms_like_thre=0.7, class_num=19):
+
+def write_inst_part_result(res_dir, height, width, image_id, boxes, masks, scores, global_parsing_prob,
+                           nms_like_thre=0.7, class_num=19):
     parsing_map, parsing_prob = write_global_result(res_dir, height, width, image_id, global_parsing_prob)
     inst_map, inst_scores = write_inst_result(res_dir, height, width, image_id, boxes, masks, scores, nms_like_thre)
     inst_part_map = np.zeros_like(inst_map)
@@ -278,9 +287,9 @@ def write_inst_part_result(res_dir, height, width, image_id, boxes, masks, score
     if not os.path.exists(floder):
         os.makedirs(floder)
 
-    wfp = open('%s/%s.txt'%(floder, image_id), 'w')
+    wfp = open('%s/%s.txt' % (floder, image_id), 'w')
     counter = 0
-    for k in range(1, class_num+1):
+    for k in range(1, class_num + 1):
         cur_counter = counter
         inst_part_prob_map = {}
         cls_indices = (parsing_map == k).astype(np.uint8)
@@ -291,21 +300,22 @@ def write_inst_part_result(res_dir, height, width, image_id, boxes, masks, score
                 counter = counter + 1
                 cls_inst_indices = np.where(part_inst_map == i)
                 inst_part_map[cls_inst_indices] = counter
-               
+
                 human_id = i
-                human_seg_sco = inst_scores[human_id-1][0]
-                
+                human_seg_sco = inst_scores[human_id - 1][0]
+
                 tmp_parsing_prob = parsing_prob[cls_inst_indices]
                 mean_parsing_prob = np.mean(tmp_parsing_prob)
-                
+
                 inst_part_prob_map[counter] = mean_parsing_prob * human_seg_sco
         if cur_counter < counter:
             for i in range(cur_counter, counter):
-                wfp.write('%d %f\n'%(k, inst_part_prob_map[i+1]))
+                wfp.write('%d %f\n' % (k, inst_part_prob_map[i + 1]))
     wfp.close()
-    cv2.imwrite(os.path.join(floder, "%s.png"%image_id), inst_part_map)
+    cv2.imwrite(os.path.join(floder, "%s.png" % image_id), inst_part_map)
 
-def vis_inst_parsings(image, res_dir, image_id, boxes, parts, class_ids, 
+
+def vis_inst_parsings(image, res_dir, image_id, boxes, parts, class_ids,
                       scores=None, class_names=['BG', 'person'],
                       figsize=(16, 16)):
     """
@@ -363,16 +373,16 @@ def vis_inst_parsings(image, res_dir, image_id, boxes, parts, class_ids,
         part = parts[:, :, i]
         masked_image = apply_parsing(masked_image, part, color_map)
 
-
     ax.imshow(masked_image.astype(np.uint8))
     plt.axis('off')
     plt.tight_layout()
     plt.draw()
-    fig.savefig(os.path.join(res_dir, 'vis_%s.png'%image_id))
+    fig.savefig(os.path.join(res_dir, 'vis_%s.png' % image_id))
     plt.close()
 
+
 def vis_insts(image, res_dir, image_id, boxes, masks, class_ids,
-                      scores=None, class_names=['BG', 'person'], figsize=(16, 16)):
+              scores=None, class_names=['BG', 'person'], figsize=(16, 16)):
     """
     boxes: [num_instance, (y1, x1, y2, x2, class_id)] in image coordinates.
     masks: [height, width, num_instance]
@@ -398,7 +408,6 @@ def vis_insts(image, res_dir, image_id, boxes, masks, class_ids,
 
     # Show area outside image boundaries.
     height, width = image.shape[:2]
-
 
     masked_image = image.astype(np.uint32).copy()
     for i in range(N):
@@ -442,8 +451,9 @@ def vis_insts(image, res_dir, image_id, boxes, masks, class_ids,
     plt.axis('off')
     plt.tight_layout()
     plt.draw()
-    fig.savefig(os.path.join(res_dir, 'color', 'vis_%s.png'%image_id))
+    fig.savefig(os.path.join(res_dir, 'color', 'vis_%s.png' % image_id))
     plt.close()
+
 
 def draw_rois(image, rois, refined_rois, mask, class_ids, class_names, limit=10):
     """
@@ -494,7 +504,7 @@ def draw_rois(image, rois, refined_rois, mask, class_ids, class_names, limit=10)
 
             # Mask
             m = utils.unmold_mask(mask[id], rois[id]
-                                  [:4].astype(np.int32), image.shape)
+            [:4].astype(np.int32), image.shape)
             masked_image = apply_mask(masked_image, m, color)
 
     ax.imshow(masked_image)
@@ -586,7 +596,7 @@ def plot_overlaps(gt_class_ids, pred_class_ids, pred_scores,
             text = "match" if gt_class_ids[j] == pred_class_ids[i] else "wrong"
         color = ("white" if overlaps[i, j] > thresh
                  else "black" if overlaps[i, j] > 0
-                 else "grey")
+        else "grey")
         plt.text(j, i, "{:.3f}\n{}".format(overlaps[i, j], text),
                  horizontalalignment="center", verticalalignment="center",
                  fontsize=9, color=color)
