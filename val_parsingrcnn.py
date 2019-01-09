@@ -1,7 +1,7 @@
 import os
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
@@ -27,16 +27,15 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Download this file and place in the root of your 
 # project (See README file for details)
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-# MODEL_PATH = "./outputs/vip_singleframe_20181229a/checkpoints/parsing_rcnn_vip_singleframe_20181229a_epoch043.h5"
-# MODEL_PATH = "./outputs/vip_singleframe_20181229ma/checkpoints/parsing_rcnn_vip_singleframe_20181229ma_epoch086.h5"
-MODEL_PATH = "./outputs/vip_singleframe_test/checkpoints/parsing_rcnn_vip_singleframe_test_epoch001.h5"
+MODEL_PATH = "./outputs/vip_singleframe_20181229a/checkpoints/parsing_rcnn_vip_singleframe_20181229a_epoch040.h5"
+# MODEL_PATH = "./outputs/vip_singleframe_20181229ma/checkpoints/parsing_rcnn_vip_singleframe_20181229ma_epoch080.h5"
 # MODEL_PATH = "./checkpoints/parsing_rcnn.h5"
 # Directory of images to run detection on
 IMAGE_DIR = DATASET_DIR + "/Images"
-IMAGE_LIST = DATASET_DIR + "/lists/test_id.txt"
+IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
 
-# RES_DIR = "./vis/test_vip_singleframe_20181229ma_epoch086"
-RES_DIR = "./vis/vip_singleframe_test_epoch001"
+RES_DIR = "./vis/val_vip_singleframe_20181229a_epoch040"
+# RES_DIR = "./vis/val_vip_singleframe"
 if not os.path.exists(RES_DIR):
     os.makedirs(RES_DIR)
 

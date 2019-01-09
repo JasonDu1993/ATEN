@@ -5,7 +5,7 @@ from time import time
 sys.path.insert(0, os.getcwd())
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
@@ -17,14 +17,14 @@ from models import aten_model as modellib
 
 
 class trainConfig(VideoModelConfig):
-    # NAME = "vip_video_20190103va"
-    NAME = "debug"
-    GPU_COUNT = 1
+    NAME = "vip_video_20190103vma"
+    # NAME = "vip_video_testm"
+    GPU_COUNT = 2
     IMAGES_PER_GPU = 1
-    # STEPS_PER_EPOCH = 3000
-    STEPS_PER_EPOCH = 20
-    # VALIDATION_STEPS = 100
-    VALIDATION_STEPS = 10
+    STEPS_PER_EPOCH = 3000
+    # STEPS_PER_EPOCH = 20
+    VALIDATION_STEPS = 100
+    # VALIDATION_STEPS = 10
     SAVE_MODEL_PERIOD = 1
     # Weight decay regularization
     WEIGHT_DECAY = 0.0001

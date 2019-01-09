@@ -11,6 +11,7 @@ from utils.flow_warp import flow_warp
 assert LooseVersion(tf.__version__) >= LooseVersion("1.3")
 assert LooseVersion(keras.__version__) >= LooseVersion('2.0.8')
 
+
 class BatchNorm(KL.BatchNormalization):
     """Batch Normalization class. Subclasses the Keras BN class and
     hardcodes training=False so the BN layer doesn't update
@@ -19,15 +20,17 @@ class BatchNorm(KL.BatchNormalization):
     Batch normalization has a negative effect on training if batches are small
     so we disable it here.
     """
+
     def __init__(self, training=False, **kwargs):
         super(BatchNorm, self).__init__(**kwargs)
         self.training = training
+
     def call(self, inputs, training=None):
         return super(self.__class__, self).call(inputs, training=self.training)
 
 
 def identity_block_share(input_tensor_list, kernel_size, filters, stage, block,
-                   use_bias=True):
+                         use_bias=True):
     """The identity_block is the block that has no conv layer at shortcut
     # Arguments
         input_tensor: input tensor
@@ -40,19 +43,18 @@ def identity_block_share(input_tensor_list, kernel_size, filters, stage, block,
     conv_name_base = 'res' + str(stage) + block + '_branch'
     bn_name_base = 'bn' + str(stage) + block + '_branch'
 
-    conv1 = KL.Conv2D(nb_filter1, (1, 1), name=conv_name_base + '2a', 
-                  use_bias=use_bias)
+    conv1 = KL.Conv2D(nb_filter1, (1, 1), name=conv_name_base + '2a',
+                      use_bias=use_bias)
     bn1 = BatchNorm(axis=-1, name=bn_name_base + '2a')
-    conv2 = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), padding='same', 
-                  name=conv_name_base + '2b', use_bias=use_bias)
+    conv2 = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), padding='same',
+                      name=conv_name_base + '2b', use_bias=use_bias)
     bn2 = BatchNorm(axis=-1, name=bn_name_base + '2b')
     conv3 = KL.Conv2D(nb_filter3, (1, 1), name=conv_name_base + '2c',
-                  use_bias=use_bias)
+                      use_bias=use_bias)
     bn3 = BatchNorm(axis=-1, name=bn_name_base + '2c')
 
     features = []
     for input_tensor in input_tensor_list:
-
         x = conv1(input_tensor)
         x = bn1(x)
         x = KL.Activation('relu')(x)
@@ -71,7 +73,7 @@ def identity_block_share(input_tensor_list, kernel_size, filters, stage, block,
 
 
 def conv_block_share(input_tensor_list, kernel_size, filters, stage, block,
-               strides=(2, 2), use_bias=True):
+                     strides=(2, 2), use_bias=True):
     """conv_block is the block that has a conv layer at shortcut
     # Arguments
         input_tensor_list: input tensor
@@ -86,27 +88,25 @@ def conv_block_share(input_tensor_list, kernel_size, filters, stage, block,
     conv_name_base = 'res' + str(stage) + block + '_branch'
     bn_name_base = 'bn' + str(stage) + block + '_branch'
 
-    conv1 = KL.Conv2D(nb_filter1, (1, 1), strides=strides, 
-                  name=conv_name_base + '2a', use_bias=use_bias)
+    conv1 = KL.Conv2D(nb_filter1, (1, 1), strides=strides,
+                      name=conv_name_base + '2a', use_bias=use_bias)
     bn1 = BatchNorm(axis=-1, name=bn_name_base + '2a')
 
-    conv2 = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), padding='same', 
-                  name=conv_name_base + '2b', use_bias=use_bias)
+    conv2 = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), padding='same',
+                      name=conv_name_base + '2b', use_bias=use_bias)
     bn2 = BatchNorm(axis=-1, name=bn_name_base + '2b')
 
-    conv3 = KL.Conv2D(nb_filter3, (1, 1), name=conv_name_base + '2c', 
-                  use_bias=use_bias)
+    conv3 = KL.Conv2D(nb_filter3, (1, 1), name=conv_name_base + '2c',
+                      use_bias=use_bias)
     bn3 = BatchNorm(axis=-1, name=bn_name_base + '2c')
 
-    conv4 = KL.Conv2D(nb_filter3, (1, 1), strides=strides, 
-                  name=conv_name_base + '1', use_bias=use_bias)
+    conv4 = KL.Conv2D(nb_filter3, (1, 1), strides=strides,
+                      name=conv_name_base + '1', use_bias=use_bias)
     bn4 = BatchNorm(axis=-1, name=bn_name_base + '1')
-
 
     features = []
 
     for input_tensor in input_tensor_list:
-
         x = conv1(input_tensor)
         x = bn1(x)
         x = KL.Activation('relu')(x)
@@ -127,9 +127,10 @@ def conv_block_share(input_tensor_list, kernel_size, filters, stage, block,
         features.append(x)
     return features
 
+
 # Atrous-Convolution version of residual blocks
 def atrous_identity_block_share(input_tensor_list, kernel_size, filters, stage,
-                          block, atrous_rate=(2, 2), use_bias=True):
+                                block, atrous_rate=(2, 2), use_bias=True):
     '''The identity_block is the block that has no conv layer at shortcut
     # Arguments
         kernel_size: defualt 3, the kernel size of middle conv layer at main path
@@ -141,21 +142,20 @@ def atrous_identity_block_share(input_tensor_list, kernel_size, filters, stage,
     conv_name_base = 'res' + str(stage) + block + '_branch'
     bn_name_base = 'bn' + str(stage) + block + '_branch'
 
-    conv1 = KL.Conv2D(nb_filter1, (1, 1), name=conv_name_base + '2a',  
-                  use_bias=use_bias)
+    conv1 = KL.Conv2D(nb_filter1, (1, 1), name=conv_name_base + '2a',
+                      use_bias=use_bias)
     bn1 = BatchNorm(axis=-1, name=bn_name_base + '2a')
 
-    conv2 = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), dilation_rate=atrous_rate,  
+    conv2 = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), dilation_rate=atrous_rate,
                       padding='same', name=conv_name_base + '2b', use_bias=use_bias)
     bn2 = BatchNorm(axis=-1, name=bn_name_base + '2b')
 
-    conv3 = KL.Conv2D(nb_filter3, (1, 1), name=conv_name_base + '2c',  
-                  use_bias=use_bias)
+    conv3 = KL.Conv2D(nb_filter3, (1, 1), name=conv_name_base + '2c',
+                      use_bias=use_bias)
     bn3 = BatchNorm(axis=-1, name=bn_name_base + '2c')
 
     features = []
     for input_tensor in input_tensor_list:
-
         x = conv1(input_tensor)
         x = bn1(x)
         x = KL.Activation('relu')(x)
@@ -172,8 +172,9 @@ def atrous_identity_block_share(input_tensor_list, kernel_size, filters, stage,
         features.append(x)
     return features
 
-def atrous_conv_block_share(input_tensor_list, kernel_size, filters, stage, 
-                     block, strides=(1, 1), atrous_rate=(2, 2), use_bias=True):
+
+def atrous_conv_block_share(input_tensor_list, kernel_size, filters, stage,
+                            block, strides=(1, 1), atrous_rate=(2, 2), use_bias=True):
     '''conv_block is the block that has a conv layer at shortcut
     # Arguments
         kernel_size: defualt 3, the kernel size of middle conv layer at main path
@@ -185,26 +186,24 @@ def atrous_conv_block_share(input_tensor_list, kernel_size, filters, stage,
     conv_name_base = 'res' + str(stage) + block + '_branch'
     bn_name_base = 'bn' + str(stage) + block + '_branch'
 
-    conv1 = KL.Conv2D(nb_filter1, (1, 1), strides=strides, 
-                  name=conv_name_base + '2a', use_bias=use_bias)
+    conv1 = KL.Conv2D(nb_filter1, (1, 1), strides=strides,
+                      name=conv_name_base + '2a', use_bias=use_bias)
     bn1 = BatchNorm(axis=-1, name=bn_name_base + '2a')
 
-    conv2 = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), padding='same', dilation_rate=atrous_rate, 
-                  name=conv_name_base + '2b', use_bias=use_bias)
+    conv2 = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), padding='same', dilation_rate=atrous_rate,
+                      name=conv_name_base + '2b', use_bias=use_bias)
     bn2 = BatchNorm(axis=-1, name=bn_name_base + '2b')
 
-    conv3 = KL.Conv2D(nb_filter3, (1, 1), name=conv_name_base + '2c',  
-                  use_bias=use_bias)
+    conv3 = KL.Conv2D(nb_filter3, (1, 1), name=conv_name_base + '2c',
+                      use_bias=use_bias)
     bn3 = BatchNorm(axis=-1, name=bn_name_base + '2c')
 
-    conv4 = KL.Conv2D(nb_filter3, (1, 1), strides=strides,  
-                        name=conv_name_base + '1', use_bias=use_bias)
+    conv4 = KL.Conv2D(nb_filter3, (1, 1), strides=strides,
+                      name=conv_name_base + '1', use_bias=use_bias)
     bn4 = BatchNorm(axis=-1, name=bn_name_base + '1')
-
 
     features = []
     for input_tensor in input_tensor_list:
-
         x = conv1(input_tensor)
         x = bn1(x)
         x = KL.Activation('relu')(x)
@@ -224,6 +223,7 @@ def atrous_conv_block_share(input_tensor_list, kernel_size, filters, stage,
         features.append(x)
     return features
 
+
 def deeplab_resnet_share(img_inputs, architecture):
     """
     Build the architecture of resnet-101.
@@ -231,8 +231,8 @@ def deeplab_resnet_share(img_inputs, architecture):
     """
 
     # Stage 1
-    conv1 = KL.Conv2D(64, (7, 7), strides=(2, 2), 
-        name='conv1', use_bias=False)
+    conv1 = KL.Conv2D(64, (7, 7), strides=(2, 2),
+                      name='conv1', use_bias=False)
     bn_conv1 = BatchNorm(axis=-1, name='bn_conv1')
     c1 = []
     for img_input in img_inputs:
@@ -255,12 +255,15 @@ def deeplab_resnet_share(img_inputs, architecture):
     # Stage 4
     features = conv_block_share(features, 3, [256, 256, 1024], stage=4, block='a', use_bias=False)
     block_count = {"resnet50": 5, "resnet101": 22}[architecture]
-    for i in range(1, block_count+1):
-        features = identity_block_share(features, 3, [256, 256, 1024], stage=4, block='b%d'%i, use_bias=False)
+    for i in range(1, block_count + 1):
+        features = identity_block_share(features, 3, [256, 256, 1024], stage=4, block='b%d' % i, use_bias=False)
     # Stage 5
-    features = atrous_conv_block_share(features, 3, [512, 512, 2048], stage=5, block='a', atrous_rate=(2, 2), use_bias=False)
-    features = atrous_identity_block_share(features, 3, [512, 512, 2048], stage=5, block='b', atrous_rate=(2, 2), use_bias=False)
-    c5 = atrous_identity_block_share(features, 3, [512, 512, 2048], stage=5, block='c', atrous_rate=(2, 2), use_bias=False)
+    features = atrous_conv_block_share(features, 3, [512, 512, 2048], stage=5, block='a', atrous_rate=(2, 2),
+                                       use_bias=False)
+    features = atrous_identity_block_share(features, 3, [512, 512, 2048], stage=5, block='b', atrous_rate=(2, 2),
+                                           use_bias=False)
+    c5 = atrous_identity_block_share(features, 3, [512, 512, 2048], stage=5, block='c', atrous_rate=(2, 2),
+                                     use_bias=False)
 
     return c1, c5
 
@@ -291,7 +294,7 @@ def load_image_gt(dataset, config, image_id, augment=False,
     """
     # Load image and mask
     image = dataset.load_image(image_id)
-    keys, identity_ind = dataset.load_keys(image_id, config.KEY_RANGE_L, 3) 
+    keys, identity_ind = dataset.load_keys(image_id, config.KEY_RANGE_L, 3)
     mask, class_ids = dataset.load_mask(image_id)
     part = dataset.load_part(image_id)
     part_rev = dataset.load_reverse_part(image_id)
@@ -339,7 +342,7 @@ def load_image_gt(dataset, config, image_id, augment=False,
 
     # Image meta data
     image_meta = compose_image_meta(image_id, shape, window, active_class_ids)
-    return [image,]+keys+[np.array([identity_ind], dtype=np.int32),image_meta, class_ids, bbox, mask, part]
+    return [image, ] + keys + [np.array([identity_ind], dtype=np.int32), image_meta, class_ids, bbox, mask, part]
 
 
 def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
@@ -405,7 +408,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
             image, key1, key2, key3, identity_ind, image_meta, gt_class_ids, gt_boxes, gt_masks, gt_parts = \
                 load_image_gt(dataset, config, image_id, augment=augment,
                               use_mini_mask=config.USE_MINI_MASK)
-            
+
             # Skip images that have no instances. This can happen in cases
             # where we train on a subset of classes and the image doesn't
             # have any of the classes we care about.
@@ -421,7 +424,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
                 rpn_rois = generate_random_rois(
                     image.shape, random_rois, gt_class_ids, gt_boxes)
                 if detection_targets:
-                    rois, mrcnn_class_ids, mrcnn_bbox, mrcnn_mask, mrcnn_part =\
+                    rois, mrcnn_class_ids, mrcnn_bbox, mrcnn_mask, mrcnn_part = \
                         build_detection_targets(
                             rpn_rois, gt_class_ids, gt_boxes, gt_masks, gt_parts, config)
 
@@ -539,24 +542,28 @@ def antipad(num=1):
     # call slice(2, 5, 10) as you want to crop on the second dimension
     def func(x):
         return x[:, num:-num, num:-num, :]
+
     return KL.Lambda(func)
+
+
 def flow_refinement_block_share(name_base, low_level_features, hight_level_features, stage, deconv_filters):
-    assert len(low_level_features) == len(hight_level_features), "length of low_level_features and hight_level_features must be equal"
-    deconv = KL.Conv2DTranspose(deconv_filters, (4, 4), strides=(2, 2), 
-                           name='%sdeconv%d'%(name_base, stage-1))
-    conv1 = KL.Conv2D(2, (3, 3), padding='same', name='%spredict_conv%d'%(name_base,stage))
-    deconv1 = KL.Conv2DTranspose(2, (4, 4), strides=(2, 2), 
-                                     name='%supsample_flow%dto%d'%(name_base, stage, stage-1))
+    assert len(low_level_features) == len(
+        hight_level_features), "length of low_level_features and hight_level_features must be equal"
+    deconv = KL.Conv2DTranspose(deconv_filters, (4, 4), strides=(2, 2),
+                                name='%sdeconv%d' % (name_base, stage - 1))
+    conv1 = KL.Conv2D(2, (3, 3), padding='same', name='%spredict_conv%d' % (name_base, stage))
+    deconv1 = KL.Conv2DTranspose(2, (4, 4), strides=(2, 2),
+                                 name='%supsample_flow%dto%d' % (name_base, stage, stage - 1))
     features = []
     for i in range(len(low_level_features)):
-        #hight_level_feature deconv
+        # hight_level_feature deconv
         x = deconv(hight_level_features[i])
         x = antipad()(x)
         hight_deconv = KL.LeakyReLU(alpha=0.1)(x)
 
-        #hight_level_feature predict flow
+        # hight_level_feature predict flow
         flow = conv1(hight_level_features[i])
-        #flow deconv
+        # flow deconv
         flow_deconv = deconv1(flow)
         flow_deconv = antipad()(flow_deconv)
 
@@ -564,9 +571,10 @@ def flow_refinement_block_share(name_base, low_level_features, hight_level_featu
         features.append(res)
     return features
 
-def flow_conv_block_share(name_base, input_tensors, filters, stage, kernel_size=3, padding=(1,1)):
-    conv1 = KL.Conv2D(filters, (kernel_size, kernel_size), strides=(2, 2), name='%sconv%d'%(name_base,stage))
-    conv2 = KL.Conv2D(filters, (3, 3), padding='same', name='%sconv%d_1'%(name_base,stage))
+
+def flow_conv_block_share(name_base, input_tensors, filters, stage, kernel_size=3, padding=(1, 1)):
+    conv1 = KL.Conv2D(filters, (kernel_size, kernel_size), strides=(2, 2), name='%sconv%d' % (name_base, stage))
+    conv2 = KL.Conv2D(filters, (3, 3), padding='same', name='%sconv%d_1' % (name_base, stage))
 
     features = []
     for i in range(len(input_tensors)):
@@ -579,17 +587,18 @@ def flow_conv_block_share(name_base, input_tensors, filters, stage, kernel_size=
         features.append(x)
     return features
 
+
 def flownet2_S_with_scale_share(stage, input_a, input_b):
     assert len(input_a) == len(input_b), "length of input_a and input_b must be equal"
 
     num = len(input_a)
-    name_base = 'flownet_s%d_'%stage
+    name_base = 'flownet_s%d_' % stage
 
     conv1_layer = KL.Conv2D(64, (7, 7), strides=(2, 2), name=name_base + 'conv1')
     conv2_layer = KL.Conv2D(128, (5, 5), strides=(2, 2), name=name_base + 'conv2')
-    pred_conv_layer = KL.Conv2D(2, (3, 3), padding='same', name=name_base+'predict_conv2')
-    pred_scale_layer = KL.Conv2D(256, (1, 1), padding='same', name=name_base+'predict_scale',
-        use_bias=False, kernel_initializer='zeros')
+    pred_conv_layer = KL.Conv2D(2, (3, 3), padding='same', name=name_base + 'predict_conv2')
+    pred_scale_layer = KL.Conv2D(256, (1, 1), padding='same', name=name_base + 'predict_scale',
+                                 use_bias=False, kernel_initializer='zeros')
 
     conv2_features = []
     for i in range(num):
@@ -605,19 +614,23 @@ def flownet2_S_with_scale_share(stage, input_a, input_b):
         conv2 = KL.LeakyReLU(alpha=0.1)(x)
         conv2_features.append(conv2)
 
-    #conv3
-    conv3_1_features = flow_conv_block_share(name_base, conv2_features, 256, 3, kernel_size=5, padding=(2,2))
-    #conv4
+    # conv3
+    conv3_1_features = flow_conv_block_share(name_base, conv2_features, 256, 3, kernel_size=5, padding=(2, 2))
+    # conv4
     conv4_1_features = flow_conv_block_share(name_base, conv3_1_features, 512, 4)
-    #conv5
+    # conv5
     conv5_1_features = flow_conv_block_share(name_base, conv4_1_features, 512, 5)
-    #conv6
+    # conv6
     conv6_1_features = flow_conv_block_share(name_base, conv5_1_features, 1024, 6)
 
-    concat5_features = flow_refinement_block_share(name_base, conv5_1_features, conv6_1_features, stage=6, deconv_filters=512)
-    concat4_features = flow_refinement_block_share(name_base, conv4_1_features, concat5_features, stage=5, deconv_filters=256)
-    concat3_features = flow_refinement_block_share(name_base, conv3_1_features, concat4_features, stage=4, deconv_filters=128)
-    concat2_features = flow_refinement_block_share(name_base, conv2_features, concat3_features, stage=3, deconv_filters=64)
+    concat5_features = flow_refinement_block_share(name_base, conv5_1_features, conv6_1_features, stage=6,
+                                                   deconv_filters=512)
+    concat4_features = flow_refinement_block_share(name_base, conv4_1_features, concat5_features, stage=5,
+                                                   deconv_filters=256)
+    concat3_features = flow_refinement_block_share(name_base, conv3_1_features, concat4_features, stage=4,
+                                                   deconv_filters=128)
+    concat2_features = flow_refinement_block_share(name_base, conv2_features, concat3_features, stage=3,
+                                                   deconv_filters=64)
 
     flows = []
     scales = []
@@ -628,6 +641,7 @@ def flownet2_S_with_scale_share(stage, input_a, input_b):
         scale = KL.Lambda(lambda x: tf.add(x, 1))(scale)
         scales.append(scale)
     return flows, scales
+
 
 def flow_image_preprocess_graph(image):
     # rescale to [-1, 1]
@@ -641,6 +655,7 @@ def flow_image_preprocess_graph(image):
     # image = tf.image.resize_bilinear(image, shape)
     return image
 
+
 def flow_postprocess_graph(flow, height, width):
     flow = flow * 20.0
     # TODO: Look at Accum (train) or Resample (deploy) to see if we need to do something different
@@ -649,48 +664,53 @@ def flow_postprocess_graph(flow, height, width):
     #                                 align_corners=True)
     return flow
 
+
 def conv_gru_unit(temporal_features, initial_state=None):
     input_tensor = KL.Lambda(lambda x: tf.stack(x, axis=1))(temporal_features)
-    x = KL.ConvGRU2D(filters=256, kernel_size=(3, 3), name="gru_recurrent_unit", 
-                   padding='same', return_sequences=False)(input_tensor, initial_state=initial_state)
+    from models.convolutional_recurrent import ConvGRU2D
+    x = ConvGRU2D(filters=256, kernel_size=(3, 3), name="gru_recurrent_unit",
+                  padding='same', return_sequences=False)(input_tensor, initial_state=initial_state)
     return x
+
+
 def conv_lstm_unit(temporal_features, initial_state=None):
     input_tensor = KL.Lambda(lambda x: tf.stack(x, axis=1))(temporal_features)
-    x = KL.ConvLSTM2D(filters=256, kernel_size=(3, 3), name="lstm_recurrent_unit", 
-                   padding='same', return_sequences=False)(input_tensor, initial_state=initial_state)
+    x = KL.ConvLSTM2D(filters=256, kernel_size=(3, 3), name="lstm_recurrent_unit",
+                      padding='same', return_sequences=False)(input_tensor, initial_state=initial_state)
     return x
+
+
 def arbitrary_size_pooling(feature_map):
-    b1 = tf.reduce_mean(feature_map, axis = 1, keep_dims=True)
-    b2 = tf.reduce_mean(b1, axis = 2, keep_dims=True)
+    b1 = tf.reduce_mean(feature_map, axis=1, keep_dims=True)
+    b2 = tf.reduce_mean(b1, axis=2, keep_dims=True)
     return b2
 
+
 def global_parsing_encoder_share(feature_map):
-    conv1 = KL.Conv2D(256, (1, 1), padding='same', activation='relu', 
+    conv1 = KL.Conv2D(256, (1, 1), padding='same', activation='relu',
                       name='mrcnn_global_parsing_encoder_c1')
     # x1 = BatchNorm(axis=-1, name='mrcnn_global_parsing_%d_bn0'%num_classes)(x1)
 
-    conv2 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(6, 6), activation='relu', 
+    conv2 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(6, 6), activation='relu',
                       name='mrcnn_global_parsing_encoder_c2')
     # x2 = BatchNorm(axis=-1, name='mrcnn_global_parsing_%d_bn1'%num_classes)(x2)
 
-    conv3 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(12, 12), activation='relu', 
+    conv3 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(12, 12), activation='relu',
                       name='mrcnn_global_parsing_encoder_c3')
     # x3 = BatchNorm(axis=-1, name='mrcnn_global_parsing_%d_bn2'%num_classes)(x3)
 
-    conv4 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(18, 18), activation='relu', 
+    conv4 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(18, 18), activation='relu',
                       name='mrcnn_global_parsing_encoder_c4')
     # x4 = BatchNorm(axis=-1, name='mrcnn_global_parsing_%d_bn3'%num_classes)(x4)
 
-    conv5 = KL.Conv2D(256, (1, 1), padding='same', activation='relu', 
+    conv5 = KL.Conv2D(256, (1, 1), padding='same', activation='relu',
                       name='mrcnn_global_parsing_encoder_c0')
     # x0 = BatchNorm(axis=-1, name='mrcnn_global_parsing_%d_bn4'%num_classes)(x0)
-    conv6 = KL.Conv2D(256, (1, 1), padding='same', activation='relu', 
+    conv6 = KL.Conv2D(256, (1, 1), padding='same', activation='relu',
                       name='mrcnn_global_parsing_encoder_conconv')
-
 
     features = []
     for i in range(len(feature_map)):
-        
         x1 = conv1(feature_map[i])
         # x1 = BatchNorm(axis=-1, name='mrcnn_global_parsing_%d_bn0'%num_classes)(x1)
 
@@ -707,8 +727,7 @@ def global_parsing_encoder_share(feature_map):
         x0 = conv5(x0)
         # x0 = BatchNorm(axis=-1, name='mrcnn_global_parsing_%d_bn4'%num_classes)(x0)
         x0 = KL.Lambda(lambda x: tf.image.resize_bilinear(
-                  x[0], tf.shape(x[1])[1:3], align_corners=True))([x0, feature_map[i]])
-
+            x[0], tf.shape(x[1])[1:3], align_corners=True))([x0, feature_map[i]])
 
         x = KL.Lambda(lambda x: tf.concat(x, axis=-1))([x0, x1, x2, x3, x4])
         x = conv6(x)
@@ -716,20 +735,20 @@ def global_parsing_encoder_share(feature_map):
 
     return features
 
+
 def global_parsing_decoder_share(feature_map, low_feature_map):
     assert len(feature_map) == len(low_feature_map)
-    conv1 = KL.Conv2D(48, (1, 1), padding='same', activation='relu', 
-              name='mrcnn_global_parsing_decoder_conv1')
-    conv2 = KL.Conv2D(256, (3, 3), padding='same', activation='relu', 
-              name='mrcnn_global_parsing_decoder_conv2')
-    conv3 = KL.Conv2D(256, (3, 3), padding='same', activation='relu', 
-              name='mrcnn_global_parsing_decoder_conv3')
+    conv1 = KL.Conv2D(48, (1, 1), padding='same', activation='relu',
+                      name='mrcnn_global_parsing_decoder_conv1')
+    conv2 = KL.Conv2D(256, (3, 3), padding='same', activation='relu',
+                      name='mrcnn_global_parsing_decoder_conv2')
+    conv3 = KL.Conv2D(256, (3, 3), padding='same', activation='relu',
+                      name='mrcnn_global_parsing_decoder_conv3')
     features = []
     for i in range(len(feature_map)):
-
         # navie upsample from 1/16(32) to 1/4(128), fit the low_feature_map
         top = KL.Lambda(lambda x: tf.image.resize_bilinear(
-                  x[0], tf.shape(x[1])[1:3], align_corners=True))([feature_map[i], low_feature_map[i]])
+            x[0], tf.shape(x[1])[1:3], align_corners=True))([feature_map[i], low_feature_map[i]])
         # low dim of low_feature_map by 1*1 conv
         low = conv1(low_feature_map[i])
 
@@ -740,23 +759,24 @@ def global_parsing_decoder_share(feature_map, low_feature_map):
         features.append(x)
     return features
 
+
 def global_parsing_share(feature_map, num_classes):
-    conv1 = KL.Conv2D(num_classes, (3, 3), padding='same', dilation_rate=(6, 6), 
+    conv1 = KL.Conv2D(num_classes, (3, 3), padding='same', dilation_rate=(6, 6),
                       name='mrcnn_global_parsing_c1')
-    conv2 = KL.Conv2D(num_classes, (3, 3), padding='same', dilation_rate=(12, 12), 
+    conv2 = KL.Conv2D(num_classes, (3, 3), padding='same', dilation_rate=(12, 12),
                       name='mrcnn_global_parsing_c2')
-    conv3 = KL.Conv2D(num_classes, (3, 3), padding='same', dilation_rate=(18, 18), 
+    conv3 = KL.Conv2D(num_classes, (3, 3), padding='same', dilation_rate=(18, 18),
                       name='mrcnn_global_parsing_c3')
 
     features = []
     for i in range(len(feature_map)):
-
         x1 = conv1(feature_map[i])
         x2 = conv2(feature_map[i])
         x3 = conv3(feature_map[i])
-        x = KL.Add()([x1, x2 ,x3])
+        x = KL.Add()([x1, x2, x3])
         features.append(x)
     return features
+
 
 def get_option_inds_graph(input_key_identity):
     """
@@ -798,7 +818,7 @@ class ATEN_PARSING_RCNN():
 
         # Image size must be dividable by 2 multiple times
         h, w = config.IMAGE_SHAPE[:2]
-        if h / 2**6 != int(h / 2**6) or w / 2**6 != int(w / 2**6):
+        if h / 2 ** 6 != int(h / 2 ** 6) or w / 2 ** 6 != int(w / 2 ** 6):
             raise Exception("Image size must be dividable by 2 at least 6 times "
                             "to avoid fractions when downscaling and upscaling.")
 
@@ -847,15 +867,15 @@ class ATEN_PARSING_RCNN():
                     name="input_gt_masks", dtype=bool)
             # 4. GT Part
             input_gt_part = KL.Input(
-                    shape=[config.IMAGE_SHAPE[0], config.IMAGE_SHAPE[1]],
-                    name="input_gt_part", dtype=tf.uint8)
+                shape=[config.IMAGE_SHAPE[0], config.IMAGE_SHAPE[1]],
+                name="input_gt_part", dtype=tf.uint8)
 
         # Build the shared convolutional layers.
         # Bottom-up Layers
         # Returns a list of the last layers of each stage, 5 in total.
         # Don't create the thead (stage 5), so we pick the 4th item in the list.
-        c1_features, c5_features = deeplab_resnet_share([input_image_key1, 
-            input_image_key2, input_image_key3], 'resnet50')
+        c1_features, c5_features = deeplab_resnet_share([input_image_key1,
+                                                         input_image_key2, input_image_key3], 'resnet50')
         coarse_features = global_parsing_encoder_share(c5_features)
         fine_features = global_parsing_decoder_share(coarse_features, c1_features)
 
@@ -863,16 +883,17 @@ class ATEN_PARSING_RCNN():
         feature_map_key1 = fine_features[0]
         feature_map_key2 = fine_features[1]
         feature_map_key3 = fine_features[2]
-        #-----------flownet-------------------------------
+        # -----------flownet-------------------------------
         # image preprocess
-        flownet_input_key3  = KL.Lambda(lambda x: flow_image_preprocess_graph(x))(input_image_key3)
-        flownet_input_key2  = KL.Lambda(lambda x: flow_image_preprocess_graph(x))(input_image_key2)
-        flownet_input_key1  = KL.Lambda(lambda x: flow_image_preprocess_graph(x))(input_image_key1)
-        flownet_input_cur  = KL.Lambda(lambda x: flow_image_preprocess_graph(x))(input_image)
+        flownet_input_key3 = KL.Lambda(lambda x: flow_image_preprocess_graph(x))(input_image_key3)
+        flownet_input_key2 = KL.Lambda(lambda x: flow_image_preprocess_graph(x))(input_image_key2)
+        flownet_input_key1 = KL.Lambda(lambda x: flow_image_preprocess_graph(x))(input_image_key1)
+        flownet_input_cur = KL.Lambda(lambda x: flow_image_preprocess_graph(x))(input_image)
         # flownet_S
-        flows, scales = flownet2_S_with_scale_share(1, 
-            input_a=[flownet_input_cur, flownet_input_key1, flownet_input_key1], 
-            input_b=[flownet_input_key1, flownet_input_key2, flownet_input_key3])
+        flows, scales = flownet2_S_with_scale_share(1,
+                                                    input_a=[flownet_input_cur, flownet_input_key1, flownet_input_key1],
+                                                    input_b=[flownet_input_key1, flownet_input_key2,
+                                                             flownet_input_key3])
 
         new_2_cur_raw_flow = flows[0]
         new_2_cur_scale = scales[0]
@@ -881,55 +902,59 @@ class ATEN_PARSING_RCNN():
         key3_2_key1_raw_flow = flows[2]
         key3_2_key1_scale = scales[2]
 
-        new_2_cur_feature_flow = KL.Lambda(lambda x: flow_postprocess_graph(x, 
-            config.BACKBONE_SHAPES[0][0], 
-            config.BACKBONE_SHAPES[0][1]))(new_2_cur_raw_flow)
-        key2_2_key1_feature_flow = KL.Lambda(lambda x: flow_postprocess_graph(x, 
-            config.BACKBONE_SHAPES[0][0], 
-            config.BACKBONE_SHAPES[0][1]))(key2_2_key1_raw_flow)
-        key3_2_key1_feature_flow = KL.Lambda(lambda x: flow_postprocess_graph(x, 
-            config.BACKBONE_SHAPES[0][0], 
-            config.BACKBONE_SHAPES[0][1]))(key3_2_key1_raw_flow)
+        new_2_cur_feature_flow = KL.Lambda(lambda x: flow_postprocess_graph(x,
+                                                                            config.BACKBONE_SHAPES[0][0],
+                                                                            config.BACKBONE_SHAPES[0][1]))(
+            new_2_cur_raw_flow)
+        key2_2_key1_feature_flow = KL.Lambda(lambda x: flow_postprocess_graph(x,
+                                                                              config.BACKBONE_SHAPES[0][0],
+                                                                              config.BACKBONE_SHAPES[0][1]))(
+            key2_2_key1_raw_flow)
+        key3_2_key1_feature_flow = KL.Lambda(lambda x: flow_postprocess_graph(x,
+                                                                              config.BACKBONE_SHAPES[0][0],
+                                                                              config.BACKBONE_SHAPES[0][1]))(
+            key3_2_key1_raw_flow)
 
-        feature_map_key2 = KL.Lambda(lambda x: flow_warp(x[0], x[1]))([feature_map_key2, 
-            key2_2_key1_feature_flow])
+        feature_map_key2 = KL.Lambda(lambda x: flow_warp(x[0], x[1]))([feature_map_key2,
+                                                                       key2_2_key1_feature_flow])
         feature_map_key2 = KL.Lambda(lambda x: tf.multiply(x[0], x[1]))([feature_map_key2, key2_2_key1_scale])
-        feature_map_key3 = KL.Lambda(lambda x: flow_warp(x[0], x[1]))([feature_map_key3, 
-            key3_2_key1_feature_flow])
+        feature_map_key3 = KL.Lambda(lambda x: flow_warp(x[0], x[1]))([feature_map_key3,
+                                                                       key3_2_key1_feature_flow])
         feature_map_key3 = KL.Lambda(lambda x: tf.multiply(x[0], x[1]))([feature_map_key3, key3_2_key1_scale])
-        #--------------------------------------------------
-        init_feature_map = KL.Lambda(lambda x: (x[0] + x[1] + x[2])/3)([feature_map_key3, 
-            feature_map_key2, feature_map_key1])
+        # --------------------------------------------------
+        init_feature_map = KL.Lambda(lambda x: (x[0] + x[1] + x[2]) / 3)([feature_map_key3,
+                                                                          feature_map_key2, feature_map_key1])
         if config.RECURRENT_UNIT == 'lstm':
-            feature_map_key1 = conv_lstm_unit([feature_map_key3, feature_map_key2, feature_map_key1], 
-                initial_state=None)
+            feature_map_key1 = conv_lstm_unit([feature_map_key3, feature_map_key2, feature_map_key1],
+                                              initial_state=None)
         elif config.RECURRENT_UNIT == 'gru':
-            feature_map_key1 = conv_gru_unit([feature_map_key3, feature_map_key2, feature_map_key1], 
-                initial_state=init_feature_map)
+            feature_map_key1 = conv_gru_unit([feature_map_key3, feature_map_key2, feature_map_key1],
+                                             initial_state=init_feature_map)
         # warping the aggregated_key_feature to cur_feature by optical flow
-        feature_map_cur = KL.Lambda(lambda x: flow_warp(x[0], x[1]))([feature_map_key1, 
-            new_2_cur_feature_flow])
+        feature_map_cur = KL.Lambda(lambda x: flow_warp(x[0], x[1]))([feature_map_key1,
+                                                                      new_2_cur_feature_flow])
         feature_map_cur = KL.Lambda(lambda x: tf.multiply(x[0], x[1]))([feature_map_cur, new_2_cur_scale])
 
         # recognize wether key frame
         option_feature_map = KL.Lambda(lambda x: tf.stack(x, axis=1))([feature_map_key1, feature_map_cur])
         choose_ind = KL.Lambda(lambda x: get_option_inds_graph(x))(input_key_identity)
-        final_feature = KL.Lambda(lambda x:tf.gather_nd(x[0], tf.cast(x[1], tf.int32)))([option_feature_map, choose_ind])
+        final_feature = KL.Lambda(lambda x: tf.gather_nd(x[0], tf.cast(x[1], tf.int32)))(
+            [option_feature_map, choose_ind])
 
         # --------task specific sub-network------------------------------
         # input final_feature
         # global parsing branch
         global_parsing_map = global_parsing_share([final_feature], config.NUM_PART_CLASS)[0]
 
-        rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same', 
-            name='mrcnn_share_rpn_conv1')(final_feature)
-        rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same', 
-            name='mrcnn_share_rpn_conv2')(rpn_feature_map)
+        rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
+                                    name='mrcnn_share_rpn_conv1')(final_feature)
+        rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
+                                    name='mrcnn_share_rpn_conv2')(rpn_feature_map)
 
-        mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same', 
-            name='mrcnn_share_recog_conv1')(final_feature)
-        mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same', 
-            name='mrcnn_share_recog_conv2')(mrcnn_feature_map)
+        mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
+                                      name='mrcnn_share_recog_conv1')(final_feature)
+        mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
+                                      name='mrcnn_share_recog_conv2')(mrcnn_feature_map)
 
         # Generate Anchors
         self.anchors = util.generate_anchors(config.RPN_ANCHOR_SCALES,
@@ -939,16 +964,16 @@ class ATEN_PARSING_RCNN():
                                              config.RPN_ANCHOR_STRIDE)
 
         # RPN Model
-        rpn_class_logits, rpn_class, rpn_bbox = rpn_graph(rpn_feature_map, 
-                                                    len(config.RPN_ANCHOR_RATIOS) * len(config.RPN_ANCHOR_SCALES),
-                                                    config.RPN_ANCHOR_STRIDE)
+        rpn_class_logits, rpn_class, rpn_bbox = rpn_graph(rpn_feature_map,
+                                                          len(config.RPN_ANCHOR_RATIOS) * len(config.RPN_ANCHOR_SCALES),
+                                                          config.RPN_ANCHOR_STRIDE)
 
         # Generate proposals
         # Proposals are [batch, N, (y1, x1, y2, x2)] in normalized coordinates
         # and zero padded.
-        proposal_count = config.POST_NMS_ROIS_TRAINING if mode == "training"\
+        proposal_count = config.POST_NMS_ROIS_TRAINING if mode == "training" \
             else config.POST_NMS_ROIS_INFERENCE
-        pre_proposal_count = config.PRE_NMS_ROIS_TRAINING if mode == "training"\
+        pre_proposal_count = config.PRE_NMS_ROIS_TRAINING if mode == "training" \
             else config.PRE_NMS_ROIS_INFERENCE
         rpn_rois = ProposalLayer(proposal_count=proposal_count,
                                  pre_proposal_count=pre_proposal_count,
@@ -972,13 +997,13 @@ class ATEN_PARSING_RCNN():
             # Subsamples proposals and generates target outputs for training
             # Note that proposal class IDs, gt_boxes, and gt_masks are zero
             # padded. Equally, returned rois and targets are zero padded.
-            rois, target_class_ids, target_bbox, target_mask =\
+            rois, target_class_ids, target_bbox, target_mask = \
                 DetectionTargetLayer(config, name="proposal_targets")([
                     target_rois, input_gt_class_ids, gt_boxes, input_gt_masks])
 
             # Network Heads
             # TODO: verify that this handles zero padded ROIs
-            mrcnn_class_logits, mrcnn_class, mrcnn_bbox =\
+            mrcnn_class_logits, mrcnn_class, mrcnn_bbox = \
                 fpn_classifier_graph(rois, mrcnn_feature_map, config.IMAGE_SHAPE,
                                      config.POOL_SIZE, config.NUM_CLASSES)
 
@@ -990,9 +1015,9 @@ class ATEN_PARSING_RCNN():
             # TODO: clean up (use tf.identify if necessary)
             output_rois = KL.Lambda(lambda x: x * 1, name="output_rois")(rois)
 
-            global_parsing_loss = KL.Lambda(lambda x: mrcnn_global_parsing_loss_graph(config.NUM_PART_CLASS, *x), name="mrcnn_global_parsing_loss")(
+            global_parsing_loss = KL.Lambda(lambda x: mrcnn_global_parsing_loss_graph(config.NUM_PART_CLASS, *x),
+                                            name="mrcnn_global_parsing_loss")(
                 [input_gt_part, global_parsing_map])
-
 
             # Losses
             rpn_class_loss = KL.Lambda(lambda x: rpn_class_loss_graph(*x), name="rpn_class_loss")(
@@ -1007,21 +1032,21 @@ class ATEN_PARSING_RCNN():
                 [target_mask, target_class_ids, mrcnn_mask])
 
             # Model
-            inputs = [input_image, input_image_key1, input_image_key2, input_image_key3, 
-                      input_key_identity, input_image_meta, input_rpn_match, input_rpn_bbox, 
+            inputs = [input_image, input_image_key1, input_image_key2, input_image_key3,
+                      input_key_identity, input_image_meta, input_rpn_match, input_rpn_bbox,
                       input_gt_class_ids, input_gt_boxes, input_gt_masks, input_gt_part]
             if not config.USE_RPN_ROIS:
                 inputs.append(input_rois)
             outputs = [rpn_class_logits, rpn_class, rpn_bbox,
                        mrcnn_class_logits, mrcnn_class, mrcnn_bbox, mrcnn_mask,
                        rpn_rois, output_rois,
-                       rpn_class_loss, rpn_bbox_loss, class_loss, bbox_loss, mask_loss, 
+                       rpn_class_loss, rpn_bbox_loss, class_loss, bbox_loss, mask_loss,
                        global_parsing_loss]
             model = KM.Model(inputs, outputs, name='aten')
         else:
             # Network Heads
             # Proposal classifier and BBox regressor heads
-            mrcnn_class_logits, mrcnn_class, mrcnn_bbox =\
+            mrcnn_class_logits, mrcnn_class, mrcnn_bbox = \
                 fpn_classifier_graph(rpn_rois, mrcnn_feature_map, config.IMAGE_SHAPE,
                                      config.POOL_SIZE, config.NUM_CLASSES)
 
@@ -1045,17 +1070,23 @@ class ATEN_PARSING_RCNN():
 
             global_parsing_prob = KL.Lambda(lambda x: post_processing_graph(*x))([global_parsing_map, input_image])
 
-            model = KM.Model([input_image, input_image_key1, input_image_key2, input_image_key3, 
-                                 input_key_identity, input_image_meta],
+            model = KM.Model([input_image, input_image_key1, input_image_key2, input_image_key3,
+                              input_key_identity, input_image_meta],
                              [detections, mrcnn_class, mrcnn_bbox,
-                                 mrcnn_mask, rpn_rois, rpn_class, rpn_bbox, global_parsing_prob],
+                              mrcnn_mask, rpn_rois, rpn_class, rpn_bbox, global_parsing_prob],
                              name='aten')
 
         # Add multi-GPU support.
         if config.GPU_COUNT > 1:
             from utils.parallel_model import ParallelModel
             model = ParallelModel(model, config.GPU_COUNT)
-
+        import platform
+        sys = platform.system()
+        # if sys == "Windows":
+        if self.mode == "training":
+            plot_model(model, "aten_training.jpg")
+        else:
+            plot_model(model, "aten_inference.png")
         return model
 
     def find_last(self):
@@ -1090,7 +1121,11 @@ class ATEN_PARSING_RCNN():
         exlude: list of layer names to excluce
         """
         import h5py
-        from keras.engine import topology
+        import keras
+        if keras.__version__ > "2.1.3":
+            from keras.engine import saving as s
+        else:
+            from keras.engine import topology as s
 
         if exclude:
             by_name = True
@@ -1104,20 +1139,20 @@ class ATEN_PARSING_RCNN():
         # In multi-GPU training, we wrap the model. Get layers
         # of the inner model because they have the weights.
         keras_model = self.keras_model
-        layers = keras_model.inner_model.layers if hasattr(keras_model, "inner_model")\
+        layers = keras_model.inner_model.layers if hasattr(keras_model, "inner_model") \
             else keras_model.layers
 
         # # exclude some layers
         if exclude:
-            layers = filter(lambda l: exclude.match(l.name)==None, layers)
+            layers = filter(lambda l: exclude.match(l.name) == None, layers)
 
         # layers_name = [l.name for l in layers]
         print("load model", filepath)
 
         if by_name:
-            topology.load_weights_from_hdf5_group_by_name(f, layers)
+            s.load_weights_from_hdf5_group_by_name(f, layers)
         else:
-            topology.load_weights_from_hdf5_group(f, layers)
+            s.load_weights_from_hdf5_group(f, layers)
         if hasattr(f, 'close'):
             f.close()
 
@@ -1126,10 +1161,9 @@ class ATEN_PARSING_RCNN():
 
     def save_weights(self, filepath):
         keras_model = self.keras_model
-        model = keras_model.inner_model if hasattr(keras_model, "inner_model")\
+        model = keras_model.inner_model if hasattr(keras_model, "inner_model") \
             else keras_model
         model.save_weights(filepath)
-
 
     def compile(self, learning_rate, momentum):
         """Gets the model ready for training. Adds losses, regularization, and
@@ -1143,14 +1177,16 @@ class ATEN_PARSING_RCNN():
         self.keras_model._losses = []
         self.keras_model._per_input_losses = {}
         loss_names = ["rpn_class_loss", "rpn_bbox_loss",
-                      "mrcnn_class_loss", "mrcnn_bbox_loss", "mrcnn_mask_loss", 
+                      "mrcnn_class_loss", "mrcnn_bbox_loss", "mrcnn_mask_loss",
                       "mrcnn_global_parsing_loss"]
         for name in loss_names:
             layer = self.keras_model.get_layer(name)
             if layer.output in self.keras_model.losses:
                 continue
+            # self.keras_model.add_loss(
+            #     tf.reduce_mean(layer.output, keep_dims=True))
             self.keras_model.add_loss(
-                tf.reduce_mean(layer.output, keep_dims=True))
+                            tf.reduce_mean(layer.output))
 
         # Add L2 Regularization
         reg_losses = [keras.regularizers.l2(self.config.WEIGHT_DECAY)(w)
@@ -1161,7 +1197,7 @@ class ATEN_PARSING_RCNN():
 
         # Compile
         self.keras_model.compile(optimizer=optimizer, loss=[
-                                 None] * len(self.keras_model.outputs))
+                                                               None] * len(self.keras_model.outputs))
 
         # Add metrics for losses
         for name in loss_names:
@@ -1171,7 +1207,6 @@ class ATEN_PARSING_RCNN():
             self.keras_model.metrics_names.append(name)
             self.keras_model.metrics_tensors.append(tf.reduce_mean(
                 layer.output, keep_dims=True))
-
 
     def set_trainable(self, layer_regex, keras_model=None, indent=0, verbose=1):
         """Sets model layers as trainable if their names match
@@ -1185,7 +1220,7 @@ class ATEN_PARSING_RCNN():
 
         # In multi-GPU training, we wrap the model. Get layers
         # of the inner model because they have the weights.
-        layers = keras_model.inner_model.layers if hasattr(keras_model, "inner_model")\
+        layers = keras_model.inner_model.layers if hasattr(keras_model, "inner_model") \
             else keras_model.layers
 
         for layer in layers:
@@ -1235,14 +1270,24 @@ class ATEN_PARSING_RCNN():
                 self.epoch = int(m.group(6)) + 1
 
         # Directory for training logs
-        self.log_dir = os.path.join(self.model_dir, "{}{:%Y%m%dT%H%M}".format(
-            self.config.NAME.lower(), now))
+        self.log_dir = os.path.join(self.model_dir, "{}".format(self.config.NAME.lower()))
 
         # Path to save after each epoch. Include placeholders that get filled by Keras.
-        self.checkpoint_path = os.path.join(self.log_dir, "aten_{}_*epoch*.h5".format(
-            self.config.NAME.lower()))
-        self.checkpoint_path = self.checkpoint_path.replace(
-            "*epoch*", "{epoch:04d}")
+        # self.checkpoint_path = os.path.join(self.log_dir, "checkpoints",
+        #                                     "parsing_rcnn_" + self.config.NAME.lower() +
+        #                                     "_epoch{epoch:03d}_loss{loss:.3f}_valloss{val_loss:.3f}.h5")
+        self.checkpoint_path = os.path.join(self.log_dir, "checkpoints",
+                                            "aten_" + self.config.NAME.lower() +
+                                            "_epoch{epoch:03d}_loss{loss:.3f}_valloss{val_loss:.3f}.h5")
+        if not os.path.exists(os.path.dirname(self.checkpoint_path)):
+            os.makedirs(os.path.dirname(self.checkpoint_path))
+
+        self.log_path = os.path.join(self.log_dir, "logs", "aten_{}_{:%Y%m%dT%H%M}.csv".format(
+            self.config.NAME.lower(), now))
+        if not os.path.exists(os.path.dirname(self.log_path)):
+            os.makedirs(os.path.dirname(self.log_path))
+
+        self.tensorboard_dir = os.path.join(self.log_dir, "tensorboard")
 
     def train(self, train_dataset, val_dataset, learning_rate, epochs, layers, period):
         """Train the model.
@@ -1280,17 +1325,22 @@ class ATEN_PARSING_RCNN():
             layers = layer_regex[layers]
 
         # Data generators
-        train_generator = data_generator(train_dataset, self.config, shuffle=True, 
+        train_generator = data_generator(train_dataset, self.config, shuffle=True,
                                          batch_size=self.config.BATCH_SIZE)
         val_generator = data_generator(val_dataset, self.config, shuffle=True,
                                        batch_size=self.config.BATCH_SIZE)
 
         # Callbacks
         callbacks = [
-            keras.callbacks.TensorBoard(log_dir=self.log_dir,
+            keras.callbacks.TensorBoard(log_dir=self.tensorboard_dir,
                                         histogram_freq=0, write_graph=True, write_images=False),
-            keras.callbacks.ModelCheckpoint(self.checkpoint_path, period=period,
-                                            verbose=0, save_weights_only=True),
+            # keras.callbacks.ModelCheckpoint(self.checkpoint_path, period=period,
+            #                                 verbose=0, save_weights_only=True),
+            keras.callbacks.ModelCheckpoint(self.checkpoint_path, verbose=0, save_best_only=True,
+                                            save_weights_only=True),
+            keras.callbacks.CSVLogger(self.log_path),
+            keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, verbose=1),
+            keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=12, verbose=1),
         ]
 
         # Train
@@ -1307,16 +1357,12 @@ class ATEN_PARSING_RCNN():
             callbacks=callbacks,
             validation_data=next(val_generator),
             validation_steps=self.config.VALIDATION_STEPS,
-            max_queue_size=100,
-            workers=max(self.config.BATCH_SIZE // 2, 2),
-            use_multiprocessing=True,
+            # max_queue_size=100,
+            # workers=max(self.config.BATCH_SIZE // 2, 2),
+            # use_multiprocessing=True,
             verbose=1,
         )
         self.epoch = max(self.epoch, epochs)
-
-
-
-
 
     def ancestor(self, tensor, name, checked=None):
         """Finds the ancestor of a TF tensor in the computation graph.
@@ -1462,7 +1508,7 @@ class ATEN_PARSING_RCNN():
             # Convert neural network mask to full size mask
             full_mask = util.unmold_mask(masks[i], boxes[i], image_shape)
             full_masks.append(full_mask)
-        full_masks = np.stack(full_masks, axis=-1)\
+        full_masks = np.stack(full_masks, axis=-1) \
             if full_masks else np.empty((0,) + masks.shape[1:3])
 
         global_parsing = mrcnn_global_parsing[window[0]:window[2], window[1]:window[3], :]
@@ -1482,7 +1528,7 @@ class ATEN_PARSING_RCNN():
         masks: [H, W, N] instance binary masks
         """
         assert len(images) == len(identity_ind
-            ) == self.config.BATCH_SIZE, "len(images) must be equal to BATCH_SIZE"
+                                  ) == self.config.BATCH_SIZE, "len(images) must be equal to BATCH_SIZE"
 
         # Mold inputs to format expected by the neural network
         molded_images, image_metas, windows = self.mold_inputs(images)
@@ -1493,14 +1539,14 @@ class ATEN_PARSING_RCNN():
 
         # Run object detection
         detections, mrcnn_class, mrcnn_bbox, mrcnn_mask, \
-            rois, rpn_class, rpn_bbox, mrcnn_global_parsing_prob =\
-            self.keras_model.predict([molded_images, molded_key1s, molded_key2s, molded_key3s, 
-                identity_ind, image_metas], verbose=0)
+        rois, rpn_class, rpn_bbox, mrcnn_global_parsing_prob = \
+            self.keras_model.predict([molded_images, molded_key1s, molded_key2s, molded_key3s,
+                                      identity_ind, image_metas], verbose=0)
         # Process detections
         results = []
         for i, image in enumerate(images):
-            final_rois, final_class_ids, final_scores, final_masks, final_globals =\
-                self.unmold_detections(detections[i], mrcnn_mask[i], mrcnn_global_parsing_prob[i], 
+            final_rois, final_class_ids, final_scores, final_masks, final_globals = \
+                self.unmold_detections(detections[i], mrcnn_mask[i], mrcnn_global_parsing_prob[i],
                                        image.shape, windows[i])
             results.append({
                 "rois": final_rois,

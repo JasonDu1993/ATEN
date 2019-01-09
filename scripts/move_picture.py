@@ -1,5 +1,6 @@
 import shutil
 import os
+
 dir_dataset = "/home/sk49/workspace/dataset/VIP/"
 dir_src = "/home/sk49/workspace/dataset/VIP/adjacent_frames"
 videos = os.listdir(dir_src)

@@ -1,7 +1,14 @@
 import os
 import sys
+from time import time
+
 sys.path.insert(0, os.getcwd())
+import tensorflow as tf
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+session = tf.Session(config=config)
 
 from configs.vip import ParsingRCNNModelConfig
 from configs.vip import VIPDataset
@@ -9,12 +16,16 @@ from models.parsing_rcnn_model import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "vip_singleframe_20181229a"
+    # NAME = "vip_singleframe_20181229a"
+    NAME = "vip_singleframe_test"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
-    STEPS_PER_EPOCH = 2000
-    VALIDATION_STEPS = 100
+    # STEPS_PER_EPOCH = 2000
+    STEPS_PER_EPOCH = 20
+    # VALIDATION_STEPS = 100
+    VALIDATION_STEPS = 10
     SAVE_MODEL_PERIOD = 1
+
 
 # Root directory of the project
 ROOT_DIR = os.getcwd()
@@ -35,6 +46,7 @@ DEFAULT_DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
 if __name__ == '__main__':
     import argparse
 
+    t0 = time()
     # Parse command line arguments
     parser = argparse.ArgumentParser(
         description='Train Mask R-CNN on Pascal Person Part.')
@@ -62,7 +74,7 @@ if __name__ == '__main__':
 
     # Create model
     model = PARSING_RCNN(mode="training", config=config,
-                        model_dir=args.logs)
+                         model_dir=args.logs)
 
     # Select weights file to load
     if args.model.lower() == "last":
@@ -102,5 +114,4 @@ if __name__ == '__main__':
     #             epochs=150,
     #             layers='all',
     #             period=config.SAVE_MODEL_PERIOD)
-
-
+    print("total", (time() - t0), "s")

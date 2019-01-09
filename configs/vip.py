@@ -237,7 +237,7 @@ class VIPDataset(Dataset):
                 get_left = False
                 if most_right_key_ind > most_right_ind:
                     raise Exception("There is not enough adjacent frames, right_key %d VS right_limit %d" % (
-                    most_right_key_ind, most_right_ind))
+                        most_right_key_ind, most_right_ind))
             else:
                 get_left = True
         else:
@@ -246,7 +246,7 @@ class VIPDataset(Dataset):
                 get_left = True
                 if most_left_key_ind < most_left_ind:
                     raise Exception("There is not enough adjacent frames left_key %d VS left_limit %d" % (
-                    most_left_key_ind, most_left_ind))
+                        most_left_key_ind, most_left_ind))
             else:
                 get_left = False
         if get_left:
@@ -319,7 +319,7 @@ class VIPDataset(Dataset):
             get_left = False
             if most_right_key_ind > most_right_ind:
                 raise Exception("There is not enough adjacent frames, right_key %d VS right_limit %d" % (
-                most_right_key_ind, most_right_ind))
+                    most_right_key_ind, most_right_ind))
         else:
             get_left = True
 

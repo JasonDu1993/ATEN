@@ -6,10 +6,11 @@ PREDICT_DIR = '/your/path/to/results'
 INST_PART_GT_DIR = '/your/path/to/VIP/Instance_ids'
 
 CLASSES = ['background', 'hat', 'hair', 'gloves', 'sun-glasses', 'upper-clothes', 'dress',
-           'coat', 'socks', 'pants', 'torso-skin', 'scarf', 'skirt', 
+           'coat', 'socks', 'pants', 'torso-skin', 'scarf', 'skirt',
            'face', 'left-arm', 'right-arm', 'left-leg', 'right-leg', 'left-shoe', 'right-shoe']
 
 IOU_THRE = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+
 
 # compute mask overlap
 def compute_mask_iou(mask_gt, masks_pre, mask_gt_area, masks_pre_area):
@@ -52,7 +53,6 @@ def NonZero(masks):
     return area
 
 
-
 def compute_mask_overlaps(masks_pre, masks_gt):
     """Computes IoU overlaps between two sets of boxes.
     masks_pre, masks_gt:
@@ -78,6 +78,7 @@ def compute_mask_overlaps(masks_pre, masks_gt):
         overlaps[:, i] = compute_mask_iou(mask_gt, masks_pre, area2[i], area1)
 
     return overlaps
+
 
 def voc_ap(rec, prec, use_07_metric=False):
     """
@@ -118,6 +119,7 @@ def voc_ap(rec, prec, use_07_metric=False):
         ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
     return ap
 
+
 def convert2evalformat(inst_id_map, id_to_convert=None):
     """
     param: 
@@ -146,6 +148,7 @@ def convert2evalformat(inst_id_map, id_to_convert=None):
 
     return masks, len(masks)
 
+
 def compute_class_ap(image_id_list, class_id, iou_threshold):
     """Compute Average Precision at a set IoU threshold (default 0.5).
     Input:
@@ -170,7 +173,7 @@ def compute_class_ap(image_id_list, class_id, iou_threshold):
     for i in range(iou_thre_num):
         tp.append([])
         fp.append([])
-    
+
     print("process class", CLASSES[class_id], class_id)
 
     for image_id in image_id_list:
@@ -184,7 +187,6 @@ def compute_class_ap(image_id_list, class_id, iou_threshold):
             gt_part_id.append([int(line[0]), int(line[1])])
         rfp.close()
 
-
         pre_img = Image.open(os.path.join(PREDICT_DIR, image_id[0], 'instance_part', '%s.png' % image_id[1]))
         pre_img = np.array(pre_img)
         rfp = open(os.path.join(PREDICT_DIR, image_id[0], 'instance_part', '%s.txt' % image_id[1]), 'r')
@@ -195,7 +197,7 @@ def compute_class_ap(image_id_list, class_id, iou_threshold):
         pre_scores = []
         for i in range(len(items)):
             if int(items[i][0]) == class_id:
-                pre_id.append(i+1)
+                pre_id.append(i + 1)
                 pre_scores.append(float(items[i][1]))
 
         gt_id = []
@@ -203,10 +205,8 @@ def compute_class_ap(image_id_list, class_id, iou_threshold):
             if gt_part_id[i][1] == class_id:
                 gt_id.append(gt_part_id[i][0])
 
-
         gt_mask, n_gt_inst = convert2evalformat(inst_part_gt, set(gt_id))
         pre_mask, n_pre_inst = convert2evalformat(pre_img, set(pre_id))
-
 
         gt_mask_num += n_gt_inst
         pre_mask_num += n_pre_inst
@@ -215,7 +215,7 @@ def compute_class_ap(image_id_list, class_id, iou_threshold):
             continue
 
         scores += pre_scores
-        
+
         if n_gt_inst == 0:
             for i in range(n_pre_inst):
                 for k in range(iou_thre_num):
@@ -232,7 +232,7 @@ def compute_class_ap(image_id_list, class_id, iou_threshold):
 
         max_overlap_ind = np.argmax(overlaps, axis=1)
 
-         # l = len(overlaps[:,max_overlap_ind])
+        # l = len(overlaps[:,max_overlap_ind])
         for i in np.arange(len(max_overlap_ind)):
             max_iou = overlaps[i][max_overlap_ind[i]]
             # print('max_iou :', max_iou)
@@ -245,7 +245,6 @@ def compute_class_ap(image_id_list, class_id, iou_threshold):
                     fp[k].append(1)
 
     ind = np.argsort(scores)[::-1]
-
 
     for k in range(iou_thre_num):
         m_tp = tp[k]
@@ -261,13 +260,12 @@ def compute_class_ap(image_id_list, class_id, iou_threshold):
         # print('m_tp : ',m_tp)
         # print('m_fp : ', m_fp)
         recall = m_tp / float(gt_mask_num)
-        precition = m_tp / np.maximum(m_fp+m_tp, np.finfo(np.float64).eps)
+        precition = m_tp / np.maximum(m_fp + m_tp, np.finfo(np.float64).eps)
 
         # Compute mean AP over recall range
         ap[k] = voc_ap(recall, precition, False)
-        
-    return ap
 
+    return ap
 
 
 if __name__ == '__main__':
@@ -277,10 +275,10 @@ if __name__ == '__main__':
     for vid in os.listdir(PREDICT_DIR):
         for img in os.listdir(os.path.join(PREDICT_DIR, vid, 'instance_part')):
             j = img.find('.')
-            if img[j+1:] == 'txt':
+            if img[j + 1:] == 'txt':
                 image_list.append([vid, img[:j]])
 
-    AP = np.zeros((len(CLASSES)-1, len(IOU_THRE)))
+    AP = np.zeros((len(CLASSES) - 1, len(IOU_THRE)))
 
     for ind in range(1, len(CLASSES)):
         AP[ind - 1, :] = compute_class_ap(image_list, ind, IOU_THRE)

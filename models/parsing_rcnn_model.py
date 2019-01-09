@@ -1257,7 +1257,7 @@ def rpn_class_loss_graph(rpn_match, rpn_class_logits):
                                              output=rpn_class_logits,
                                              from_logits=True)
     loss = K.switch(tf.size(loss) > 0, K.mean(loss), tf.constant(0.0))
-    return loss
+    return K.cast(loss, dtype="float32")
 
 
 def rpn_bbox_loss_graph(config, target_bbox, rpn_match, rpn_bbox):
@@ -1290,7 +1290,7 @@ def rpn_bbox_loss_graph(config, target_bbox, rpn_match, rpn_bbox):
     loss = (less_than_one * 0.5 * diff ** 2) + (1 - less_than_one) * (diff - 0.5)
 
     loss = K.switch(tf.size(loss) > 0, K.mean(loss), tf.constant(0.0))
-    return loss
+    return K.cast(loss, dtype="float32")
 
 
 def mrcnn_class_loss_graph(target_class_ids, pred_class_logits,
@@ -1323,7 +1323,7 @@ def mrcnn_class_loss_graph(target_class_ids, pred_class_logits,
     # Computer loss mean. Use only predictions that contribute
     # to the loss to get a correct mean.
     loss = tf.reduce_sum(loss) / tf.reduce_sum(pred_active)
-    return loss
+    return K.cast(loss, dtype="float32")
 
 
 def mrcnn_bbox_loss_graph(target_bbox, target_class_ids, pred_bbox):
@@ -1354,8 +1354,8 @@ def mrcnn_bbox_loss_graph(target_bbox, target_class_ids, pred_bbox):
                     smooth_l1_loss(y_true=target_bbox, y_pred=pred_bbox),
                     tf.constant(0.0))
     loss = K.mean(loss)
-    loss = K.reshape(loss, [1, 1])
-    return loss
+    # loss = K.reshape(loss, [1, 1])
+    return K.cast(loss, dtype="float32")
 
 
 def mrcnn_mask_loss_graph(target_masks, target_class_ids, pred_masks):
@@ -1394,8 +1394,8 @@ def mrcnn_mask_loss_graph(target_masks, target_class_ids, pred_masks):
                     K.binary_crossentropy(target=y_true, output=y_pred),
                     tf.constant(0.0))
     loss = K.mean(loss)
-    loss = K.reshape(loss, [1, 1])
-    return loss
+    # loss = K.reshape(loss, [1, 1])
+    return K.cast(loss, dtype="float32")
 
 
 def mrcnn_global_parsing_loss_graph(num_classes, gt_parsing_map, predict_parsing_map):
@@ -1423,8 +1423,8 @@ def mrcnn_global_parsing_loss_graph(num_classes, gt_parsing_map, predict_parsing
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
         labels=gt, logits=prediction)
     loss = tf.reduce_mean(loss)
-    loss = tf.reshape(loss, [1, 1])
-    return loss
+    # loss = tf.reshape(loss, [1, 1])
+    return K.cast(loss, dtype="float32")
 
 
 def post_processing_graph(parts, input_image):
@@ -1985,9 +1985,9 @@ class PARSING_RCNN():
         sys = platform.system()
         if sys == "Windows":
             if self.mode == "training":
-                plot_model(model, "aten_training.jpg")
+                plot_model(model, "parsing_rcnn_training.jpg")
             else:
-                plot_model(model, "aten_inference.png")
+                plot_model(model, "parsing_rcnn_inference.png")
         return model
 
     def find_last(self):
@@ -2027,6 +2027,7 @@ class PARSING_RCNN():
             from keras.engine import saving as s
         else:
             from keras.engine import topology as s
+
         if exclude_pattern:
             by_name = True
 
@@ -2078,7 +2079,7 @@ class PARSING_RCNN():
             if layer.output in self.keras_model.losses:
                 continue
             self.keras_model.add_loss(
-                tf.reduce_mean(layer.output, keep_dims=True))
+                tf.reduce_mean(layer.output))
 
         # Add L2 Regularization
         reg_losses = [keras.regularizers.l2(self.config.WEIGHT_DECAY)(w)
@@ -2170,7 +2171,7 @@ class PARSING_RCNN():
         #                                     "_epoch{epoch:03d}_loss{loss:.3f}_valloss{val_loss:.3f}.h5")
         self.checkpoint_path = os.path.join(self.log_dir, "checkpoints",
                                             "parsing_rcnn_" + self.config.NAME.lower() +
-                                            "_epoch{epoch:03d}.h5")
+                                            "_epoch{epoch:03d}_loss{loss:.3f}_valloss{val_loss:.3f}.h5")
         if not os.path.exists(os.path.dirname(self.checkpoint_path)):
             os.makedirs(os.path.dirname(self.checkpoint_path))
 

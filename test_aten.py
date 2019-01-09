@@ -1,7 +1,13 @@
 import os
 import sys
+
 sys.path.insert(0, os.getcwd())
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+import tensorflow as tf
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+session = tf.Session(config=config)
 from utils.flowlib import *
 from configs import vip
 
@@ -16,6 +22,7 @@ class InferenceConfig(vip.VideoModelConfig):
     IMAGES_PER_GPU = 1
     KEY_RANGE_L = 3
     RECURRENT_UNIT = "gru"
+
 
 config = InferenceConfig()
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
@@ -48,12 +55,12 @@ for i in range(len(image_ids)):
     file_line = image_info['id']
     ind = file_line.rfind('/')
     vid = file_line[:ind]
-    im_name = file_line[ind+1:]
+    im_name = file_line[ind + 1:]
     path = os.path.join(RES_DIR, vid)
     if not os.path.exists(path):
         os.makedirs(path)
 
-    if os.path.exists(os.path.join(path, 'instance_part', '%s.png'%im_name)):
+    if os.path.exists(os.path.join(path, 'instance_part', '%s.png' % im_name)):
         continue
     print(i, file_line)
     cur_frame = dataset.load_image(image_id)
@@ -63,7 +70,7 @@ for i in range(len(image_ids)):
     key2 = keys[1]
     key3 = keys[2]
 
-    r = model.detect([cur_frame,], [key1,], [key2,], [key3,], [identity_ind,])[0]
+    r = model.detect([cur_frame, ], [key1, ], [key2, ], [key3, ], [identity_ind, ])[0]
     # print("detect out ", r['class_ids'].shape[0], "person")
     visualize.vis_insts(cur_frame, path, im_name, r['rois'], r['masks'], r['class_ids'], r['scores'])
     visualize.write_inst_part_result(path, cur_frame.shape[0], cur_frame.shape[1], im_name,

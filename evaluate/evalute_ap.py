@@ -5,8 +5,8 @@ import numpy as np
 PREDICT_DIR = '/your/path/to/results'
 
 GT_DIR = '/your/path/to/VIP/Human_ids'
-BBOX_IOU_THRE = [float(x)/100.0 for x in list(range(50, 100, 5))]
-MASK_IOU_THRE = [float(x)/100.0 for x in list(range(50, 100, 5))]
+BBOX_IOU_THRE = [float(x) / 100.0 for x in list(range(50, 100, 5))]
+MASK_IOU_THRE = [float(x) / 100.0 for x in list(range(50, 100, 5))]
 
 
 ############################################################
@@ -62,7 +62,6 @@ def NonZero(masks):
     return area
 
 
-
 def compute_mask_overlaps(masks_pre, masks_gt):
     """Computes IoU overlaps between two sets of boxes.
     masks_pre, masks_gt:
@@ -84,6 +83,7 @@ def compute_mask_overlaps(masks_pre, masks_gt):
         overlaps[:, i] = compute_mask_iou(mask_gt, masks_pre, area2[i], area1)
 
     return overlaps
+
 
 def voc_ap(rec, prec, use_07_metric=False):
     """
@@ -125,7 +125,7 @@ def voc_ap(rec, prec, use_07_metric=False):
     return ap
 
 
-def compute_mask_ap(image_list,iou_threshold):
+def compute_mask_ap(image_list, iou_threshold):
     """Compute Average Precision at a set IoU threshold (default 0.5).
     Input:
     image_list : all picures' id list
@@ -151,7 +151,6 @@ def compute_mask_ap(image_list,iou_threshold):
     for i in range(iou_thre_num):
         tp.append([])
         fp.append([])
-    
 
     for image_id in image_list:
         gt_mask = cv2.imread(os.path.join(GT_DIR, image_id[0], '%s.png' % image_id[1]), 0)
@@ -159,7 +158,6 @@ def compute_mask_ap(image_list,iou_threshold):
 
         gt_mask, n_gt_inst = convert2evalformat(gt_mask)
         pre_mask, n_pre_inst = convert2evalformat(pre_mask)
-
 
         gt_mask_num += n_gt_inst
         pre_mask_num += n_pre_inst
@@ -189,7 +187,7 @@ def compute_mask_ap(image_list,iou_threshold):
 
         max_overlap_ind = np.argmax(overlaps, axis=1)
 
-         # l = len(overlaps[:,max_overlap_ind])
+        # l = len(overlaps[:,max_overlap_ind])
         for i in np.arange(len(max_overlap_ind)):
             max_iou = overlaps[i][max_overlap_ind[i]]
             # print('max_iou :', max_iou)
@@ -219,12 +217,11 @@ def compute_mask_ap(image_list,iou_threshold):
         # print('m_tp : ',m_tp)
         # print('m_fp : ', m_fp)
         recall = m_tp / float(gt_mask_num)
-        precition = m_tp / np.maximum(m_fp+m_tp, np.finfo(np.float64).eps)
+        precition = m_tp / np.maximum(m_fp + m_tp, np.finfo(np.float64).eps)
 
         # Compute mean AP over recall range
         mAp[k] = voc_ap(recall, precition, False)
-        print("IOU Threshold:%.2f, mAP:%f"%(iou_threshold[k], mAp[k]))
-
+        print("IOU Threshold:%.2f, mAP:%f" % (iou_threshold[k], mAp[k]))
 
     print("averge mAP:", np.mean(mAp))
     print("----------------------------------------")
@@ -299,9 +296,9 @@ def compute_bbox_overlaps(boxes1, boxes2):
     # Compute overlaps to generate matrix [boxes1 count, boxes2 count]
     # Each cell contains the IoU value.
     overlaps = np.zeros((boxes1.shape[0], boxes2.shape[0]))
-    for i in range(overlaps.shape[1]):#先对gt做处理计算iou
+    for i in range(overlaps.shape[1]):  # 先对gt做处理计算iou
         box2 = boxes2[i]
-        overlaps[:, i] = compute_bbox_iou(box2, boxes1, area2[i], area1)#对box_pre的处理在compute_iou函数中进行
+        overlaps[:, i] = compute_bbox_iou(box2, boxes1, area2[i], area1)  # 对box_pre的处理在compute_iou函数中进行
     return overlaps
 
 
@@ -327,9 +324,8 @@ def compute_bbox_ap(image_list, iou_threshold):
         tp.append([])
         fp.append([])
 
-
     for image_id in image_list:
-        gt_mask = cv2.imread(os.path.join(GT_DIR, image_id[0],'%s.png' % image_id[1]), 0)
+        gt_mask = cv2.imread(os.path.join(GT_DIR, image_id[0], '%s.png' % image_id[1]), 0)
         pre_mask = cv2.imread(os.path.join(PREDICT_DIR, image_id[0], 'gray', 'inst_%s.png' % image_id[1]), 0)
 
         gt_mask, n_gt_inst = convert2evalformat(gt_mask)
@@ -345,12 +341,12 @@ def compute_bbox_ap(image_list, iou_threshold):
         items = [x.strip().split(' ') for x in rfp.readlines()]
         rfp.close()
         tmp_scores = [x[0] for x in items]
-        
+
         scores += tmp_scores
 
         # Compute IoU overlaps [pred_masks, gt_makss]
 
-        if not gt_mask :
+        if not gt_mask:
             for i in range(n_pre_inst):
                 for k in range(iou_thre_num):
                     fp[k].append(1)
@@ -368,12 +364,12 @@ def compute_bbox_ap(image_list, iou_threshold):
         # print('gt_bbox .shape', gt_bbox.shape)
 
         overlaps = compute_bbox_overlaps(pre_bbox, gt_bbox)
-        
+
         # print('overlaps.shape :',overlaps.shape)
 
         bbox_overlap_ind = np.argmax(overlaps, axis=1)
 
-         # l = len(overlaps[:,max_overlap_ind])
+        # l = len(overlaps[:,max_overlap_ind])
         for i in np.arange(len(bbox_overlap_ind)):
             max_iou = overlaps[i][bbox_overlap_ind[i]]
             # print('max_iou :',max_iou)
@@ -401,18 +397,14 @@ def compute_bbox_ap(image_list, iou_threshold):
         # print('m_tp : ',m_tp)
         # print('m_fp : ', m_fp)
         recall = m_tp / float(gt_bbox_num)
-        precition = m_tp / np.maximum(m_fp+m_tp, np.finfo(np.float64).eps)
+        precition = m_tp / np.maximum(m_fp + m_tp, np.finfo(np.float64).eps)
 
         # Compute mean AP over recall range
         mAp[k] = voc_ap(recall, precition, False)
-        print("IOU Threshold:%.2f, mAP:%f"%(iou_threshold[k], mAp[k]))
-
+        print("IOU Threshold:%.2f, mAP:%f" % (iou_threshold[k], mAp[k]))
 
     print("averge mAP:", np.mean(mAp))
     print("----------------------------------------")
-
-
-
 
 
 def convert2evalformat(inst_id_map):
@@ -437,20 +429,15 @@ def convert2evalformat(inst_id_map):
 
 if __name__ == '__main__':
     print("result of", PREDICT_DIR)
-    
 
     image_list = []
     for vid in os.listdir(PREDICT_DIR):
         for img in os.listdir(os.path.join(PREDICT_DIR, vid, 'gray')):
             j = img.find('_')
             if img[:j] == 'inst':
-                image_list.append([vid, img[j+1:-4]])
+                image_list.append([vid, img[j + 1:-4]])
 
 
-#    compute_bbox_ap(image_list, BBOX_IOU_THRE)
+            #    compute_bbox_ap(image_list, BBOX_IOU_THRE)
 
     compute_mask_ap(image_list, MASK_IOU_THRE)
-
-
-
-

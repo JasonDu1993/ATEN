@@ -5,45 +5,36 @@ from time import time
 sys.path.insert(0, os.getcwd())
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
-import numpy as np
 
-from configs.vip import VideoModelConfig
+from configs.vip import ParsingRCNNModelConfig
 from configs.vip import VIPDataset
-from models import aten_model as modellib
+from models.parsing_rcnn_model import PARSING_RCNN
 
 
-class trainConfig(VideoModelConfig):
-    # NAME = "vip_video_20190103va"
-    NAME = "debug"
-    GPU_COUNT = 1
-    IMAGES_PER_GPU = 1
-    # STEPS_PER_EPOCH = 3000
-    STEPS_PER_EPOCH = 20
-    # VALIDATION_STEPS = 100
-    VALIDATION_STEPS = 10
+class trainConfig(ParsingRCNNModelConfig):
+    NAME = "vip_singleframe_20181229ma"
+    GPU_COUNT = 2
+    IMAGES_PER_GPU = 4
+    STEPS_PER_EPOCH = 2000
+    VALIDATION_STEPS = 100
     SAVE_MODEL_PERIOD = 1
-    # Weight decay regularization
-    WEIGHT_DECAY = 0.0001
-    # Image mean (RGB)
-    MEAN_PIXEL = np.array([123.7, 116.8, 103.9])
-    KEY_RANGE_L = 3
-    RECURRENT_UNIT = 'gru'
 
 
 # Root directory of the project
 ROOT_DIR = os.getcwd()
+
 # Path to trained weights file
-PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "aten_p2l3.h5")
-PARSING_RCNN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
-FLOWNET_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "flownet2-S.h5")
+PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
+
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
-DEFAULT_LOGS_DIR = "./outputs_aten"
+DEFAULT_LOGS_DIR = "./outputs"
 DEFAULT_DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+
 ############################################################
 #  Training
 ############################################################
@@ -58,7 +49,7 @@ if __name__ == '__main__':
         description='Train Mask R-CNN on Pascal Person Part.')
     parser.add_argument('--dataset', required=False,
                         default=DEFAULT_DATASET_DIR,
-                        metavar="/path/to/coco/",
+                        metavar="/path/to/dataset/",
                         help='Directory of the dataset')
     parser.add_argument('--model', required=False,
                         default="pretrain",
@@ -79,7 +70,9 @@ if __name__ == '__main__':
     config.display()
 
     # Create model
-    model = modellib.ATEN_PARSING_RCNN(mode="training", config=config, model_dir=args.logs)
+    model = PARSING_RCNN(mode="training", config=config,
+                         model_dir=args.logs)
+
     # Select weights file to load
     if args.model.lower() == "last":
         # Find last trained weights
@@ -88,8 +81,7 @@ if __name__ == '__main__':
         model_path = PRETRAIN_MODEL_PATH
     else:
         model_path = args.model
-
-    # Load weights
+    # common load weight 
     print("Loading weights ", model_path)
     model.load_weights(model_path, by_name=True)
 
@@ -107,10 +99,16 @@ if __name__ == '__main__':
     # *** This training schedule is an example. Update to your needs ***
 
     # Fine tune all layers
-    print("Fine tune all layers")
+
     model.train(dataset_train, dataset_val,
                 learning_rate=0.001,
                 epochs=200,
                 layers='all',
                 period=config.SAVE_MODEL_PERIOD)
-    print("total", time() - t0, "s")
+
+    # model.train(dataset_train, dataset_val,
+    #             learning_rate=0.0001,
+    #             epochs=150,
+    #             layers='all',
+    #             period=config.SAVE_MODEL_PERIOD)
+    print("total", (time() - t0), "s")

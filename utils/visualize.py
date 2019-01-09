@@ -82,7 +82,7 @@ def apply_parsing(image, part, color_map, alpha=0.7):
     for i in range(len(coordinates[0])):
         image[coordinates[0][i], coordinates[1][i], :] = color_map[part[
             coordinates[0][i], coordinates[1][i]]] * alpha + image[coordinates[0][i], coordinates[1][i], :] * (
-        1 - alpha)
+            1 - alpha)
     return image
 
 
