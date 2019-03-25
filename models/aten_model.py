@@ -228,6 +228,30 @@ def deeplab_resnet_share(img_inputs, architecture):
     """
     Build the architecture of resnet-101.
     img_inputs: a list of input image
+    architecture:Str, "resnet50" or "resnet101"
+    img_inputs = <class 'list'>: [<tf.Tensor 'input_image_key1:0' shape=(?, 512, 512, 3) dtype=float32>,
+    <tf.Tensor 'input_image_key2:0' shape=(?, 512, 512, 3) dtype=float32>,
+    <tf.Tensor 'input_image_key3:0' shape=(?, 512, 512, 3) dtype=float32>]
+
+    c1 = <class 'list'>: [<tf.Tensor 'max_pooling2d_1/MaxPool:0' shape=(?, 128, 128, 64) dtype=float32>,
+    <tf.Tensor 'max_pooling2d_2/MaxPool:0' shape=(?, 128, 128, 64) dtype=float32>,
+    <tf.Tensor 'max_pooling2d_3/MaxPool:0' shape=(?, 128, 128, 64) dtype=float32>]
+
+    c2 = <class 'list'>: [<tf.Tensor 'activation_24/Relu:0' shape=(?, 128, 128, 256) dtype=float32>,
+    <tf.Tensor 'activation_27/Relu:0' shape=(?, 128, 128, 256) dtype=float32>,
+     <tf.Tensor 'activation_30/Relu:0' shape=(?, 128, 128, 256) dtype=float32>]
+
+    c3 = <class 'list'>: [<tf.Tensor 'activation_60/Relu:0' shape=(?, 64, 64, 512) dtype=float32>,
+    <tf.Tensor 'activation_63/Relu:0' shape=(?, 64, 64, 512) dtype=float32>,
+    <tf.Tensor 'activation_66/Relu:0' shape=(?, 64, 64, 512) dtype=float32>]
+
+    c4 = <class 'list'>: [<tf.Tensor 'activation_114/Relu:0' shape=(?, 32, 32, 1024) dtype=float32>,
+    <tf.Tensor 'activation_117/Relu:0' shape=(?, 32, 32, 1024) dtype=float32>,
+    <tf.Tensor 'activation_120/Relu:0' shape=(?, 32, 32, 1024) dtype=float32>]
+
+    c5 = <class 'list'>: [<tf.Tensor 'activation_141/Relu:0' shape=(?, 32, 32, 2048) dtype=float32>,
+    <tf.Tensor 'activation_144/Relu:0' shape=(?, 32, 32, 2048) dtype=float32>,
+    <tf.Tensor 'activation_147/Relu:0' shape=(?, 32, 32, 2048) dtype=float32>]
     """
 
     # Stage 1
@@ -246,17 +270,18 @@ def deeplab_resnet_share(img_inputs, architecture):
     # Stage 2
     features = conv_block_share(c1, 3, [64, 64, 256], stage=2, block='a', strides=(1, 1), use_bias=False)
     features = identity_block_share(features, 3, [64, 64, 256], stage=2, block='b', use_bias=False)
-    features = identity_block_share(features, 3, [64, 64, 256], stage=2, block='c', use_bias=False)
+    c2 = features = identity_block_share(features, 3, [64, 64, 256], stage=2, block='c', use_bias=False)
     # Stage 3
     features = conv_block_share(features, 3, [128, 128, 512], stage=3, block='a', use_bias=False)
     features = identity_block_share(features, 3, [128, 128, 512], stage=3, block='b1', use_bias=False)
     features = identity_block_share(features, 3, [128, 128, 512], stage=3, block='b2', use_bias=False)
-    features = identity_block_share(features, 3, [128, 128, 512], stage=3, block='b3', use_bias=False)
+    c3 = features = identity_block_share(features, 3, [128, 128, 512], stage=3, block='b3', use_bias=False)
     # Stage 4
     features = conv_block_share(features, 3, [256, 256, 1024], stage=4, block='a', use_bias=False)
     block_count = {"resnet50": 5, "resnet101": 22}[architecture]
     for i in range(1, block_count + 1):
         features = identity_block_share(features, 3, [256, 256, 1024], stage=4, block='b%d' % i, use_bias=False)
+    c4 = features
     # Stage 5
     features = atrous_conv_block_share(features, 3, [512, 512, 2048], stage=5, block='a', atrous_rate=(2, 2),
                                        use_bias=False)
@@ -294,7 +319,7 @@ def load_image_gt(dataset, config, image_id, augment=False,
     """
     # Load image and mask
     image = dataset.load_image(image_id)
-    keys, identity_ind = dataset.load_keys(image_id, config.KEY_RANGE_L, 3)
+    keys, identity_ind = dataset.load_keys(image_id, key_range=config.KEY_RANGE_L, key_num=3)
     mask, class_ids = dataset.load_mask(image_id)
     part = dataset.load_part(image_id)
     part_rev = dataset.load_reverse_part(image_id)
@@ -681,7 +706,17 @@ def conv_lstm_unit(temporal_features, initial_state=None):
 
 
 def arbitrary_size_pooling(feature_map):
-    b1 = tf.reduce_mean(feature_map, axis=1, keep_dims=True)
+    """similar from  keras.layers import GlobalAveragePooling2D
+
+    Args:
+        feature_map:  Tensor("activation_141/Relu:0", shape=(?, 32, 32, 2048), dtype=float32)
+
+    Returns:
+        b1: Tensor("lambda_1/Mean:0", shape=(?, 1, 32, 2048), dtype=float32)
+        b2: Tensor("lambda_1/Mean_3:0", shape=(?, 1, 1, 2048), dtype=float32)
+    """
+    b1 = tf.reduce_mean(feature_map, axis=1,
+                        keep_dims=True)
     b2 = tf.reduce_mean(b1, axis=2, keep_dims=True)
     return b2
 
@@ -729,8 +764,9 @@ def global_parsing_encoder_share(feature_map):
         x0 = KL.Lambda(lambda x: tf.image.resize_bilinear(
             x[0], tf.shape(x[1])[1:3], align_corners=True))([x0, feature_map[i]])
 
-        x = KL.Lambda(lambda x: tf.concat(x, axis=-1))([x0, x1, x2, x3, x4])
-        x = conv6(x)
+        x = KL.Lambda(lambda x: tf.concat(x, axis=-1))(
+            [x0, x1, x2, x3, x4])  # Tensor("lambda_3/concat:0", shape=(?, 32, 32, 1280), dtype=float32)
+        x = conv6(x)  # Tensor("mrcnn_global_parsing_encoder_conconv/Relu:0", shape=(?, 32, 32, 256), dtype=float32)
         features.append(x)
 
     return features
@@ -1086,7 +1122,7 @@ class ATEN_PARSING_RCNN():
         if self.mode == "training":
             plot_model(model, "aten_training.jpg")
         else:
-            plot_model(model, "aten_inference.png")
+            plot_model(model, "aten_test.png")
         return model
 
     def find_last(self):
@@ -1186,7 +1222,7 @@ class ATEN_PARSING_RCNN():
             # self.keras_model.add_loss(
             #     tf.reduce_mean(layer.output, keep_dims=True))
             self.keras_model.add_loss(
-                            tf.reduce_mean(layer.output))
+                tf.reduce_mean(layer.output))
 
         # Add L2 Regularization
         reg_losses = [keras.regularizers.l2(self.config.WEIGHT_DECAY)(w)

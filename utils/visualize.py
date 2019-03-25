@@ -207,8 +207,9 @@ def write_global_result(res_dir, height, width, image_id, global_parsing_prob):
     """
     if not os.path.exists(os.path.join(res_dir, 'color')):
         os.makedirs(os.path.join(res_dir, 'color'))
-    if not os.path.exists(os.path.join(res_dir, 'gray')):
-        os.makedirs(os.path.join(res_dir, 'gray'))
+    if not os.path.exists(os.path.join(res_dir, 'global_parsing')):
+        os.makedirs(os.path.join(res_dir, 'global_parsing'))
+
 
     c_map = get_color_map()
     global_parsing = np.argmax(global_parsing_prob, axis=-1)
@@ -224,7 +225,7 @@ def write_global_result(res_dir, height, width, image_id, global_parsing_prob):
     for k in range(len(coo[0])):
         global_parsing_map[coo[0][k], coo[1][k], :] = c_map[global_parsing[coo[0][k], coo[1][k]]][::-1]
     cv2.imwrite(os.path.join(res_dir, "color/global_%s.png" % image_id), global_parsing_map)
-    cv2.imwrite(os.path.join(res_dir, "gray/global_%s.png" % image_id), global_parsing)
+    cv2.imwrite(os.path.join(res_dir, "global_parsing/%s.png" % image_id), global_parsing)
     return global_parsing, global_parsing_max_prob
 
 
@@ -237,8 +238,8 @@ def write_inst_result(res_dir, height, width, image_id, boxes, masks, scores, nm
     """
     if not os.path.exists(os.path.join(res_dir, 'color')):
         os.makedirs(os.path.join(res_dir, 'color'))
-    if not os.path.exists(os.path.join(res_dir, 'gray')):
-        os.makedirs(os.path.join(res_dir, 'gray'))
+    if not os.path.exists(os.path.join(res_dir, 'instance_segmentation')):
+        os.makedirs(os.path.join(res_dir, 'instance_segmentation'))
     c_map = get_color_map()
     masks = np.transpose(masks, (2, 0, 1))
     N = boxes.shape[0]
@@ -246,7 +247,7 @@ def write_inst_result(res_dir, height, width, image_id, boxes, masks, scores, nm
     gray_map = np.zeros((height, width), dtype=np.uint8)
     inst_count = 1
     scores_boxes = []
-    wfp = open(os.path.join(res_dir, 'gray', 'scores_%s.txt' % image_id), 'w')
+    wfp = open(os.path.join(res_dir, 'instance_segmentation', '%s.txt' % image_id), 'w')
     for i in range(N):
         mask = masks[i]
         box = boxes[i]
@@ -272,7 +273,7 @@ def write_inst_result(res_dir, height, width, image_id, boxes, masks, scores, nm
             color_map[coo[0][k], coo[1][k], :] = c_map[inst_count][::-1]
         inst_count += 1
     cv2.imwrite(os.path.join(res_dir, "color/inst_%s.png" % image_id), color_map)
-    cv2.imwrite(os.path.join(res_dir, "gray/inst_%s.png" % image_id), gray_map)
+    cv2.imwrite(os.path.join(res_dir, "instance_segmentation/%s.png" % image_id), gray_map)
     wfp.close()
     return gray_map, scores_boxes
 
@@ -283,7 +284,7 @@ def write_inst_part_result(res_dir, height, width, image_id, boxes, masks, score
     inst_map, inst_scores = write_inst_result(res_dir, height, width, image_id, boxes, masks, scores, nms_like_thre)
     inst_part_map = np.zeros_like(inst_map)
     # build floder
-    floder = os.path.join(res_dir, 'instance_part')
+    floder = os.path.join(res_dir, 'instance_parsing')
     if not os.path.exists(floder):
         os.makedirs(floder)
 

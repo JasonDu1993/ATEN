@@ -2,8 +2,8 @@ import os
 from PIL import Image
 import numpy as np
 
-PREDICT_DIR = '/your/path/to/results'
-INST_PART_GT_DIR = '/your/path/to/VIP/Instance_ids'
+PREDICT_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20181229a_epoch040'
+INST_PART_GT_DIR = '/home/sk49/workspace/dataset/VIP/Instance_ids'
 
 CLASSES = ['background', 'hat', 'hair', 'gloves', 'sun-glasses', 'upper-clothes', 'dress',
            'coat', 'socks', 'pants', 'torso-skin', 'scarf', 'skirt',

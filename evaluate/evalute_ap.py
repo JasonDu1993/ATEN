@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 
-PREDICT_DIR = '/your/path/to/results'
+PREDICT_DIR = './sample_result'
 
 GT_DIR = '/your/path/to/VIP/Human_ids'
 BBOX_IOU_THRE = [float(x) / 100.0 for x in list(range(50, 100, 5))]
@@ -438,6 +438,6 @@ if __name__ == '__main__':
                 image_list.append([vid, img[j + 1:-4]])
 
 
-            #    compute_bbox_ap(image_list, BBOX_IOU_THRE)
+                #    compute_bbox_ap(image_list, BBOX_IOU_THRE)
 
     compute_mask_ap(image_list, MASK_IOU_THRE)

@@ -374,7 +374,7 @@ class VIPDataset(Dataset):
         # gt_inst_data = cv2.imread(image_info["inst_anno"])
         # gt_inst_data = cv2.imread(img_path)
         # get all instance label list
-        unique_inst = np.unique(gt_inst_data)
+        unique_inst = np.unique(gt_inst_data)  # 去除重复元素，并按元素由大到小返回一个新的无元素重复的元组或者列表
         background_ind = np.where(unique_inst == 0)[0]
         unique_inst = np.delete(unique_inst, background_ind)
 

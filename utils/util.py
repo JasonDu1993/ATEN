@@ -539,11 +539,11 @@ def unmold_part(part, bbox, image_shape):
 
 def generate_anchors(scales, ratios, shape, feature_stride, anchor_stride):
     """
-    scales: 1D array of anchor sizes in pixels. Example: [32, 64, 128]
-    ratios: 1D array of anchor ratios of width/height. Example: [0.5, 1, 2]
+    scales: 1D array of anchor sizes in pixels. For example,vip: [32, 64, 128, 356, 384]
+    ratios: 1D array of anchor ratios of width/height. Example: [0.5, 0.75, 1]
     shape: [height, width] spatial shape of the feature map over which
             to generate anchors.
-    feature_stride: Stride of the feature map relative to the image in pixels.
+    feature_stride: Stride of the feature map relative to the image in pixels.For vip is 4
     anchor_stride: Stride of anchors on the feature map. For example, if the
         value is 2 then generate anchors for every other feature map pixel.
     """

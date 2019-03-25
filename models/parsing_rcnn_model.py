@@ -48,7 +48,7 @@ class BatchNorm(KL.BatchNormalization):
     so we disable it here.
     """
 
-    def __init__(self, training=True, **kwargs):
+    def __init__(self, training=False, **kwargs):
         super(BatchNorm, self).__init__(**kwargs)
         self.training = training
 
@@ -216,6 +216,14 @@ def atrous_conv_block(input_tensor, kernel_size, filters, stage,
 def deeplab_resnet(img_input, architecture):
     """
     Build the architecture of resnet
+    img_input:Tensor("input_image:0", shape=(?, 512, 512, 3), dtype=float32)
+    architecture:Str, "resnet50" or "resnet101"
+    Rreturn:
+        C1:Tensor("max_pooling2d_1/MaxPool:0", shape=(?, 128, 128, 64), dtype=float32)
+        C2:Tensor("activation_10/Relu:0", shape=(?, 128, 128, 256), dtype=float32)
+        C3:Tensor("activation_22/Relu:0", shape=(?, 64, 64, 512), dtype=float32)
+        C4:Tensor("activation_40/Relu:0", shape=(?, 32, 32, 1024), dtype=float32)
+        C5:Tensor("activation_49/Relu:0", shape=(?, 32, 32, 2048), dtype=float32)
     """
 
     # Stage 1
@@ -298,7 +306,7 @@ class ProposalLayer(KE.Layer):
     """Receives anchor scores and selects a subset to pass as proposals
     to the second stage. Filtering is done based on anchor scores and
     non-max suppression to remove overlaps. It also applies bounding
-    box refinment detals to anchors.
+    box refinement details to anchors.
 
     Inputs:
         rpn_probs: [batch, anchors, (bg prob, fg prob)]
@@ -980,7 +988,7 @@ def rpn_graph(feature_map, anchors_per_location, anchor_stride):
     x = KL.Conv2D(2 * anchors_per_location, (1, 1), padding='valid',
                   activation='linear', name='rpn_class_raw')(shared)
 
-    # Reshape to [batch, anchors, 2]
+    # Reshape to [batch, anchors, 2] for vip shape is [bacth, 128*128*anchors_per_location, 2] anchors_per_location=15
     rpn_class_logits = KL.Lambda(
         lambda t: tf.reshape(t, [tf.shape(t)[0], -1, 2]))(x)
 
@@ -1144,6 +1152,15 @@ def build_fpn_mask_graph(rois, feature_map,
 
 
 def arbitrary_size_pooling(feature_map):
+    """similar from  keras.layers import GlobalAveragePooling2D
+
+    Args:
+        feature_map:  Tensor("activation_141/Relu:0", shape=(?, 32, 32, 2048), dtype=float32)
+
+    Returns:
+        b1: Tensor("lambda_1/Mean:0", shape=(?, 1, 32, 2048), dtype=float32)
+        b2: Tensor("lambda_1/Mean_3:0", shape=(?, 1, 1, 2048), dtype=float32)
+    """
     b1 = tf.reduce_mean(feature_map, axis=1, keep_dims=True)
     b2 = tf.reduce_mean(b1, axis=2, keep_dims=True)
     return b2

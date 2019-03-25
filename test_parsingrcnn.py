@@ -27,16 +27,16 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Download this file and place in the root of your 
 # project (See README file for details)
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-# MODEL_PATH = "./outputs/vip_singleframe_20181229a/checkpoints/parsing_rcnn_vip_singleframe_20181229a_epoch043.h5"
+MODEL_PATH = "./outputs/vip_singleframe_20181229a/checkpoints/parsing_rcnn_vip_singleframe_20181229a_epoch043.h5"
 # MODEL_PATH = "./outputs/vip_singleframe_20181229ma/checkpoints/parsing_rcnn_vip_singleframe_20181229ma_epoch086.h5"
-MODEL_PATH = "./outputs/vip_singleframe_test/checkpoints/parsing_rcnn_vip_singleframe_test_epoch001.h5"
+# MODEL_PATH = "./outputs/vip_singleframe_test/checkpoints/parsing_rcnn_vip_singleframe_test_epoch001.h5"
 # MODEL_PATH = "./checkpoints/parsing_rcnn.h5"
 # Directory of images to run detection on
 IMAGE_DIR = DATASET_DIR + "/Images"
 IMAGE_LIST = DATASET_DIR + "/lists/test_id.txt"
 
 # RES_DIR = "./vis/test_vip_singleframe_20181229ma_epoch086"
-RES_DIR = "./vis/vip_singleframe_test_epoch001"
+RES_DIR = "./vis/experiment_20181229a_epoch043"
 if not os.path.exists(RES_DIR):
     os.makedirs(RES_DIR)
 
@@ -69,7 +69,7 @@ for line in rfp.readlines():
     video_floder = os.path.join(RES_DIR, vid)
     if not os.path.exists(video_floder):
         os.makedirs(video_floder)
-    if os.path.exists(os.path.join(video_floder, 'instance_part', image_id) + '.png'):
+    if os.path.exists(os.path.join(video_floder, 'global_parsing', image_id) + '.png'):
         continue
     image = skimage.io.imread(os.path.join(IMAGE_DIR, vid, image_id) + '.jpg')
     # Run detection
