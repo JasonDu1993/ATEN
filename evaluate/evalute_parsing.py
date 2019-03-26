@@ -12,7 +12,13 @@ CLASSES = ['background', 'hat', 'hair', 'sun-glasses', 'upper-clothes', 'dress',
 GT_DIR = '/home/sk49/workspace/dataset/VIP/Category_ids'
 # PRE_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe'
 # PRE_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20181229a_epoch041'
-PRE_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20181229ma_epoch084'
+PRE_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20181229ma_epoch084_submit'
+
+evalute_result_path = "/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20181229ma_epoch084_submit/" \
+                      "20181229ma_epoch084_evalute_parsing.txt"
+
+f = open(evalute_result_path, "w")
+res = ""
 
 
 def main():
@@ -46,17 +52,21 @@ def init_path():
 
     file_names = []
     for vid in os.listdir(image_dir):
-        for img in os.listdir(os.path.join(image_dir, vid, 'gray')):
-            j = img.find('_')
-            if img[:j] == 'global':
-                file_names.append([vid, img[j + 1:-4]])
+        if not vid.startswith("video"):
+            continue
+        for img in os.listdir(os.path.join(image_dir, vid, 'global_parsing')):
+            # if img.startswith("video"):
+            file_names.append([vid, img[:-4]])
+    global res
+    res += "video name:" + str(len(file_names)) + "\n"
+    res += "result of" + image_dir + "\n"
     print("video name:", len(file_names), file_names)
     print("result of", image_dir)
 
     image_paths = []
     label_paths = []
     for file_name in file_names:
-        image_paths.append(os.path.join(image_dir, file_name[0], 'gray', 'global_' + file_name[1] + '.png'))
+        image_paths.append(os.path.join(image_dir, file_name[0], 'global_parsing', file_name[1] + '.png'))
         label_paths.append(os.path.join(label_dir, file_name[0], file_name[1] + '.png'))
     return image_paths, label_paths
 
@@ -93,33 +103,52 @@ def show_result(hist):
     num_cor_pix = np.diag(hist)
     # num of gt pixels
     num_gt_pix = hist.sum(1)
+
+    global res
     print('=' * 50)
 
     # @evaluation 1: overall accuracy
     acc = num_cor_pix.sum() / hist.sum()
     print('>>>', 'overall accuracy', acc)
+    res += "1, overall accuracy:\n"
+    res += ">>> acc: " + str(acc) + "\n"
+    res += '-' * 50 + "\n"
     print('-' * 50)
 
-    # @evaluation 2: mean accuracy & per-class accuracy 
+    # @evaluation 2: mean accuracy & per-class accuracy
+    res += "2, Accuracy for each class (pixel accuracy), mean accuracy & per-class accuracy:\n"
     print('Accuracy for each class (pixel accuracy):')
     for i in range(n_cl):
         print('%-15s: %f' % (classes[i], num_cor_pix[i] / num_gt_pix[i]))
+        res += '%-15s: %f' % (classes[i], num_cor_pix[i] / num_gt_pix[i]) + "\n"
     acc = num_cor_pix / num_gt_pix
     print('>>>', 'mean accuracy', np.nanmean(acc))
+    res += ">>> mean accuracy: " + str(np.nanmean(acc)) + "\n"
+    res += '-' * 50 + "\n"
     print('-' * 50)
 
     # @evaluation 3: mean IU & per-class IU
+    res += "3, mean IU & per-class IU:\n"
     union = num_gt_pix + hist.sum(0) - num_cor_pix
     for i in range(n_cl):
         print('%-15s: %f' % (classes[i], num_cor_pix[i] / union[i]))
+        res += '%-15s: %f' % (classes[i], num_cor_pix[i] / union[i]) + "\n"
     iu = num_cor_pix / (num_gt_pix + hist.sum(0) - num_cor_pix)
-    print('>>>', 'mean IU', np.nanmean(iu))
+    res += ">>> mean IU: " + str(np.nanmean(iu)) + "\n"
+    res += '-' * 50 + "\n"
+    print('>>>', 'mean IU', str(np.nanmean(iu)))
     print('-' * 50)
 
     # @evaluation 4: frequency weighted IU
+    res += "4, frequency weighted IU:\n"
     freq = num_gt_pix / hist.sum()
-    print('>>>', 'fwavacc', (freq[freq > 0] * iu[freq > 0]).sum())
+    res += ">>> IU: " + str((freq[freq > 0] * iu[freq > 0]).sum()) + "\n"
+    res += '-' * 50 + "\n"
+    print('>>>', 'IU', (freq[freq > 0] * iu[freq > 0]).sum())
     print('=' * 50)
+    f.write(res)
+    f.flush()
+    f.close()
 
 
 if __name__ == '__main__':

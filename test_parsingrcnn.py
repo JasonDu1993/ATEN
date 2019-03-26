@@ -12,7 +12,8 @@ import skimage.io
 
 from configs.vip import ParsingRCNNModelConfig
 
-from models.parsing_rcnn_model import PARSING_RCNN
+# from models.parsing_rcnn_model import PARSING_RCNN
+from models.parsing_rcnn_model_dilated import PARSING_RCNN
 from utils import visualize
 from time import time
 
@@ -36,7 +37,7 @@ IMAGE_DIR = DATASET_DIR + "/Images"
 IMAGE_LIST = DATASET_DIR + "/lists/test_id.txt"
 
 # RES_DIR = "./vis/test_vip_singleframe_20181229ma_epoch086"
-RES_DIR = "./vis/experiment_20181229a_epoch043"
+RES_DIR = "./vis/test1"
 if not os.path.exists(RES_DIR):
     os.makedirs(RES_DIR)
 

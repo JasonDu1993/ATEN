@@ -8,8 +8,8 @@
 import os
 import shutil
 
-dir_path = "/home/sk49/workspace/zhoudu/ATEN/vis/test_vip_singleframe_20181229ma_epoch086"
-submit_path = "/home/sk49/workspace/zhoudu/ATEN/vis/test_vip_singleframe_20181229ma_epoch086_submit"
+dir_path = "/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20181229ma_epoch084"
+submit_path = "/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20181229ma_epoch084_submit"
 
 videos = os.listdir(dir_path)
 print(videos)
