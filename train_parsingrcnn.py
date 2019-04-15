@@ -5,7 +5,7 @@ from time import time
 sys.path.insert(0, os.getcwd())
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
@@ -17,8 +17,8 @@ from models.parsing_rcnn_model_dilated import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "vip_singleframe_20190326a"
-    # NAME = "vip_singleframe_test"
+    # NAME = "vip_singleframe_20190408a"
+    NAME = "vip_singleframe_test"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
     STEPS_PER_EPOCH = 2000
@@ -33,8 +33,8 @@ ROOT_DIR = os.getcwd()
 
 # Path to trained weights file
 # PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
-PRETRAIN_MODEL_PATH ="/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20181229a/checkpoints/" \
-                     "parsing_rcnn_vip_singleframe_20181229a_epoch043.h5"
+PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190326a/checkpoints/" \
+                      "parsing_rcnn_vip_singleframe_20190326a_epoch038_loss0.491_valloss0.550.h5"
 
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
@@ -89,8 +89,9 @@ if __name__ == '__main__':
         model_path = args.model
     # common load weight 
     print("Loading weights ", model_path)
+    t0 = time()
     model.load_weights(model_path, by_name=True)
-
+    print("Loaded weights ", time() - t0, "s")
     # Training dataset. Use the training set and 35K from the
     # validation set, as as in the Mask RCNN paper.
     dataset_train = VIPDataset()

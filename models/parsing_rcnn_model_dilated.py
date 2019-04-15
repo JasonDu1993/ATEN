@@ -3,6 +3,7 @@ import logging
 import os
 import random
 import re
+import cv2
 # Requires TensorFlow 1.3+ and Keras 2.0.8+.
 from distutils.version import LooseVersion
 
@@ -14,7 +15,7 @@ import keras.models as KM
 import numpy as np
 import skimage.transform
 import tensorflow as tf
-
+from time import time
 from keras.utils.vis_utils import plot_model
 from utils import util
 
@@ -1653,12 +1654,13 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
 
     # Anchors
     # [anchor_count, (y1, x1, y2, x2)]
+    t0 = time()
     anchors = util.generate_anchors(config.RPN_ANCHOR_SCALES,
                                     config.RPN_ANCHOR_RATIOS,
                                     config.BACKBONE_SHAPES[0],
                                     config.BACKBONE_STRIDES[0],
                                     config.RPN_ANCHOR_STRIDE)
-
+    print("generate_anchors", time() - t0, "s")  # 16ms
     # Keras requires a generator to run indefinately.
     while True:
         try:
@@ -1819,6 +1821,7 @@ class PARSING_RCNN():
                             "to avoid fractions when downscaling and upscaling.")
 
         # Inputs
+        t0 = time()
         input_image = KL.Input(
             shape=config.IMAGE_SHAPE.tolist(), name="input_image")
         input_image_meta = KL.Input(shape=[None], name="input_image_meta")
@@ -1856,17 +1859,25 @@ class PARSING_RCNN():
             input_gt_part = KL.Input(
                 shape=[config.IMAGE_SHAPE[0], config.IMAGE_SHAPE[1]],
                 name="input_gt_part", dtype=tf.uint8)
-
+        t1 = time()
+        print("input", t1 - t0, "s")
         # Build the shared convolutional layers.
         # Bottom-up Layers
         # Returns a list of the last layers of each stage, 5 in total.
         # Don't create the thead (stage 5), so we pick the 4th item in the list.
         c1, c5 = deeplab_resnet(input_image, 'resnet50')
+        t2 = time()
+        print("deeplab_resnet", t2 - t1, "s")
         coarse_feature = global_parsing_encoder(c5)
+        t3 = time()
+        print("global_parsing_encoder", t3 - t2, "s")
         fine_feature = global_parsing_decoder(coarse_feature, c1)
+        t4 = time()
+        print("global_parsing_decoder", t4 - t3, "s")
         # global parsing branch
         global_parsing_map = global_parsing_graph(fine_feature, config.NUM_PART_CLASS)
-
+        t4 = time()
+        print("global_parsing_graph", t4 - t3, "s")
         rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
                                     name='mrcnn_share_rpn_conv1')(fine_feature)
         rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
@@ -1876,7 +1887,8 @@ class PARSING_RCNN():
                                       name='mrcnn_share_recog_conv1')(fine_feature)
         mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
                                       name='mrcnn_share_recog_conv2')(mrcnn_feature_map)
-
+        t5 = time()
+        print("mrcnn_share_rpn and mrcnn_share_recog", t5 - t4, "s")
         # Generate Anchors
         self.anchors = util.generate_anchors(config.RPN_ANCHOR_SCALES,
                                              config.RPN_ANCHOR_RATIOS,
@@ -1884,10 +1896,14 @@ class PARSING_RCNN():
                                              config.BACKBONE_STRIDES[0],
                                              config.RPN_ANCHOR_STRIDE)
 
+        t6 = time()
+        print("build generate_anchors", t6 - t5, "s")
         # RPN Model
         rpn_class_logits, rpn_class, rpn_bbox = rpn_graph(rpn_feature_map,
                                                           len(config.RPN_ANCHOR_RATIOS) * len(config.RPN_ANCHOR_SCALES),
                                                           config.RPN_ANCHOR_STRIDE)
+        t7 = time()
+        print("rpn_graph", t7 - t6, "s")
 
         # Generate proposals
         # Proposals are [batch, N, (y1, x1, y2, x2)] in normalized coordinates
@@ -1902,13 +1918,15 @@ class PARSING_RCNN():
                                  name="ROI",
                                  anchors=self.anchors,
                                  config=config)([rpn_class, rpn_bbox])
-
+        t8 = time()
+        print("ProposalLayer", t8 - t7, "s")
         if mode == "training":
             # Class ID mask to mark class IDs supported by the dataset the image
             # came from.
             _, _, _, active_class_ids = KL.Lambda(lambda x: parse_image_meta_graph(x),
                                                   mask=[None, None, None, None])(input_image_meta)
-
+            t9 = time()
+            print("train parse_image_meta_graph", t9 - t8, "s")
             target_rois = rpn_rois
 
             # Generate detection targets
@@ -1918,25 +1936,29 @@ class PARSING_RCNN():
             rois, target_class_ids, target_bbox, target_mask = \
                 DetectionTargetLayer(config, name="proposal_targets")([
                     target_rois, input_gt_class_ids, gt_boxes, input_gt_masks])
-
+            t10 = time()
+            print("train DetectionTargetLayer", t10 - t9, "s")
             # Network Heads
             # TODO: verify that this handles zero padded ROIs
             mrcnn_class_logits, mrcnn_class, mrcnn_bbox = \
                 fpn_classifier_graph(rois, mrcnn_feature_map, config.IMAGE_SHAPE,
                                      config.POOL_SIZE, config.NUM_CLASSES)
-
+            t11 = time()
+            print("train fpn_classifier_graph", t11 - t10, "s")
             mrcnn_mask = build_fpn_mask_graph(rois, mrcnn_feature_map,
                                               config.IMAGE_SHAPE,
                                               config.MASK_POOL_SIZE,
                                               config.NUM_CLASSES)
-
+            t12 = time()
+            print("train build_fpn_mask_graph", t12 - t11, "s")
             # TODO: clean up (use tf.identify if necessary)
             output_rois = KL.Lambda(lambda x: x * 1, name="output_rois")(rois)
 
             global_parsing_loss = KL.Lambda(lambda x: mrcnn_global_parsing_loss_graph(config.NUM_PART_CLASS, *x),
                                             name="mrcnn_global_parsing_loss")(
                 [input_gt_part, global_parsing_map])
-
+            t13 = time()
+            print("train mrcnn_global_parsing_loss_graph", t13 - t12, "s")
             # Losses
             rpn_class_loss = KL.Lambda(lambda x: rpn_class_loss_graph(*x), name="rpn_class_loss")(
                 [input_rpn_match, rpn_class_logits])
@@ -1948,7 +1970,8 @@ class PARSING_RCNN():
                 [target_bbox, target_class_ids, mrcnn_bbox])
             mask_loss = KL.Lambda(lambda x: mrcnn_mask_loss_graph(*x), name="mrcnn_mask_loss")(
                 [target_mask, target_class_ids, mrcnn_mask])
-
+            t14 = time()
+            print("train loss", t14 - t13, "s")
             # Model
             inputs = [input_image, input_image_meta,
                       input_rpn_match, input_rpn_bbox, input_gt_class_ids, input_gt_boxes, input_gt_masks,
@@ -1961,18 +1984,23 @@ class PARSING_RCNN():
                        rpn_class_loss, rpn_bbox_loss, class_loss, bbox_loss, mask_loss,
                        global_parsing_loss]
             model = KM.Model(inputs, outputs, name='parsing_rcnn')
+            t15 = time()
+            print("train Model", t15 - t14, "s")
         else:
             # Network Heads
             # Proposal classifier and BBox regressor heads
+            t16 = time()
             mrcnn_class_logits, mrcnn_class, mrcnn_bbox = \
                 fpn_classifier_graph(rpn_rois, mrcnn_feature_map, config.IMAGE_SHAPE,
                                      config.POOL_SIZE, config.NUM_CLASSES)
-
+            t17 = time()
+            print("Inference fpn_classifier_graph", t17 - t16, "s")
             # Detections
             # output is [batch, num_detections, (y1, x1, y2, x2, class_id, score)] in image coordinates
             detections = DetectionLayer(config, name="mrcnn_detection")(
                 [rpn_rois, mrcnn_class, mrcnn_bbox, input_image_meta])
-
+            t18 = time()
+            print("Inference DetectionLayer", t18 - t17, "s")
             # Convert boxes to normalized coordinates
             # TODO: let DetectionLayer return normalized coordinates to avoid
             #       unnecessary conversions
@@ -1985,15 +2013,18 @@ class PARSING_RCNN():
                                               config.IMAGE_SHAPE,
                                               config.MASK_POOL_SIZE,
                                               config.NUM_CLASSES)
-
+            t19 = time()
+            print("Inference build_fpn_mask_graph", t19 - t18, "s")
             # global parsing branch
             global_parsing_prob = KL.Lambda(lambda x: post_processing_graph(*x))([global_parsing_map, input_image])
-
+            t20 = time()
+            print("Inference post_processing_graph", t20 - t19, "s")
             model = KM.Model([input_image, input_image_meta],
                              [detections, mrcnn_class, mrcnn_bbox,
                               mrcnn_mask, rpn_rois, rpn_class, rpn_bbox, global_parsing_prob],
                              name='parsing_rcnn')
-
+            t21 = time()
+            print("Inference Model", t21 - t20, "s")
         # Add multi-GPU support.
         if config.GPU_COUNT > 1:
             from utils.parallel_model import ParallelModel
@@ -2369,19 +2400,19 @@ class PARSING_RCNN():
         """Reformats the detections of one image from the format of the neural
         network output to a format suitable for use in the rest of the
         application.
-
-        detections: [N, (y1, x1, y2, x2, class_id, score)]
-        mrcnn_mask: [N, height, width, num_classes]
-        mrcnn_global_parsing: [resized_height, resized_width, num_classes]
-        image_shape: [height, width, depth] Original size of the image before resizing
-        window: [y1, x1, y2, x2] Box in the image where the real image is
-                excluding the padding.
+        Args:
+            detections: [N, (y1, x1, y2, x2, class_id, score)]
+            mrcnn_mask: [N, height, width, num_classes]
+            mrcnn_global_parsing: [resized_height, resized_width, num_classes]
+            image_shape: [height, width, depth] Original size of the image before resizing
+            window: [y1, x1, y2, x2] Box in the image where the real image is
+                    excluding the padding.
 
         Returns:
-        boxes: [N, (y1, x1, y2, x2)] Bounding boxes in pixels
-        class_ids: [N] Integer class IDs for each bounding box
-        scores: [N] Float probability scores of the class_id
-        masks: [height, width, num_instances] Instance masks
+            boxes: [N, (y1, x1, y2, x2)] Bounding boxes in pixels
+            class_ids: [N] Integer class IDs for each bounding box
+            scores: [N] Float probability scores of the class_id
+            masks: [height, width, num_instances] Instance masks
         """
         # How many detections do we have?
         # Detections array is padded with zeros. Find the first class_id == 0.
@@ -2389,10 +2420,10 @@ class PARSING_RCNN():
         N = zero_ix[0] if zero_ix.shape[0] > 0 else detections.shape[0]
 
         # Extract boxes, class_ids, scores, and class-specific masks
-        boxes = detections[:N, :4]
-        class_ids = detections[:N, 4].astype(np.int32)
-        scores = detections[:N, 5]
-        masks = mrcnn_mask[np.arange(N), :, :, class_ids]
+        boxes = detections[:N, :4]  # shape (N, 4)
+        class_ids = detections[:N, 4].astype(np.int32)  # shape (N,)
+        scores = detections[:N, 5]  # shape (N,)
+        masks = mrcnn_mask[np.arange(N), :, :, class_ids]  # shape (N, height, width)
 
         # Compute scale and shift to translate coordinates to image domain.
         h_scale = image_shape[0] / (window[2] - window[0])
@@ -2424,16 +2455,18 @@ class PARSING_RCNN():
             full_masks.append(full_mask)
         full_masks = np.stack(full_masks, axis=-1) \
             if full_masks else np.empty((0,) + masks.shape[1:3])
-
         global_parsing = mrcnn_global_parsing[window[0]:window[2], window[1]:window[3], :]
-        global_parsing = skimage.transform.resize(global_parsing, (image_shape[0], image_shape[1]), mode="constant")
+        # global_parsing = skimage.transform.resize(global_parsing, (image_shape[0], image_shape[1]), mode="constant")
+        # global_parsing = cv2.resize(global_parsing, (image_shape[1], image_shape[0]), interpolation=cv2.INTER_LINEAR)
+        # print("unmold_detections global_parsing", np.min(global_parsing), np.max(global_parsing))
+        global_parsing = cv2.resize(global_parsing, (image_shape[1], image_shape[0]), interpolation=cv2.INTER_CUBIC)
 
         return boxes, class_ids, scores, full_masks, global_parsing
 
     def detect(self, images, verbose=0):
         """Runs the detection pipeline.
 
-        images: List of images, potentially of different sizes.
+        images: List of images, potentially of different sizes.every image shape is [H, W, 3],3 represent rgb
 
         Returns a list of dicts, one dict per image. The dict contains:
         rois: [N, (y1, x1, y2, x2)] detection bounding boxes
@@ -2455,15 +2488,27 @@ class PARSING_RCNN():
             log("molded_images", molded_images)
             log("image_metas", image_metas)
         # Run object detection
+        t1 = time()
+        # detections (1, 100, 6) float32 0-441     , mrcnn_class (1, 1000, 2) float32 0-1
+        # mrcnn_bbox (1, 1000, 2, 4) -3.17 ～ 2.47 ，mrcnn_mask (1, 100, 28, 28, 2) 0-1
+        # roi (1, 1000, 4) 0-1                     ，rpn_class (1, 245760, 2) 0-1
+        # rpn_bbox (1, 245760, 4) -4,73 ～ 18.27   ，mrcnn_global_parsing_prob (1, 512, 512, 20) 0-1
+        # detections: [B, N, (y1, x1, y2, x2, class_id, score)]
+        # mrcnn_mask: [B, N, height, width, num_classes]
+        # mrcnn_global_parsing: [B, resized_height, resized_width, num_classes]
         detections, mrcnn_class, mrcnn_bbox, mrcnn_mask, \
         rois, rpn_class, rpn_bbox, mrcnn_global_parsing_prob = \
             self.keras_model.predict([molded_images, image_metas], verbose=0)
+        t2 = time()
+        # print("mrcnn_global_parsing_prob", np.min(mrcnn_global_parsing_prob), np.max(mrcnn_global_parsing_prob))
+        # print("Run object detection", t2 - t1, "s")
         # Process detections
         results = []
         for i, image in enumerate(images):
             final_rois, final_class_ids, final_scores, final_masks, final_globals = \
                 self.unmold_detections(detections[i], mrcnn_mask[i], mrcnn_global_parsing_prob[i],
                                        image.shape, windows[i])
+            # print("results", np.min(final_masks), np.max(final_masks), np.min(final_globals), np.max(final_globals))
             results.append({
                 "rois": final_rois,
                 "class_ids": final_class_ids,
@@ -2471,6 +2516,7 @@ class PARSING_RCNN():
                 "masks": final_masks,
                 "global_parsing": final_globals
             })
+        # print("Process detections", time.time() - t1, "s")
         return results
 
 

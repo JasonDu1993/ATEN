@@ -68,11 +68,14 @@ for i in range(len(image_ids)):
     ind = file_line.rfind('/')
     vid = file_line[:ind]
     im_name = file_line[ind + 1:]
-    path = os.path.join(RES_DIR, vid)
-    if not os.path.exists(path):
-        os.makedirs(path)
+    video_floder = os.path.join(RES_DIR, "vp_results", vid)
+    color_floder = os.path.join(RES_DIR, "color_results", vid)
+    if not os.path.exists(video_floder):
+        os.makedirs(video_floder)
+    if not os.path.exists(color_floder):
+        os.makedirs(color_floder)
 
-    if os.path.exists(os.path.join(path, 'global_parsing', '%s.png' % im_name)):
+    if os.path.exists(os.path.join(video_floder, 'global_parsing', '%s.png' % im_name)):
         continue
     print(i, file_line)
     cur_frame = dataset.load_image(image_id)
@@ -87,8 +90,8 @@ for i in range(len(image_ids)):
     t2 = time()
     print("aten test one image", t2 - t1, "s")
     # print("detect out ", r['class_ids'].shape[0], "person")
-    visualize.vis_insts(cur_frame, path, im_name, r['rois'], r['masks'], r['class_ids'], r['scores'])
-    visualize.write_inst_part_result(path, cur_frame.shape[0], cur_frame.shape[1], im_name,
+    visualize.vis_insts(cur_frame, video_floder, im_name, r['rois'], r['masks'], r['class_ids'], r['scores'])
+    visualize.write_inst_part_result(video_floder, color_floder, cur_frame.shape[0], cur_frame.shape[1], im_name,
                                      r['rois'], r['masks'], r['scores'], r['global_parsing'])
     print("aten visualize results", time() - t2, "s")
 

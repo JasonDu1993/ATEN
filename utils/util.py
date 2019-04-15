@@ -13,6 +13,7 @@ import math
 import cv2
 import copy
 import random
+import time
 import numpy as np
 import tensorflow as tf
 import scipy.misc
@@ -226,10 +227,10 @@ class Dataset(object):
 
     def __init__(self, class_map=None):
         self._image_ids = []
-        self.image_info = []
+        self.image_info = []  # the value is dict, whick like {'id': 'videos245/000000001051', 'source': 'VIP', 'path': '/home/sk49/workspace/dataset/VIP/Images/videos245/000000001051.jpg', 'front_frame_list': '/home/sk49/workspace/dataset/VIP/front_frame_list/videos245/000000001051.txt', 'behind_frame_list': '/home/sk49/workspace/dataset/VIP/behind_frame_list/videos245/000000001051.txt', 'inst_anno': '/home/sk49/workspace/dataset/VIP/Human_ids/videos245/000000001051.png', 'part_anno': '/home/sk49/workspace/dataset/VIP/Category_ids/videos245/000000001051.png', 'part_rev_anno': '/home/sk49/workspace/dataset/VIP/Category_rev_ids/videos245/000000001051.png'}
         # Background is always the first class
         self.class_info = [{"source": "", "id": 0, "name": "BG"}]
-        self.parsing_class_info = [{"source": "", "id": 0, "name": "BG"}]
+        self.parsing_class_info = [{"source": "", "id": 0, "name": "BG"}]  # <class 'list'>: [{'source': '', 'id': 0, 'name': 'BG'}, {'source': 'VIP', 'id': 1, 'name': 'hat'}, {'source': 'VIP', 'id': 2, 'name': 'hair'}, {'source': 'VIP', 'id': 3, 'name': 'gloves'}, {'source': 'VIP', 'id': 4, 'name': 'sun-glasses'}, {'source': 'VIP', 'id': 5, 'name': 'upper-clothes'}, {'source': 'VIP', 'id': 6, 'name': 'dress'}, {'source': 'VIP', 'id': 7, 'name': 'coat'}, {'source': 'VIP', 'id': 8, 'name': 'socks'}, {'source': 'VIP', 'id': 9, 'name': 'pants'}, {'source': 'VIP', 'id': 10, 'name': 'torso-skin'}, {'source': 'VIP', 'id': 11, 'name': 'scarf'}, {'source': 'VIP', 'id': 12, 'name': 'skirt'}, {'source': 'VIP', 'id': 13, 'name': 'face'}, {'source': 'VIP', 'id': 14, 'name': 'left-arm'}, {'source': 'VIP', 'id': 15, 'name': 'right-arm'}, {'source': 'VIP', 'id': 16, 'name': 'left-leg'}, {'source': 'VIP', 'id': 17, 'name': 'right-leg'}, {'source': 'VIP', 'id': 18, 'name': 'left-shoe'}, {'source': 'VIP', 'id': 19, 'name': 'right-shoe'}]
         self.source_class_ids = {}
 
     def add_class(self, source, class_id, class_name):
@@ -276,18 +277,18 @@ class Dataset(object):
             return ",".join(name.split(",")[:1])
 
         # Build (or rebuild) everything else from the info dicts.
-        self.num_classes = len(self.class_info)
-        self.class_ids = np.arange(self.num_classes)
-        self.class_names = [clean_name(c["name"]) for c in self.class_info]
-        self.num_images = len(self.image_info)
+        self.num_classes = len(self.class_info)  # 2
+        self.class_ids = np.arange(self.num_classes)  # [0 1]
+        self.class_names = [clean_name(c["name"]) for c in self.class_info]  # <class 'list'>: ['BG', 'person']
+        self.num_images = len(self.image_info)  # 训练集数据量18469 验证集数据量2445
         self._image_ids = np.arange(self.num_images)
 
         self.class_from_source_map = {"{}.{}".format(info['source'], info['id']): id
-                                      for info, id in zip(self.class_info, self.class_ids)}
+                                      for info, id in zip(self.class_info, self.class_ids)}  # {'.0': 0, 'VIP.1': 1}
 
         # Map sources to class_ids they support
-        self.sources = list(set([i['source'] for i in self.class_info]))
-        self.source_class_ids = {}
+        self.sources = list(set([i['source'] for i in self.class_info]))  # <class 'list'>: ['', 'VIP']
+        self.source_class_ids = {}  # {'': [0], 'VIP': [0, 1]}
         # Loop over datasets
         for source in self.sources:
             self.source_class_ids[source] = []
@@ -379,7 +380,7 @@ def resize_image(image, min_dim=None, max_dim=None, padding=False):
         coordinates of the image part of the full image (excluding
         the padding). The x2, y2 pixels are not included.
     scale: The scale factor used to resize the image
-    padding: Padding added to the image [(top, bottom), (left, right), (0, 0)]
+    padding: Padding added to the image [(top_pad, bottom_pad), (left_pad, right_pad), (0, 0)]
     """
     # Default window (y1, x1, y2, x2) and default scale == 1.
     h, w = image.shape[:2]
@@ -395,7 +396,7 @@ def resize_image(image, min_dim=None, max_dim=None, padding=False):
         image_max = max(h, w)
         if round(image_max * scale) > max_dim:
             scale = max_dim / image_max
-    # Resize image and mask
+    # [TODO] 修改为opencv的resizeResize image and mask
     if scale != 1:
         image = scipy.misc.imresize(
             image, (round(h * scale), round(w * scale)))
@@ -502,8 +503,11 @@ def unmold_mask(mask, bbox, image_shape):
     """
     threshold = 0.5
     y1, x1, y2, x2 = bbox
+    # [TODO] 将imresize换成opencv的resize
+    t1 = time.time()
     mask = scipy.misc.imresize(
         mask, (y2 - y1, x2 - x1), interp='bilinear').astype(np.float32) / 255.0
+    # print("unmold_mask", time.time() - t1)
     mask = np.where(mask >= threshold, 1, 0).astype(np.uint8)
 
     # Put the mask in the right location.

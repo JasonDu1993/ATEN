@@ -12,6 +12,8 @@ import itertools
 import colorsys
 import numpy as np
 from skimage.measure import find_contours
+import matplotlib
+import matplotlib.colors
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.lines as lines
@@ -19,7 +21,10 @@ from matplotlib.patches import Polygon
 import IPython.display
 import cv2
 import utils
+from time import time
 import scipy.io as sio
+
+matplotlib.use('Agg')
 
 
 ############################################################
@@ -60,6 +65,32 @@ def random_colors(N, bright=True):
     hsv = [(i / N, 1, brightness) for i in range(N)]
     colors = list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv))
     random.shuffle(colors)
+    return colors
+
+
+def random_colors_opencv(N=20):
+    """
+    Generate random colors.
+    To get visually distinct colors, generate them in HSV space then
+    convert to RGB.
+    """
+    # colors = [list((matplotlib.colors.hsv_to_rgb([x, 1.0, 1.0]) * 255).astype(int)) for x in
+    #           np.arange(0, 1, 1.0 / N)]
+    # np.random.shuffle(colors)
+    # 20个颜色通过上述代码获取
+    if N <= 50:
+        colors = [[255, 0, 30], [0, 224, 255], [0, 255, 132], [112, 255, 0], [255, 0, 0], [255, 0, 183], [0, 255, 71],
+                  [0, 163, 255], [0, 40, 255], [142, 255, 0], [173, 255, 0], [112, 0, 255], [255, 0, 244],
+                  [255, 0, 122], [20, 255, 0], [0, 132, 255], [142, 0, 255], [204, 0, 255], [0, 255, 193],
+                  [0, 255, 102], [0, 71, 255], [173, 0, 255], [255, 30, 0], [255, 0, 214], [51, 0, 255], [203, 255, 0],
+                  [0, 255, 40], [0, 255, 163], [81, 255, 0], [255, 214, 0], [234, 0, 255], [20, 0, 255], [255, 61, 0],
+                  [255, 91, 0], [255, 122, 0], [255, 244, 0], [255, 0, 61], [255, 0, 152], [0, 10, 255], [255, 0, 91],
+                  [234, 255, 0], [255, 153, 0], [0, 255, 10], [0, 193, 255], [0, 255, 224], [0, 102, 255],
+                  [255, 183, 0], [81, 0, 255], [0, 255, 255], [51, 255, 0]]
+    else:
+        colors = [list((matplotlib.colors.hsv_to_rgb([x, 1.0, 1.0]) * 255).astype(int)) for x in
+                  np.arange(0, 1, 1.0 / N)]
+        np.random.shuffle(colors)
     return colors
 
 
@@ -200,18 +231,16 @@ def get_color_map(n=256):
     return color_map
 
 
-def write_global_result(res_dir, height, width, image_id, global_parsing_prob):
+def write_global_result(res_dir, color_dir, height, width, image_id, global_parsing_prob):
     """
     Input:
     global_parsing_prob: [height, width, NUM_PART_CLASS]
     """
-    if not os.path.exists(os.path.join(res_dir, 'color')):
-        os.makedirs(os.path.join(res_dir, 'color'))
+    if not os.path.exists(os.path.join(color_dir, 'color')):
+        os.makedirs(os.path.join(color_dir, 'color'))
     if not os.path.exists(os.path.join(res_dir, 'global_parsing')):
         os.makedirs(os.path.join(res_dir, 'global_parsing'))
-
-
-    c_map = get_color_map()
+    c_map = np.array(random_colors_opencv(20))
     global_parsing = np.argmax(global_parsing_prob, axis=-1)
 
     global_parsing_max_prob = np.max(global_parsing_prob, axis=-1)
@@ -221,33 +250,42 @@ def write_global_result(res_dir, height, width, image_id, global_parsing_prob):
     global_parsing_map = np.zeros((height, width, 3), dtype=np.uint8)
 
     coo = np.where(global_parsing > 0)
-
-    for k in range(len(coo[0])):
-        global_parsing_map[coo[0][k], coo[1][k], :] = c_map[global_parsing[coo[0][k], coo[1][k]]][::-1]
-    cv2.imwrite(os.path.join(res_dir, "color/global_%s.png" % image_id), global_parsing_map)
-    cv2.imwrite(os.path.join(res_dir, "global_parsing/%s.png" % image_id), global_parsing)
+    global_parsing_map[coo[0], coo[1], :] = c_map[global_parsing[coo[0], coo[1]]]
+    img_global_path = os.path.join(res_dir, "global_parsing", "%s.png" % image_id)
+    color_global_path = os.path.join(color_dir, "color", "global_%s.png" % image_id)
+    if not os.path.exists(img_global_path):
+        cv2.imwrite(img_global_path, global_parsing)
+    if not os.path.exists(color_global_path):
+        cv2.imwrite(color_global_path, global_parsing_map)
     return global_parsing, global_parsing_max_prob
 
 
-def write_inst_result(res_dir, height, width, image_id, boxes, masks, scores, nms_like_thre=0.7):
+def write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks, scores, nms_like_thre=0.7):
     """
     input:
     boxes: [num_instance, (y1, x1, y2, x2)] in image coordinates.
     masks: [height, width, num_instance] of uint8
     scores: [num_instance] confidence scores for each box
     """
-    if not os.path.exists(os.path.join(res_dir, 'color')):
-        os.makedirs(os.path.join(res_dir, 'color'))
+    if not os.path.exists(os.path.join(color_dir, 'color')):
+        os.makedirs(os.path.join(color_dir, 'color'))
     if not os.path.exists(os.path.join(res_dir, 'instance_segmentation')):
         os.makedirs(os.path.join(res_dir, 'instance_segmentation'))
+    t1 = time()
     c_map = get_color_map()
+    t2 = time()
+    # print(t2 - t1)
     masks = np.transpose(masks, (2, 0, 1))
     N = boxes.shape[0]
     color_map = np.zeros((height, width, 3), dtype=np.uint8)
     gray_map = np.zeros((height, width), dtype=np.uint8)
     inst_count = 1
     scores_boxes = []
-    wfp = open(os.path.join(res_dir, 'instance_segmentation', '%s.txt' % image_id), 'w')
+    txt_instance_segmentation = os.path.join(res_dir, 'instance_segmentation', '%s.txt' % image_id)
+    # if not os.path.exists(txt_instance_segmentation):
+    wfp = open(txt_instance_segmentation, 'w')
+    t3 = time()
+    # print(t3 - t2)
     for i in range(N):
         mask = masks[i]
         box = boxes[i]
@@ -272,24 +310,98 @@ def write_inst_result(res_dir, height, width, image_id, boxes, masks, scores, nm
             gray_map[coo[0][k], coo[1][k]] = inst_count
             color_map[coo[0][k], coo[1][k], :] = c_map[inst_count][::-1]
         inst_count += 1
-    cv2.imwrite(os.path.join(res_dir, "color/inst_%s.png" % image_id), color_map)
-    cv2.imwrite(os.path.join(res_dir, "instance_segmentation/%s.png" % image_id), gray_map)
+    # print("for", time() - t3)
     wfp.close()
+    img_instance_segmentation_path = os.path.join(res_dir, "instance_segmentation", "%s.png" % image_id)
+    if not os.path.exists(img_instance_segmentation_path):
+        cv2.imwrite(img_instance_segmentation_path, gray_map)
+    color_instance_segmentation_path = os.path.join(color_dir, "color", "inst_%s.png" % image_id)
+    if not os.path.exists(color_instance_segmentation_path):
+        cv2.imwrite(color_instance_segmentation_path, color_map)
+
     return gray_map, scores_boxes
 
 
-def write_inst_part_result(res_dir, height, width, image_id, boxes, masks, scores, global_parsing_prob,
+def write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes, masks, scores, nms_like_thre=0.7):
+    """
+    input:
+    boxes: [num_instance, (y1, x1, y2, x2)] in image coordinates.
+    masks: [height, width, num_instance] of uint8
+    scores: [num_instance] confidence scores for each box
+    """
+    if not os.path.exists(os.path.join(color_dir, 'color')):
+        os.makedirs(os.path.join(color_dir, 'color'))
+    if not os.path.exists(os.path.join(res_dir, 'instance_segmentation')):
+        os.makedirs(os.path.join(res_dir, 'instance_segmentation'))
+    N = boxes.shape[0]
+    t1 = time()
+    c_map = random_colors_opencv(N)
+    t2 = time()
+    # print(t2 - t1)
+    masks = np.transpose(masks, (2, 0, 1))
+    color_map = np.zeros((height, width, 3), dtype=np.uint8)
+    gray_map = np.zeros((height, width), dtype=np.uint8)
+    inst_count = 1
+    scores_boxes = []
+    txt_instance_segmentation = os.path.join(res_dir, 'instance_segmentation', '%s.txt' % image_id)
+    # if not os.path.exists(txt_instance_segmentation):
+    wfp = open(txt_instance_segmentation, 'w')
+    t3 = time()
+    # print(t3 - t2)
+    for i in range(N):
+        mask = masks[i]
+        box = boxes[i]
+        score = scores[i]
+        coo = np.where(mask > 0)
+        u_pixels = len(coo[0])
+
+        # nms-like postprocess
+        mask[gray_map[mask > 0] > 0] = 0
+        coo = np.where(mask > 0)
+        u1_pixels = len(coo[0])
+
+        if float(u1_pixels) / float(u_pixels) <= nms_like_thre:
+            continue
+
+        # write score and bbox
+        scores_boxes.append([score, box[0], box[1], box[2], box[3]])
+        wfp.write('%f %d %d %d %d\n' % (score, box[0], box[1], box[2], box[3]))
+        gray_map[mask > 0] = inst_count
+        color_map[coo[0], coo[1], :] = c_map[inst_count]
+        inst_count += 1
+    # print("for", time() - t3)
+    wfp.close()
+    img_instance_segmentation_path = os.path.join(res_dir, "instance_segmentation", "%s.png" % image_id)
+    if not os.path.exists(img_instance_segmentation_path):
+        cv2.imwrite(img_instance_segmentation_path, gray_map)
+    color_instance_segmentation_path = os.path.join(color_dir, "color", "inst_%s.png" % image_id)
+    if not os.path.exists(color_instance_segmentation_path):
+        cv2.imwrite(color_instance_segmentation_path, color_map)
+
+    return gray_map, scores_boxes
+
+
+def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, masks, scores, global_parsing_prob,
                            nms_like_thre=0.7, class_num=19):
-    parsing_map, parsing_prob = write_global_result(res_dir, height, width, image_id, global_parsing_prob)
-    inst_map, inst_scores = write_inst_result(res_dir, height, width, image_id, boxes, masks, scores, nms_like_thre)
+    t0 = time()
+    parsing_map, parsing_prob = write_global_result(res_dir, color_dir, height, width, image_id, global_parsing_prob)
+    t1 = time()
+    print("write_global_result", t1 - t0)
+    inst_map, inst_scores = write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks, scores,
+                                              nms_like_thre)
+    # inst_map, inst_scores = write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes, masks, scores,
+    #                                                 nms_like_thre)
+    t2 = time()
+    print("write_inst_result", t2 - t1)
     inst_part_map = np.zeros_like(inst_map)
     # build floder
     floder = os.path.join(res_dir, 'instance_parsing')
     if not os.path.exists(floder):
         os.makedirs(floder)
-
-    wfp = open('%s/%s.txt' % (floder, image_id), 'w')
+    instance_parsing_path = '%s/%s.txt' % (floder, image_id)
+    wfp = open(instance_parsing_path, 'w')
     counter = 0
+    t3 = time()
     for k in range(1, class_num + 1):
         cur_counter = counter
         inst_part_prob_map = {}
@@ -313,7 +425,12 @@ def write_inst_part_result(res_dir, height, width, image_id, boxes, masks, score
             for i in range(cur_counter, counter):
                 wfp.write('%d %f\n' % (k, inst_part_prob_map[i + 1]))
     wfp.close()
-    cv2.imwrite(os.path.join(floder, "%s.png" % image_id), inst_part_map)
+    t4 = time()
+    # print("for", t4 - t3)
+    img_instance_parsing_path = os.path.join(floder, "%s.png" % image_id)
+    if not os.path.exists(img_instance_parsing_path):
+        cv2.imwrite(img_instance_parsing_path, inst_part_map)
+        # print("save", time() - t4)
 
 
 def vis_inst_parsings(image, res_dir, image_id, boxes, parts, class_ids,
@@ -385,12 +502,14 @@ def vis_inst_parsings(image, res_dir, image_id, boxes, parts, class_ids,
 def vis_insts(image, res_dir, image_id, boxes, masks, class_ids,
               scores=None, class_names=['BG', 'person'], figsize=(16, 16)):
     """
-    boxes: [num_instance, (y1, x1, y2, x2, class_id)] in image coordinates.
-    masks: [height, width, num_instance]
-    class_ids: [num_instances]
-    class_names: list of class names of the dataset
-    scores: (optional) confidence scores for each box
-    figsize: (optional) the size of the image.
+    Args:
+        image: numpy.ndarray, shape=[height, width, num_instance] (720, 1280, 3), dtype=uint32
+        boxes: numpy.ndarray, shape=[num_instance, (y1, x1, y2, x2)] in image coordinates.
+        masks: numpy.ndarray, shape=[height, width, num_instance] (720, 1280, 3),dtype=uint8
+        class_ids: list, len=num_instances
+        class_names: list of class names of the dataset, default is ['BG', 'person']
+        scores: (optional) confidence scores for each box,numpy.ndarray,shape=[num_instances], dtype=float32
+        figsize: (optional) the size of the image.
     """
     # Number of 
     if not os.path.exists(os.path.join(res_dir, 'color')):
@@ -406,11 +525,14 @@ def vis_insts(image, res_dir, image_id, boxes, masks, class_ids,
 
     # Generate random colors
     colors = random_colors(N)
+    # colors = random_colors_opencv(N)
 
     # Show area outside image boundaries.
     height, width = image.shape[:2]
 
     masked_image = image.astype(np.uint32).copy()
+    t1 = time()
+    print("N", N)
     for i in range(N):
         color = colors[i]
 
@@ -448,12 +570,85 @@ def vis_insts(image, res_dir, image_id, boxes, masks, class_ids,
             verts = np.fliplr(verts) - 1
             p = Polygon(verts, facecolor="none", edgecolor=color)
             ax.add_patch(p)
+    t2 = time()
+    print(t2 - t1)
     ax.imshow(masked_image.astype(np.uint8))
+    t3 = time()
+    print(t3 - t2)
     plt.axis('off')
     plt.tight_layout()
     plt.draw()
-    fig.savefig(os.path.join(res_dir, 'color', 'vis_%s.png' % image_id))
+    img_path = os.path.join(res_dir, 'color', 'vis_%s.png' % image_id)
+    if not os.path.exists(img_path):
+        fig.savefig(img_path)
     plt.close()
+    t4 = time()
+    print("savefig", t4 - t3)
+
+
+def vis_insts_opencv(image, res_dir, image_id, boxes, masks, class_ids,
+                     scores=None, class_names=['BG', 'person'], figsize=(16, 16)):
+    """针对每个人体画一个颜色
+   Args:
+       image: numpy.ndarray, shape=[height, width, num_instance] (720, 1280, 3), dtype=uint8
+       boxes: numpy.ndarray, shape=[num_instance, (y1, x1, y2, x2)] in image coordinates.
+       masks: numpy.ndarray, shape=[height, width, num_instance] (720, 1280, 3),dtype=uint8
+       class_ids: list, len=num_instances
+       class_names: list of class names of the dataset, default is ['BG', 'person']
+       scores: (optional) confidence scores for each box,numpy.ndarray,shape=[num_instances], dtype=float32
+       figsize: (optional) the size of the image.
+    """
+    # Number of
+    if not os.path.exists(os.path.join(res_dir, 'color')):
+        os.makedirs(os.path.join(res_dir, 'color'))
+
+    N = boxes.shape[0]
+    if not N:
+        print("\n*** No instances to display *** \n")
+    else:
+        assert boxes.shape[0] == masks.shape[-1] == class_ids.shape[0]
+
+    # Generate random colors
+    colors = random_colors_opencv(N)
+
+    # Show area outside image boundaries.
+    height, width = image.shape[:2]
+
+    masked_image = image.astype(np.uint8).copy()
+    t1 = time()
+    # print("N", N)
+    for i in range(N):
+        color = colors[i]
+        # Bounding box
+        if not np.any(boxes[i]):
+            # Skip this instance. Has no bbox. Likely lost in image cropping.
+            continue
+        y1, x1, y2, x2 = boxes[i]
+        cv2.rectangle(masked_image, (x1, y1), (x2, y2), color=color, thickness=1)
+
+        # Label
+        class_id = class_ids[i]
+        score = scores[i] if scores is not None else None
+        label = class_names[class_id]
+        x = random.randint(x1, (x1 + x2) // 2)
+        caption = "{} {:.3f}".format(label, score) if score else label
+        cv2.putText(masked_image, caption, (x1, max(y1 - 15, 0)), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5,
+                    color=color, thickness=1)
+        # Mask
+        mask = masks[:, :, i]
+        masked_image_binary = mask * 255
+        masked_image_binary = masked_image_binary.astype(np.uint8)
+
+        # Mask Polygon
+        # opencv 找边缘轮廓需要传入二值图
+        img1, contours, hierarchy = cv2.findContours(masked_image_binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        cv2.drawContours(masked_image, contours, -1, color=color, thickness=1)
+
+    img_path = os.path.join(res_dir, 'color', 'vis_%s.png' % image_id)
+    if not os.path.exists(img_path):
+        cv2.imwrite(img_path, masked_image)
+    t2 = time()
+    # print("opencv", t2 - t1, "s")
 
 
 def draw_rois(image, rois, refined_rois, mask, class_ids, class_names, limit=10):

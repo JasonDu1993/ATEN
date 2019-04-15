@@ -13,7 +13,7 @@ import numpy as np
 
 from configs.vip import VideoModelConfig
 from configs.vip import VIPDataset
-from models import aten_model as modellib
+from models import aten_model_dilated as modellib
 
 
 class trainConfig(VideoModelConfig):
