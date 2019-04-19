@@ -1435,12 +1435,12 @@ def mrcnn_global_parsing_loss_graph(num_classes, gt_parsing_map, predict_parsing
 
     # Predictions: ignoring all predictions with labels greater or equal than n_classes
     indices = tf.squeeze(tf.where(tf.less_equal(raw_gt, num_classes - 1)), 1)
-    gt = tf.gather(raw_gt, indices)
-    prediction = tf.gather(raw_prediction, indices)
+    gt = tf.gather(raw_gt, indices)  # shape = (K,) K 表示找到的符合tf.less_equal(raw_gt, num_classes - 1)的个数
+    prediction = tf.gather(raw_prediction, indices)  # shape = （K, parsing_class_num)
 
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        labels=gt, logits=prediction)
-    loss = tf.reduce_mean(loss)
+        labels=gt, logits=prediction)  # (parsing_class_num, )
+    loss = tf.reduce_mean(loss)  # scalar
     # loss = tf.reshape(loss, [1, 1])
     return K.cast(loss, dtype="float32")
 

@@ -100,11 +100,14 @@ class ConvRecurrent2D(Recurrent):
         self.kernel_size = conv_utils.normalize_tuple(kernel_size, 2, 'kernel_size')
         self.strides = conv_utils.normalize_tuple(strides, 2, 'strides')
         self.padding = conv_utils.normalize_padding(padding)
-        import keras
-        if keras.__version__ > "2.1.3":
-            self.data_format = K.normalize_data_format(data_format)
-        else:
-            self.data_format = conv_utils.normalize_data_format(data_format)
+        # import keras
+        # if keras.__version__ > "2.1.3":
+        #     from keras.backend import normalize_data_format
+        #     # self.data_format = K.normalize_data_format(data_format)
+        #     self.data_format = normalize_data_format(data_format)
+        # else:
+        #     self.data_format = conv_utils.normalize_data_format(data_format)
+        self.data_format = conv_utils.normalize_data_format(data_format)
         self.dilation_rate = conv_utils.normalize_tuple(dilation_rate, 2, 'dilation_rate')
         self.return_sequences = return_sequences
         self.go_backwards = go_backwards
