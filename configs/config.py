@@ -157,7 +157,7 @@ class Config(object):
         self.BACKBONE_SHAPES = np.array(
             [[int(math.ceil(self.IMAGE_SHAPE[0] / stride)),
               int(math.ceil(self.IMAGE_SHAPE[1] / stride))]
-             for stride in self.BACKBONE_STRIDES])
+             for stride in self.BACKBONE_STRIDES])  # [[128 128] [ 64  64] [ 32  32] [ 32  32][ 16  16]]
 
     def display(self):
         """Display Configuration values."""

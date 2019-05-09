@@ -261,16 +261,19 @@ def deeplab_resnet(img_input, architecture):
 #  Proposal Layer
 ############################################################
 
-def apply_box_deltas_graph(boxes, deltas):
-    """Applies the given deltas to the given boxes.
-    boxes: [N, 4] where each row is y1, x1, y2, x2
-    deltas: [N, 4] where each row is [dy, dx, log(dh), log(dw)]
+def apply_box_deltas_graph(anchors, deltas):
+    """Applies the given deltas to the given anchors.
+    Args:
+        anchors: Tensor, shape=(N, 4) where each row is y1, x1, y2, x2
+        deltas: Tensor, shape=(N, 4) where each row is [dy, dx, log(dh), log(dw)]
+    Returns:
+        result: Tensor, shape=(N, 4) where each row is y1, x1, y2, x2
     """
     # Convert to y, x, h, w
-    height = boxes[:, 2] - boxes[:, 0]
-    width = boxes[:, 3] - boxes[:, 1]
-    center_y = boxes[:, 0] + 0.5 * height
-    center_x = boxes[:, 1] + 0.5 * width
+    height = anchors[:, 2] - anchors[:, 0]
+    width = anchors[:, 3] - anchors[:, 1]
+    center_y = anchors[:, 0] + 0.5 * height
+    center_x = anchors[:, 1] + 0.5 * width
     # Apply deltas
     center_y += deltas[:, 0] * height
     center_x += deltas[:, 1] * width
@@ -286,19 +289,19 @@ def apply_box_deltas_graph(boxes, deltas):
 
 
 def clip_boxes_graph(boxes, window):
-    """
-    boxes: [N, 4] each row is y1, x1, y2, x2
-    window: [4] in the form y1, x1, y2, x2
+    """去除预测出来的boxes坐标限制在window所在范围内
+    boxes: numpy.ndarray, [N, 4] each row is y1, x1, y2, x2
+    window: Tensor, [4] in the form y1, x1, y2, x2
     """
     # Split corners
     wy1, wx1, wy2, wx2 = tf.split(window, 4)
     y1, x1, y2, x2 = tf.split(boxes, 4, axis=1)
     # Clip
-    y1 = tf.maximum(tf.minimum(y1, wy2), wy1)
+    y1 = tf.maximum(tf.minimum(y1, wy2), wy1)  # shape (N=12000, 1)
     x1 = tf.maximum(tf.minimum(x1, wx2), wx1)
     y2 = tf.maximum(tf.minimum(y2, wy2), wy1)
     x2 = tf.maximum(tf.minimum(x2, wx2), wx1)
-    clipped = tf.concat([y1, x1, y2, x2], axis=1, name="clipped_boxes")
+    clipped = tf.concat([y1, x1, y2, x2], axis=1, name="clipped_boxes")  # shape (N=12000, 4)
     return clipped
 
 
@@ -319,7 +322,11 @@ class ProposalLayer(KE.Layer):
     def __init__(self, proposal_count, pre_proposal_count, nms_threshold, anchors,
                  config=None, **kwargs):
         """
-        anchors: [N, (y1, x1, y2, x2)] anchors defined in image coordinates
+        Args:
+            proposal_count:training default 2000, inference default 1000
+            pre_proposal_count:training default 12000, inference default 6000
+            nms_threshold: default 0.7
+            anchors: [N, (y1, x1, y2, x2)] anchors defined in image coordinates
         """
         super(ProposalLayer, self).__init__(**kwargs)
         self.config = config
@@ -328,34 +335,42 @@ class ProposalLayer(KE.Layer):
         self.nms_threshold = nms_threshold
         self.anchors = anchors.astype(np.float32)
 
-    def call(self, inputs):
-        # Box Scores. Use the foreground class confidence. [Batch, num_rois, 1]
-        scores = inputs[0][:, :, 1]
+    def call(self, inputs):          #
+        """ Box Scores. Use the foreground class confidence. [Batch, num_rois, 1]
+
+        Args:
+            inputs: list: [<tf.Tensor 'rpn_class_xxx/truediv:0' shape=(1, 245760, 2) dtype=float32>,
+                            <tf.Tensor 'lambda_63/Reshape:0' shape=(1, 245760, 4) dtype=float32>]
+        Returns:
+            proposals: [B, proposal_count, 4], the coordinate is normalized to 1
+
+        """
+        scores = inputs[0][:, :, 1]  # shape (1, 245760=128*128*5*3)
         # Box deltas [batch, num_rois, 4]
-        deltas = inputs[1]
-        deltas = deltas * np.reshape(self.config.RPN_BBOX_STD_DEV, [1, 1, 4])
+        deltas = inputs[1]  # shape (1, 245760, 4)
+        deltas = deltas * np.reshape(self.config.RPN_BBOX_STD_DEV, [1, 1, 4])  # shape (1, 245760, 4)
         # Base anchors
-        anchors = self.anchors
+        anchors = self.anchors  # shape (245760, 4)
 
         # Improve performance by trimming to top anchors by score
         # and doing the rest on the smaller subset.
         pre_nms_limit = min(self.pre_proposal_count, self.anchors.shape[0])
         ix = tf.nn.top_k(scores, pre_nms_limit, sorted=True,
-                         name="top_anchors").indices
+                         name="top_anchors").indices  # (1, pre_nms_limit)
         scores = util.batch_slice([scores, ix], lambda x, y: tf.gather(x, y),
-                                  self.config.IMAGES_PER_GPU)
+                                  self.config.IMAGES_PER_GPU)  # shape(1, pre_nms_limit)
         deltas = util.batch_slice([deltas, ix], lambda x, y: tf.gather(x, y),
-                                  self.config.IMAGES_PER_GPU)
+                                  self.config.IMAGES_PER_GPU)  # shape(1, pre_nms_limit, 4)
         anchors = util.batch_slice(ix, lambda x: tf.gather(anchors, x),
                                    self.config.IMAGES_PER_GPU,
-                                   names=["pre_nms_anchors"])
+                                   names=["pre_nms_anchors"])  # shape(1, pre_nms_limit, 4)
 
         # Apply deltas to anchors to get refined anchors.
         # [batch, N, (y1, x1, y2, x2)]
         boxes = util.batch_slice([anchors, deltas],
                                  lambda x, y: apply_box_deltas_graph(x, y),
                                  self.config.IMAGES_PER_GPU,
-                                 names=["refined_anchors"])
+                                 names=["refined_anchors"])  # shape(1, pre_nms_limit, 4)
 
         # Clip to image boundaries. [batch, N, (y1, x1, y2, x2)]
         height, width = self.config.IMAGE_SHAPE[:2]
@@ -363,7 +378,7 @@ class ProposalLayer(KE.Layer):
         boxes = util.batch_slice(boxes,
                                  lambda x: clip_boxes_graph(x, window),
                                  self.config.IMAGES_PER_GPU,
-                                 names=["refined_anchors_clipped"])
+                                 names=["refined_anchors_clipped"])  # shape (1, 12000, 4)
 
         # Filter out small boxes
         # According to Xinlei Chen's paper, this reduces detection accuracy
@@ -624,17 +639,17 @@ class ROIAlign(KE.Layer):
 #  Detection Target Layer
 ############################################################
 
-def overlaps_graph(boxes1, boxes2):
+def overlaps_graph(proposals, gt_boxes):
     """Computes IoU overlaps between two sets of boxes.
-    boxes1, boxes2: [N, (y1, x1, y2, x2)].
+    proposals, gt_boxes: [N1, (y1, x1, y2, x2)], [N2, (y1,x1,y2,x2)].overlaps shape [N1, N2]
     """
-    # 1. Tile boxes2 and repeate boxes1. This allows us to compare
-    # every boxes1 against every boxes2 without loops.
+    # 1. Tile gt_boxes and repeate proposals. This allows us to compare
+    # every proposals against every gt_boxes without loops.
     # TF doesn't have an equivalent to np.repeate() so simulate it
     # using tf.tile() and tf.reshape.
-    b1 = tf.reshape(tf.tile(tf.expand_dims(boxes1, 1),
-                            [1, 1, tf.shape(boxes2)[0]]), [-1, 4])
-    b2 = tf.tile(boxes2, [tf.shape(boxes1)[0], 1])
+    b1 = tf.reshape(tf.tile(tf.expand_dims(proposals, 1),
+                            [1, 1, tf.shape(gt_boxes)[0]]), [-1, 4])
+    b2 = tf.tile(gt_boxes, [tf.shape(proposals)[0], 1])
     # 2. Compute intersections
     b1_y1, b1_x1, b1_y2, b1_x2 = tf.split(b1, 4, axis=1)
     b2_y1, b2_x1, b2_y2, b2_x2 = tf.split(b2, 4, axis=1)
@@ -647,9 +662,9 @@ def overlaps_graph(boxes1, boxes2):
     b1_area = (b1_y2 - b1_y1) * (b1_x2 - b1_x1)
     b2_area = (b2_y2 - b2_y1) * (b2_x2 - b2_x1)
     union = b1_area + b2_area - intersection
-    # 4. Compute IoU and reshape to [boxes1, boxes2]
+    # 4. Compute IoU and reshape to [proposals, gt_boxes]
     iou = intersection / union
-    overlaps = tf.reshape(iou, [tf.shape(boxes1)[0], tf.shape(boxes2)[0]])
+    overlaps = tf.reshape(iou, [tf.shape(proposals)[0], tf.shape(gt_boxes)[0]])
     return overlaps
 
 
@@ -657,21 +672,21 @@ def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config)
     """Generates detection targets for one image. Subsamples proposals and
     generates target class IDs, bounding box deltas, and masks for each.
 
-    Inputs:
-    proposals: [N, (y1, x1, y2, x2)] in normalized coordinates. Might
-               be zero padded if there are not enough proposals.
-    gt_class_ids: [MAX_GT_INSTANCES] int class IDs
-    gt_boxes: [MAX_GT_INSTANCES, (y1, x1, y2, x2)] in normalized coordinates.
-    gt_masks: [height, width, MAX_GT_INSTANCES] of boolean type.
+    Args:
+        proposals: [N, (y1, x1, y2, x2)] in normalized coordinates. Might
+                   be zero padded if there are not enough proposals.
+        gt_class_ids: [MAX_GT_INSTANCES] int class IDs
+        gt_boxes: [MAX_GT_INSTANCES, (y1, x1, y2, x2)] in normalized coordinates.
+        gt_masks: [height, width, MAX_GT_INSTANCES] of boolean type.
 
     Returns: Target ROIs and corresponding class IDs, bounding box shifts,
     and masks.
-    rois: [TRAIN_ROIS_PER_IMAGE, (y1, x1, y2, x2)] in normalized coordinates
-    class_ids: [TRAIN_ROIS_PER_IMAGE]. Integer class IDs. Zero padded.
-    deltas: [TRAIN_ROIS_PER_IMAGE, NUM_CLASSES, (dy, dx, log(dh), log(dw))]
-            Class-specific bbox refinments.
-    masks: [TRAIN_ROIS_PER_IMAGE, height, width). Masks cropped to bbox
-           boundaries and resized to neural network output size.
+        rois: [TRAIN_ROIS_PER_IMAGE, (y1, x1, y2, x2)] in normalized coordinates
+        class_ids: [TRAIN_ROIS_PER_IMAGE]. Integer class IDs. Zero padded.
+        deltas: [TRAIN_ROIS_PER_IMAGE, NUM_CLASSES, (dy, dx, log(dh), log(dw))]
+                Class-specific bbox refinments.
+        masks: [TRAIN_ROIS_PER_IMAGE, height, width). Masks cropped to bbox
+               boundaries and resized to neural network output size.
 
     Note: Returned arrays might be zero padded if not enough target ROIs.
     """
@@ -692,7 +707,7 @@ def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config)
                          name="trim_gt_masks")
 
     # Compute overlaps matrix [proposals, gt_boxes]
-    overlaps = overlaps_graph(proposals, gt_boxes)
+    overlaps = overlaps_graph(proposals, gt_boxes)  # overlaps shape [tf.shape(proposals)[0], tf.shape(gt_boxes)[0]]
 
     # Determine postive and negative ROIs
     roi_iou_max = tf.reduce_max(overlaps, axis=1)
@@ -706,22 +721,22 @@ def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config)
     # Subsample ROIs. Aim for 33% positive
     # Positive ROIs
     positive_count = int(config.TRAIN_ROIS_PER_IMAGE *
-                         config.ROI_POSITIVE_RATIO)
+                         config.ROI_POSITIVE_RATIO)  # int(128*0.33)等于42
     positive_indices = tf.random_shuffle(positive_indices)[:positive_count]
     positive_count = tf.shape(positive_indices)[0]
     # Negative ROIs. Add enough to maintain positive:negative ratio.
-    r = 1.0 / config.ROI_POSITIVE_RATIO
+    r = 1.0 / config.ROI_POSITIVE_RATIO  # r=1/0.33等于3.0303...
     negative_count = tf.cast(r * tf.cast(positive_count, tf.float32), tf.int32) - positive_count
-    negative_indices = tf.random_shuffle(negative_indices)[:negative_count]
+    negative_indices = tf.random_shuffle(negative_indices)[:negative_count]  # int(1/0.33 * 42)等于127
     # Gather selected ROIs
-    positive_rois = tf.gather(proposals, positive_indices)
-    negative_rois = tf.gather(proposals, negative_indices)
+    positive_rois = tf.gather(proposals, positive_indices)  # shape (positive_count, 4)
+    negative_rois = tf.gather(proposals, negative_indices)  # shape (negative_count, 4)
 
     # Assign positive ROIs to GT boxes.
-    positive_overlaps = tf.gather(overlaps, positive_indices)
-    roi_gt_box_assignment = tf.argmax(positive_overlaps, axis=1)
-    roi_gt_boxes = tf.gather(gt_boxes, roi_gt_box_assignment)
-    roi_gt_class_ids = tf.gather(gt_class_ids, roi_gt_box_assignment)
+    positive_overlaps = tf.gather(overlaps, positive_indices)  # shape (positive_count, tf.shape(gt_boxes)[0])
+    roi_gt_box_assignment = tf.argmax(positive_overlaps, axis=1)  # shape (positive_count,)
+    roi_gt_boxes = tf.gather(gt_boxes, roi_gt_box_assignment)  # shape (positive_count, 4)
+    roi_gt_class_ids = tf.gather(gt_class_ids, roi_gt_box_assignment)  # shape (positive_count,)
 
     # Compute bbox refinement for positive ROIs
     deltas = util.box_refinement_graph(positive_rois, roi_gt_boxes)
@@ -729,9 +744,9 @@ def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config)
 
     # Assign positive ROIs to GT masks
     # Permute masks to [N, height, width, 1]
-    transposed_masks = tf.expand_dims(tf.transpose(gt_masks, [2, 0, 1]), -1)
+    transposed_masks = tf.expand_dims(tf.transpose(gt_masks, [2, 0, 1]), -1)  # shape (N, 56, 56, 1)
     # Pick the right mask for each ROI
-    roi_masks = tf.gather(transposed_masks, roi_gt_box_assignment)
+    roi_masks = tf.gather(transposed_masks, roi_gt_box_assignment)  # shape (positive_count, 56, 56, 1)
 
     # Compute mask targets
     boxes = positive_rois
@@ -973,7 +988,7 @@ def rpn_graph(feature_map, anchors_per_location, anchor_stride):
 
     Returns:
         rpn_logits: [batch, H, W, 2] Anchor classifier logits (before softmax)
-        rpn_probs: [batch, W, W, 2] Anchor classifier probabilities.
+        rpn_probs: [batch, H, W, 2] Anchor classifier probabilities.
         rpn_bbox: [batch, H, W, (dy, dx, log(dh), log(dw))] Deltas to be
                   applied to anchors.
     """
@@ -1531,7 +1546,7 @@ def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
     # RPN Match: 1 = positive anchor, -1 = negative anchor, 0 = neutral
     rpn_match = np.zeros([anchors.shape[0]], dtype=np.int32)
     # RPN bounding boxes: [max anchors per image, (dy, dx, log(dh), log(dw))]
-    rpn_bbox = np.zeros((config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4))
+    rpn_bbox = np.zeros((config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4))  # shape(256, 4)
 
     # Compute overlaps [num_anchors, num_gt_boxes]
     overlaps = util.compute_overlaps(anchors, gt_boxes)
@@ -1546,7 +1561,7 @@ def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
     #
     # 1. Set negative anchors first. They get overwritten below if a GT box is
     # matched to them. Skip boxes in crowd areas.
-    anchor_iou_argmax = np.argmax(overlaps, axis=1)
+    anchor_iou_argmax = np.argmax(overlaps, axis=1)  # shape : (245760,)
     anchor_iou_max = overlaps[np.arange(overlaps.shape[0]), anchor_iou_argmax]
     rpn_match[(anchor_iou_max < 0.3)] = -1
     # 2. Set an anchor for each GT box (regardless of IoU value).
@@ -1575,7 +1590,7 @@ def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
 
     # For positive anchors, compute shift and scale needed to transform them
     # to match the corresponding GT boxes.
-    ids = np.where(rpn_match == 1)[0]
+    ids = np.where(rpn_match == 1)[0]  # For example: ids shape: (41,)
     ix = 0  # index into rpn_bbox
     # TODO: use box_refinment() rather than duplicating the code here
     for i, a in zip(ids, anchors[ids]):
@@ -1594,7 +1609,7 @@ def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
         a_center_y = a[0] + 0.5 * a_h
         a_center_x = a[1] + 0.5 * a_w
 
-        # Compute the bbox refinement that the RPN should predict.
+        # Compute the bbox refinement that the RPN should predict.  rpn_bbox shape: (256, 4)
         rpn_bbox[ix] = [
             (gt_center_y - a_center_y) / a_h,
             (gt_center_x - a_center_x) / a_w,
@@ -1602,7 +1617,7 @@ def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
             np.log(gt_w / a_w),
         ]
         # Normalize
-        rpn_bbox[ix] /= config.RPN_BBOX_STD_DEV
+        rpn_bbox[ix] /= config.RPN_BBOX_STD_DEV  # config.RPN_BBOX_STD_DEV ndarray [0.1 0.1 0.2 0.2]
         ix += 1
 
     return rpn_match, rpn_bbox

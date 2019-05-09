@@ -100,14 +100,14 @@ class ConvRecurrent2D(Recurrent):
         self.kernel_size = conv_utils.normalize_tuple(kernel_size, 2, 'kernel_size')
         self.strides = conv_utils.normalize_tuple(strides, 2, 'strides')
         self.padding = conv_utils.normalize_padding(padding)
-        # import keras
-        # if keras.__version__ > "2.1.3":
-        #     from keras.backend import normalize_data_format
-        #     # self.data_format = K.normalize_data_format(data_format)
-        #     self.data_format = normalize_data_format(data_format)
-        # else:
-        #     self.data_format = conv_utils.normalize_data_format(data_format)
-        self.data_format = conv_utils.normalize_data_format(data_format)
+        import keras
+        if keras.__version__ > "2.1.3":
+            from keras.backend import normalize_data_format
+            # self.data_format = K.normalize_data_format(data_format)
+            self.data_format = normalize_data_format(data_format)
+        else:
+            self.data_format = conv_utils.normalize_data_format(data_format)
+        # self.data_format = conv_utils.normalize_data_format(data_format)
         self.dilation_rate = conv_utils.normalize_tuple(dilation_rate, 2, 'dilation_rate')
         self.return_sequences = return_sequences
         self.go_backwards = go_backwards
@@ -364,7 +364,7 @@ class ConvGRU2D(ConvRecurrent2D):
         state_shape[channel_axis] = input_dim
         state_shape = tuple(state_shape)
         self.state_spec = [InputSpec(shape=state_shape), InputSpec(shape=state_shape)]
-        kernel_shape = self.kernel_size + (input_dim, self.filters * 3)
+        kernel_shape = self.kernel_size + (input_dim, self.filters * 3)  # [TODO]为什么要乘以3，因为要保存3个中间变量
         self.kernel_shape = kernel_shape
         recurrent_kernel_shape = self.kernel_size + (self.filters, self.filters * 3)
 

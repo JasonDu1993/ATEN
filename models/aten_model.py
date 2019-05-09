@@ -691,8 +691,10 @@ def flow_postprocess_graph(flow, height, width):
 
 
 def conv_gru_unit(temporal_features, initial_state=None):
-    input_tensor = KL.Lambda(lambda x: tf.stack(x, axis=1))(temporal_features)
+    input_tensor = KL.Lambda(lambda x: tf.stack(x, axis=1))(
+        temporal_features)  # shape (B,3,128,128,256), 3 represent the number of images
     from models.convolutional_recurrent import ConvGRU2D
+    # from keras_convGRU.keras.layers.convolutional_recurrent import ConvGRU2D
     x = ConvGRU2D(filters=256, kernel_size=(3, 3), name="gru_recurrent_unit",
                   padding='same', return_sequences=False)(input_tensor, initial_state=initial_state)
     return x

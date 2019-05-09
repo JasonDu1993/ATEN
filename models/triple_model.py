@@ -14,6 +14,8 @@ from models.convolutional_recurrent import ConvGRU2D
 from keras.models import Model
 from keras.utils.vis_utils import plot_model
 import tensorflow as tf
+from configs.vip import VIPDataset
+from configs.vip import VideoModelConfig
 
 sess = tf.Session()
 
@@ -251,14 +253,21 @@ def temporal_and_mask_multi_propagation(inputs, inputs_image_keys, inputs_mask_k
     return x
 
 
+def load_image_gt(dataset):
+    image = dataset.load_image()
+    dataset.
+
+
 class TripleCNN(object):
-    def __init__(self, mode, input_shape, ):
+    def __init__(self, mode, input_shape, config):
         assert mode in ['training', 'inference']
         self.mode = mode
         self.input_shape = input_shape
-        self.keras_model = self.build(mode, input_shape)
+        self.keras_model = self.build(mode, input_shape, config)
 
-    def build(self, mode, input_shape, image_nums=5):
+    def build(self, mode, input_shape, config=None, image_nums=5):
+        if not config:
+            config = VideoModelConfig()
         assert mode in ["training", "inference"]
         h, w, c = input_shape
         inputs = Input(shape=(h, w, c), name="input_image")
@@ -275,6 +284,133 @@ class TripleCNN(object):
         print(model.summary())
         plot_model(model, "triple_single_model.png")
         # plot_model(model, "triple_multi_model.png")
+        if mode == "training":
+
+            # Network Heads
+            # TODO: verify that this handles zero padded ROIs
+            mrcnn_class_logits, mrcnn_class, mrcnn_bbox = \
+                fpn_classifier_graph(rois, mrcnn_feature_map, config.IMAGE_SHAPE,
+                                     config.POOL_SIZE, config.NUM_CLASSES)
+
+            mrcnn_mask = build_fpn_mask_graph(rois, mrcnn_feature_map,
+                                              config.IMAGE_SHAPE,
+                                              config.MASK_POOL_SIZE,
+                                              config.NUM_CLASSES)
+
+            # TODO: clean up (use tf.identify if necessary)
+            output_rois = KL.Lambda(lambda x: x * 1, name="output_rois")(rois)
+
+            global_parsing_loss = KL.Lambda(lambda x: mrcnn_global_parsing_loss_graph(config.NUM_PART_CLASS, *x),
+                                            name="mrcnn_global_parsing_loss")(
+                [input_gt_part, global_parsing_map])
+
+            # Losses
+            rpn_class_loss = KL.Lambda(lambda x: rpn_class_loss_graph(*x), name="rpn_class_loss")(
+                [input_rpn_match, rpn_class_logits])
+            rpn_bbox_loss = KL.Lambda(lambda x: rpn_bbox_loss_graph(config, *x), name="rpn_bbox_loss")(
+                [input_rpn_bbox, input_rpn_match, rpn_bbox])
+            class_loss = KL.Lambda(lambda x: mrcnn_class_loss_graph(*x), name="mrcnn_class_loss")(
+                [target_class_ids, mrcnn_class_logits, active_class_ids])
+            bbox_loss = KL.Lambda(lambda x: mrcnn_bbox_loss_graph(*x), name="mrcnn_bbox_loss")(
+                [target_bbox, target_class_ids, mrcnn_bbox])
+            mask_loss = KL.Lambda(lambda x: mrcnn_mask_loss_graph(*x), name="mrcnn_mask_loss")(
+                [target_mask, target_class_ids, mrcnn_mask])
+
+            # Model
+            inputs = [input_image, input_image_key1, input_image_key2, input_image_key3,
+                      input_key_identity, input_image_meta, input_rpn_match, input_rpn_bbox,
+                      input_gt_class_ids, input_gt_boxes, input_gt_masks, input_gt_part]
+            if not config.USE_RPN_ROIS:
+                inputs.append(input_rois)
+            outputs = [rpn_class_logits, rpn_class, rpn_bbox,
+                       mrcnn_class_logits, mrcnn_class, mrcnn_bbox, mrcnn_mask,
+                       rpn_rois, output_rois,
+                       rpn_class_loss, rpn_bbox_loss, class_loss, bbox_loss, mask_loss,
+                       global_parsing_loss]
+            model = KM.Model(inputs, outputs, name='aten')
+        else:
+            # Network Heads
+            # Proposal classifier and BBox regressor heads
+            mrcnn_class_logits, mrcnn_class, mrcnn_bbox = \
+                fpn_classifier_graph(rpn_rois, mrcnn_feature_map, config.IMAGE_SHAPE,
+                                     config.POOL_SIZE, config.NUM_CLASSES)
+
+            # Detections
+            # output is [batch, num_detections, (y1, x1, y2, x2, class_id, score)] in image coordinates
+            detections = DetectionLayer(config, name="mrcnn_detection")(
+                [rpn_rois, mrcnn_class, mrcnn_bbox, input_image_meta])
+
+            # Convert boxes to normalized coordinates
+            # TODO: let DetectionLayer return normalized coordinates to avoid
+            #       unnecessary conversions
+            h, w = config.IMAGE_SHAPE[:2]
+            detection_boxes = KL.Lambda(
+                lambda x: x[..., :4] / np.array([h, w, h, w]))(detections)
+
+            # Create masks for detections
+            mrcnn_mask = build_fpn_mask_graph(detection_boxes, mrcnn_feature_map,
+                                              config.IMAGE_SHAPE,
+                                              config.MASK_POOL_SIZE,
+                                              config.NUM_CLASSES)
+
+            global_parsing_prob = KL.Lambda(lambda x: post_processing_graph(*x))([global_parsing_map, input_image])
+
+            model = KM.Model([input_image, input_image_key1, input_image_key2, input_image_key3,
+                              input_key_identity, input_image_meta],
+                             [detections, mrcnn_class, mrcnn_bbox,
+                              mrcnn_mask, rpn_rois, rpn_class, rpn_bbox, global_parsing_prob],
+                             name='aten')
+
+        # Add multi-GPU support.
+        if config.GPU_COUNT > 1:
+            from utils.parallel_model import ParallelModel
+            model = ParallelModel(model, config.GPU_COUNT)
+        import platform
+        sys = platform.system()
+        # if sys == "Windows":
+        if self.mode == "training":
+            plot_model(model, "aten_training.jpg")
+        else:
+            plot_model(model, "aten_test.png")
+        return model
+
+    def train(self, lr, batch_size, model, input_shape, annotation_path, image_path, anchors, num_classes, model_name,
+              log_dir='./checkpoints/csvlogs/'):
+        """retrain/fine-tune the model"""
+        model.compile(optimizer=Adam(lr=lr), loss={
+            # use custom yolo_loss Lambda layer.
+            'yolo_loss': lambda y_true, y_pred: y_pred})
+        lr_reduce = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=8, verbose=1, mode='min')
+        logging = TensorBoard(log_dir=log_dir)
+        checkpointer = ModelCheckpoint(
+            filepath='./checkpoints/models/' + model_name + '.{epoch:03d}-{loss:.3f}-{val_loss:.3f}.h5',
+            verbose=2,
+            monitor='val_loss',
+            save_weights_only=True,
+            save_best_only=True)
+        early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=8, verbose=1, mode='auto')
+        timestamp = time.time()
+        csv_logger = CSVLogger('./checkpoints/csvlogs/' + model_name + str(timestamp) + '.log')
+
+        val_split = 0.1
+        with open(annotation_path) as f:
+            lines = f.readlines()
+        np.random.seed(10101)
+        np.random.shuffle(lines)
+        np.random.seed(None)
+        num_val = int(len(lines) * val_split)
+        num_train = len(lines) - num_val
+        print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
+        image_data, box_data = get_training_data(annotation_path, image_path, "./datas/train.npz", input_shape,
+                                                 max_boxes=20)
+        image_data = image_data / 255.0
+        y_true = preprocess_true_boxes(box_data, input_shape, anchors, num_classes)
+        model.fit([image_data, *y_true],
+                  np.zeros(len(image_data)),
+                  validation_split=.1,
+                  batch_size=batch_size,
+                  epochs=100,
+                  callbacks=[logging, checkpointer, csv_logger, early_stopping, lr_reduce])
 
 
 if __name__ == '__main__':

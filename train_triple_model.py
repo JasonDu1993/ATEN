@@ -5,28 +5,30 @@ from time import time
 sys.path.insert(0, os.getcwd())
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 config = tf.ConfigProto()
-# config.gpu_options.allow_growth = True
-config.gpu_options.per_process_gpu_memory_fraction = 0.3
+config.gpu_options.allow_growth = True
+# config.gpu_options.per_process_gpu_memory_fraction = 0.3
 session = tf.Session(config=config)
 import numpy as np
 
 from configs.vip import VideoModelConfig
-from configs.vip import VIPDataset
-# from models import aten_model as modellib
-from models import aten_model_dilated as modellib
+from configs.vipdataset_triple_model import VIPDatasetForTripleModel
+from models import aten_triplemodel_dilated as modellib
+
+
+# from models import aten_model_dilated as modellib
 
 
 class trainConfig(VideoModelConfig):
-    # NAME = "vip_video_20190103va"
-    NAME = "debug"
+    NAME = "vip_video_20190507va"
+    # NAME = "debug"
     GPU_COUNT = 1
-    IMAGES_PER_GPU = 1
-    # STEPS_PER_EPOCH = 3000
-    STEPS_PER_EPOCH = 20
-    # VALIDATION_STEPS = 100
-    VALIDATION_STEPS = 10
+    IMAGES_PER_GPU = 2
+    STEPS_PER_EPOCH = 2000
+    # STEPS_PER_EPOCH = 20
+    VALIDATION_STEPS = 100
+    # VALIDATION_STEPS = 10
     SAVE_MODEL_PERIOD = 1
     # Weight decay regularization
     WEIGHT_DECAY = 0.0001
@@ -39,7 +41,9 @@ class trainConfig(VideoModelConfig):
 # Root directory of the project
 ROOT_DIR = os.getcwd()
 # Path to trained weights file
-PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "aten_p2l3.h5")
+# PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "aten_p2l3.h5")
+PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints",
+                                   "parsing_rcnn_vip_singleframe_20190408a_epoch073_loss0.401_valloss0.391.h5")
 PARSING_RCNN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
 FLOWNET_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "flownet2-S.h5")
 # Directory to save logs and model checkpoints, if not provided
@@ -97,12 +101,12 @@ if __name__ == '__main__':
 
     # Training dataset. Use the training set and 35K from the
     # validation set, as as in the Mask RCNN paper.
-    dataset_train = VIPDataset()
+    dataset_train = VIPDatasetForTripleModel()
     dataset_train.load_vip(args.dataset, "trainval")
     dataset_train.prepare()
 
     # Validation dataset
-    dataset_val = VIPDataset()
+    dataset_val = VIPDatasetForTripleModel()
     dataset_val.load_vip(args.dataset, "val")
     dataset_val.prepare()
 

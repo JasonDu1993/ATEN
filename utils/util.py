@@ -155,7 +155,7 @@ def apply_box_deltas(boxes, deltas):
 
 def box_refinement_graph(box, gt_box):
     """Compute refinement needed to transform box to gt_box.
-    box and gt_box are [N, (y1, x1, y2, x2)]
+    box and gt_box are [N, (y1, x1, y2, x2)], return the result is [N, (dy, dyx, log(dh), log(dw)]
     """
     box = tf.cast(box, tf.float32)
     gt_box = tf.cast(gt_box, tf.float32)
@@ -226,11 +226,45 @@ class Dataset(object):
     """
 
     def __init__(self, class_map=None):
-        self._image_ids = []
-        self.image_info = []  # the value is dict, whick like {'id': 'videos245/000000001051', 'source': 'VIP', 'path': '/home/sk49/workspace/dataset/VIP/Images/videos245/000000001051.jpg', 'front_frame_list': '/home/sk49/workspace/dataset/VIP/front_frame_list/videos245/000000001051.txt', 'behind_frame_list': '/home/sk49/workspace/dataset/VIP/behind_frame_list/videos245/000000001051.txt', 'inst_anno': '/home/sk49/workspace/dataset/VIP/Human_ids/videos245/000000001051.png', 'part_anno': '/home/sk49/workspace/dataset/VIP/Category_ids/videos245/000000001051.png', 'part_rev_anno': '/home/sk49/workspace/dataset/VIP/Category_rev_ids/videos245/000000001051.png'}
+        self._image_ids = []  # [   0    1    2 ... 2442 2443 2444]
+        self.image_info = []
+        # self.image_info(list),the value is dict, whick like
+        # {'id': 'videos245/000000001051', 'source': 'VIP',
+        # 'path': '/home/sk49/workspace/dataset/VIP/Images/videos245/000000001051.jpg',
+        # 'front_frame_list': '/home/sk49/workspace/dataset/VIP/front_frame_list/videos245/000000001051.txt',
+        # 'behind_frame_list': '/home/sk49/workspace/dataset/VIP/behind_frame_list/videos245/000000001051.txt',
+        # 'inst_anno': '/home/sk49/workspace/dataset/VIP/Human_ids/videos245/000000001051.png',
+        # 'part_anno': '/home/sk49/workspace/dataset/VIP/Category_ids/videos245/000000001051.png',
+        # 'part_rev_anno': '/home/sk49/workspace/dataset/VIP/Category_rev_ids/videos245/000000001051.png'}
+
         # Background is always the first class
         self.class_info = [{"source": "", "id": 0, "name": "BG"}]
-        self.parsing_class_info = [{"source": "", "id": 0, "name": "BG"}]  # <class 'list'>: [{'source': '', 'id': 0, 'name': 'BG'}, {'source': 'VIP', 'id': 1, 'name': 'hat'}, {'source': 'VIP', 'id': 2, 'name': 'hair'}, {'source': 'VIP', 'id': 3, 'name': 'gloves'}, {'source': 'VIP', 'id': 4, 'name': 'sun-glasses'}, {'source': 'VIP', 'id': 5, 'name': 'upper-clothes'}, {'source': 'VIP', 'id': 6, 'name': 'dress'}, {'source': 'VIP', 'id': 7, 'name': 'coat'}, {'source': 'VIP', 'id': 8, 'name': 'socks'}, {'source': 'VIP', 'id': 9, 'name': 'pants'}, {'source': 'VIP', 'id': 10, 'name': 'torso-skin'}, {'source': 'VIP', 'id': 11, 'name': 'scarf'}, {'source': 'VIP', 'id': 12, 'name': 'skirt'}, {'source': 'VIP', 'id': 13, 'name': 'face'}, {'source': 'VIP', 'id': 14, 'name': 'left-arm'}, {'source': 'VIP', 'id': 15, 'name': 'right-arm'}, {'source': 'VIP', 'id': 16, 'name': 'left-leg'}, {'source': 'VIP', 'id': 17, 'name': 'right-leg'}, {'source': 'VIP', 'id': 18, 'name': 'left-shoe'}, {'source': 'VIP', 'id': 19, 'name': 'right-shoe'}]
+        # self.class_info <class 'list'>:
+        # [{'source': '', 'id': 0, 'name': 'BG'},
+        # {'source': 'VIP', 'id': 1, 'name': 'person'}]
+
+        self.parsing_class_info = [{"source": "", "id": 0, "name": "BG"}]
+        #  self.parsing_class_info <class 'list'>:
+        # [{'source': '', 'id': 0, 'name': 'BG'},
+        # {'source': 'VIP', 'id': 1, 'name': 'hat'},
+        # {'source': 'VIP', 'id': 2, 'name': 'hair'},
+        # {'source': 'VIP', 'id': 3, 'name': 'gloves'},
+        # {'source': 'VIP', 'id': 4, 'name': 'sun-glasses'},
+        # {'source': 'VIP', 'id': 5, 'name': 'upper-clothes'},
+        # {'source': 'VIP', 'id': 6, 'name': 'dress'},
+        # {'source': 'VIP', 'id': 7, 'name': 'coat'},
+        # {'source': 'VIP', 'id': 8, 'name': 'socks'},
+        # {'source': 'VIP', 'id': 9, 'name': 'pants'},
+        # {'source': 'VIP', 'id': 10, 'name': 'torso-skin'},
+        # {'source': 'VIP', 'id': 11, 'name': 'scarf'},
+        # {'source': 'VIP', 'id': 12, 'name': 'skirt'},
+        # {'source': 'VIP', 'id': 13, 'name': 'face'},
+        # {'source': 'VIP', 'id': 14, 'name': 'left-arm'},
+        # {'source': 'VIP', 'id': 15, 'name': 'right-arm'},
+        # {'source': 'VIP', 'id': 16, 'name': 'left-leg'},
+        # {'source': 'VIP', 'id': 17, 'name': 'right-leg'},
+        # {'source': 'VIP', 'id': 18, 'name': 'left-shoe'},
+        # {'source': 'VIP', 'id': 19, 'name': 'right-shoe'}]
         self.source_class_ids = {}
 
     def add_class(self, source, class_id, class_name):
@@ -424,8 +458,8 @@ def resize_mask(mask, scale, padding):
             [(top, bottom), (left, right), (0, 0)]
     """
     h, w = mask.shape[:2]
-    mask = scipy.ndimage.zoom(mask, zoom=[scale, scale, 1], order=0)
-    mask = np.pad(mask, padding, mode='constant', constant_values=0)
+    mask = scipy.ndimage.zoom(mask, zoom=[scale, scale, 1], order=0)  # 上采样、最近邻插法
+    mask = np.pad(mask, padding, mode='constant', constant_values=0)  #
     return mask
 
 
@@ -458,7 +492,7 @@ def minimize_mask(bbox, mask, mini_shape):
 
     See inspect_data.ipynb notebook for more details.
     """
-    mini_mask = np.zeros(mini_shape + (mask.shape[-1],), dtype=bool)
+    mini_mask = np.zeros(mini_shape + (mask.shape[-1],), dtype=bool)  # shape: (56, 56, inst_num) inst_num表示人的个数
     for i in range(mask.shape[-1]):
         m = mask[:, :, i]
         y1, x1, y2, x2 = bbox[i][:4]
@@ -552,29 +586,29 @@ def generate_anchors(scales, ratios, shape, feature_stride, anchor_stride):
         value is 2 then generate anchors for every other feature map pixel.
     """
     # Get all combinations of scales and ratios
-    scales, ratios = np.meshgrid(np.array(scales), np.array(ratios))
-    scales = scales.flatten()
-    ratios = ratios.flatten()
+    scales, ratios = np.meshgrid(np.array(scales), np.array(ratios))  # shape :(3, 5)
+    scales = scales.flatten()  # shape: (15=3*5,)
+    ratios = ratios.flatten()  # shape: (15,)
 
     # Enumerate heights and widths from scales and ratios
-    heights = scales / np.sqrt(ratios)
-    widths = scales * np.sqrt(ratios)
+    heights = scales / np.sqrt(ratios)  # shape: (15,) min: 32.0 max: 543.0580079512685
+    widths = scales * np.sqrt(ratios)  # shape: (15,) min: 22.627416997969522 max: 384.0
 
-    # Enumerate shifts in feature space
-    shifts_y = np.arange(0, shape[0], anchor_stride) * feature_stride
-    shifts_x = np.arange(0, shape[1], anchor_stride) * feature_stride
+    # Enumerate shifts in feature space shape=[128, 128], anchor_stride=1, feature_stride=4
+    shifts_y = np.arange(0, shape[0], anchor_stride) * feature_stride  # shape: (128,) min:0 max: 508
+    shifts_x = np.arange(0, shape[1], anchor_stride) * feature_stride  # shape: (128,) min:0 max: 508
     shifts_x, shifts_y = np.meshgrid(shifts_x, shifts_y)
 
-    # Enumerate combinations of shifts, widths, and heights
+    # Enumerate combinations of shifts, widths, and heights # box_widths: (16384=128*128,15)  box_centers_x: (16384,15)
     box_widths, box_centers_x = np.meshgrid(widths, shifts_x)
     box_heights, box_centers_y = np.meshgrid(heights, shifts_y)
 
     # Reshape to get a list of (y, x) and a list of (h, w)
     box_centers = np.stack(
-        [box_centers_y, box_centers_x], axis=2).reshape([-1, 2])
-    box_sizes = np.stack([box_heights, box_widths], axis=2).reshape([-1, 2])
+        [box_centers_y, box_centers_x], axis=2).reshape([-1, 2])  # box_centers shape: (245760=128*128*15, 2)
+    box_sizes = np.stack([box_heights, box_widths], axis=2).reshape([-1, 2])  # box_sizes shape: (245760=128*128*15, 2)
 
-    # Convert to corner coordinates (y1, x1, y2, x2)
+    # Convert to corner coordinates (y1, x1, y2, x2) shape: (245760, 4) min： -271.5290039756342 max:779.5290039756342
     boxes = np.concatenate([box_centers - 0.5 * box_sizes,
                             box_centers + 0.5 * box_sizes], axis=1)
     return boxes
@@ -714,11 +748,13 @@ def batch_slice(inputs, graph_fn, batch_size, names=None):
     computation graph and then combines the results. It allows you to run a
     graph on a batch of inputs even if the graph is written to support one
     instance only.
-
-    inputs: list of tensors. All must have the same first dimension length
-    graph_fn: A function that returns a TF tensor that's part of a graph.
-    batch_size: number of slices to divide the data into.
-    names: If provided, assigns names to the resulting tensors.
+    Args:
+        inputs: list of tensors. All must have the same first dimension length
+        graph_fn: A function that returns a TF tensor that's part of a graph.
+        batch_size: number of slices to divide the data into.
+        names: If provided, assigns names to the resulting tensors.
+    Returns:
+        result: batch_size==1,return a Tensor, batch_size > 1, return a list
     """
     if not isinstance(inputs, list):
         inputs = [inputs]

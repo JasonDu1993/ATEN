@@ -5,6 +5,7 @@ import skimage.transform
 
 from models.parsing_rcnn_model import *
 from utils.flow_warp import flow_warp
+from configs.vip import VideoModelConfig
 
 # Requires TensorFlow 1.3+ and Keras 2.0.8+.
 
@@ -175,13 +176,13 @@ def atrous_identity_block_share(input_tensor_list, kernel_size, filters, stage,
 
 def atrous_conv_block_share(input_tensor_list, kernel_size, filters, stage,
                             block, strides=(1, 1), atrous_rate=(2, 2), use_bias=True):
-    '''conv_block is the block that has a conv layer at shortcut
+    """conv_block is the block that has a conv layer at shortcut
     # Arguments
         kernel_size: defualt 3, the kernel size of middle conv layer at main path
         filters: list of integers, the nb_filters of 3 conv layer at main path
         stage: integer, current stage label, used for generating layer names
         block: 'a','b'..., current block label, used for generating layer names
-    '''
+    """
     nb_filter1, nb_filter2, nb_filter3 = filters
     conv_name_base = 'res' + str(stage) + block + '_branch'
     bn_name_base = 'bn' + str(stage) + block + '_branch'
@@ -826,6 +827,18 @@ def get_option_inds_graph(input_key_identity):
     return option_inds
 
 
+def average_after_element_add(inputs):
+    if not isinstance(inputs, list):
+        inputs = [inputs]
+    l = len(inputs)
+    res = inputs[0]
+    for i in range(1, l):
+        res = res + inputs[i]
+    res = res / l
+
+    return res
+
+
 class ATEN_PARSING_RCNN():
     """Encapsulates the Mask RCNN model functionality.
 
@@ -851,6 +864,8 @@ class ATEN_PARSING_RCNN():
             mode: Either "training" or "inference". The inputs and
                 outputs of the model differ accordingly.
         """
+        if config is None:
+            config = VideoModelConfig()
         assert mode in ['training', 'inference']
 
         # Image size must be dividable by 2 multiple times
@@ -862,12 +877,10 @@ class ATEN_PARSING_RCNN():
         # Inputs
         input_image = KL.Input(
             shape=config.IMAGE_SHAPE.tolist(), name="input_image")
-        input_image_key1 = KL.Input(
-            shape=config.IMAGE_SHAPE.tolist(), name="input_image_key1")
-        input_image_key2 = KL.Input(
-            shape=config.IMAGE_SHAPE.tolist(), name="input_image_key2")
-        input_image_key3 = KL.Input(
-            shape=config.IMAGE_SHAPE.tolist(), name="input_image_key3")
+        input_image_keys = []
+        for i in range(1, config.KEY_RANGE_L + 1):
+            input_image_keys.append(KL.Input(shape=config.IMAGE_SHAPE.tolist(), name="input_image_key" + str(i)))
+
         input_key_identity = KL.Input(
             batch_shape=[config.BATCH_SIZE, 1],
             name="input_key_identity", dtype=tf.int32)
@@ -911,8 +924,7 @@ class ATEN_PARSING_RCNN():
         # Bottom-up Layers
         # Returns a list of the last layers of each stage, 5 in total.
         # Don't create the thead (stage 5), so we pick the 4th item in the list.
-        c1_features, c5_features = deeplab_resnet_share([input_image_key1,
-                                                         input_image_key2, input_image_key3], 'resnet50')
+        c1_features, c5_features = deeplab_resnet_share(input_image_keys, 'resnet50')
         coarse_features = global_parsing_encoder_share(c5_features)
         fine_features = global_parsing_decoder_share(coarse_features, c1_features)
 
@@ -920,60 +932,19 @@ class ATEN_PARSING_RCNN():
         feature_map_key1 = fine_features[0]
         feature_map_key2 = fine_features[1]
         feature_map_key3 = fine_features[2]
-        # -----------flownet-------------------------------
-        # image preprocess
-        flownet_input_key3 = KL.Lambda(lambda x: flow_image_preprocess_graph(x))(input_image_key3)
-        flownet_input_key2 = KL.Lambda(lambda x: flow_image_preprocess_graph(x))(input_image_key2)
-        flownet_input_key1 = KL.Lambda(lambda x: flow_image_preprocess_graph(x))(input_image_key1)
-        flownet_input_cur = KL.Lambda(lambda x: flow_image_preprocess_graph(x))(input_image)
-        # flownet_S
-        flows, scales = flownet2_S_with_scale_share(1,
-                                                    input_a=[flownet_input_cur, flownet_input_key1, flownet_input_key1],
-                                                    input_b=[flownet_input_key1, flownet_input_key2,
-                                                             flownet_input_key3])
-
-        new_2_cur_raw_flow = flows[0]
-        new_2_cur_scale = scales[0]
-        key2_2_key1_raw_flow = flows[1]
-        key2_2_key1_scale = scales[1]
-        key3_2_key1_raw_flow = flows[2]
-        key3_2_key1_scale = scales[2]
-
-        new_2_cur_feature_flow = KL.Lambda(lambda x: flow_postprocess_graph(x,
-                                                                            config.BACKBONE_SHAPES[0][0],
-                                                                            config.BACKBONE_SHAPES[0][1]))(
-            new_2_cur_raw_flow)
-        key2_2_key1_feature_flow = KL.Lambda(lambda x: flow_postprocess_graph(x,
-                                                                              config.BACKBONE_SHAPES[0][0],
-                                                                              config.BACKBONE_SHAPES[0][1]))(
-            key2_2_key1_raw_flow)
-        key3_2_key1_feature_flow = KL.Lambda(lambda x: flow_postprocess_graph(x,
-                                                                              config.BACKBONE_SHAPES[0][0],
-                                                                              config.BACKBONE_SHAPES[0][1]))(
-            key3_2_key1_raw_flow)
-
-        feature_map_key2 = KL.Lambda(lambda x: flow_warp(x[0], x[1]))([feature_map_key2,
-                                                                       key2_2_key1_feature_flow])
-        feature_map_key2 = KL.Lambda(lambda x: tf.multiply(x[0], x[1]))([feature_map_key2, key2_2_key1_scale])
-        feature_map_key3 = KL.Lambda(lambda x: flow_warp(x[0], x[1]))([feature_map_key3,
-                                                                       key3_2_key1_feature_flow])
-        feature_map_key3 = KL.Lambda(lambda x: tf.multiply(x[0], x[1]))([feature_map_key3, key3_2_key1_scale])
         # --------------------------------------------------
-        init_feature_map = KL.Lambda(lambda x: (x[0] + x[1] + x[2]) / 3)([feature_map_key3,
-                                                                          feature_map_key2, feature_map_key1])
+        # init_feature_map = KL.Lambda(lambda x: (x[0] + x[1] + x[2]) / 3)([feature_map_key3,
+        #                                                                   feature_map_key2, feature_map_key1])
+        init_feature_map = KL.Lambda(lambda x: average_after_element_add(x))(fine_features)
         if config.RECURRENT_UNIT == 'lstm':
-            feature_map_key1 = conv_lstm_unit([feature_map_key3, feature_map_key2, feature_map_key1],
-                                              initial_state=None)
+            feature_map_key = conv_lstm_unit(fine_features,
+                                             initial_state=None)
         elif config.RECURRENT_UNIT == 'gru':
-            feature_map_key1 = conv_gru_unit([feature_map_key3, feature_map_key2, feature_map_key1],
-                                             initial_state=init_feature_map)
-        # warping the aggregated_key_feature to cur_feature by optical flow
-        feature_map_cur = KL.Lambda(lambda x: flow_warp(x[0], x[1]))([feature_map_key1,
-                                                                      new_2_cur_feature_flow])
-        feature_map_cur = KL.Lambda(lambda x: tf.multiply(x[0], x[1]))([feature_map_cur, new_2_cur_scale])
-
+            feature_map_key = conv_gru_unit(fine_features,
+                                            initial_state=init_feature_map)
+        feature_map_cur = KL.Lambda(lambda x: tf.multiply(x[0], x[1]))([feature_map_key, init_feature_map])
         # recognize wether key frame
-        option_feature_map = KL.Lambda(lambda x: tf.stack(x, axis=1))([feature_map_key1, feature_map_cur])
+        option_feature_map = KL.Lambda(lambda x: tf.stack(x, axis=1))([feature_map_key, feature_map_cur])
         choose_ind = KL.Lambda(lambda x: get_option_inds_graph(x))(input_key_identity)
         final_feature = KL.Lambda(lambda x: tf.gather_nd(x[0], tf.cast(x[1], tf.int32)))(
             [option_feature_map, choose_ind])
@@ -1069,9 +1040,9 @@ class ATEN_PARSING_RCNN():
                 [target_mask, target_class_ids, mrcnn_mask])
 
             # Model
-            inputs = [input_image, input_image_key1, input_image_key2, input_image_key3,
-                      input_key_identity, input_image_meta, input_rpn_match, input_rpn_bbox,
-                      input_gt_class_ids, input_gt_boxes, input_gt_masks, input_gt_part]
+            inputs = [input_image] + input_image_keys + [input_key_identity, input_image_meta, input_rpn_match,
+                                                         input_rpn_bbox, input_gt_class_ids, input_gt_boxes,
+                                                         input_gt_masks, input_gt_part]
             if not config.USE_RPN_ROIS:
                 inputs.append(input_rois)
             outputs = [rpn_class_logits, rpn_class, rpn_bbox,
@@ -1107,10 +1078,9 @@ class ATEN_PARSING_RCNN():
 
             global_parsing_prob = KL.Lambda(lambda x: post_processing_graph(*x))([global_parsing_map, input_image])
 
-            model = KM.Model([input_image, input_image_key1, input_image_key2, input_image_key3,
-                              input_key_identity, input_image_meta],
-                             [detections, mrcnn_class, mrcnn_bbox,
-                              mrcnn_mask, rpn_rois, rpn_class, rpn_bbox, global_parsing_prob],
+            model = KM.Model([input_image] + input_image_keys + [input_key_identity, input_image_meta],
+                             [detections, mrcnn_class, mrcnn_bbox, mrcnn_mask, rpn_rois, rpn_class, rpn_bbox,
+                              global_parsing_prob],
                              name='aten')
 
         # Add multi-GPU support.
@@ -1314,7 +1284,7 @@ class ATEN_PARSING_RCNN():
         #                                     "parsing_rcnn_" + self.config.NAME.lower() +
         #                                     "_epoch{epoch:03d}_loss{loss:.3f}_valloss{val_loss:.3f}.h5")
         self.checkpoint_path = os.path.join(self.log_dir, "checkpoints",
-                                            "aten_" + self.config.NAME.lower() +
+                                            "triplemodel_" + self.config.NAME.lower() +
                                             "_epoch{epoch:03d}_loss{loss:.3f}_valloss{val_loss:.3f}.h5")
         if not os.path.exists(os.path.dirname(self.checkpoint_path)):
             os.makedirs(os.path.dirname(self.checkpoint_path))
