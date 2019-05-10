@@ -641,7 +641,8 @@ def vis_insts_opencv(image, res_dir, image_id, boxes, masks, class_ids,
 
         # Mask Polygon
         # opencv 找边缘轮廓需要传入二值图
-        contours, hierarchy = cv2.findContours(masked_image_binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        res = cv2.findContours(masked_image_binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours = res[-2]
         cv2.drawContours(masked_image, contours, -1, color=color, thickness=1)
 
     img_path = os.path.join(res_dir, 'color', 'vis_%s.png' % image_id)

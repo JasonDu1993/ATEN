@@ -1089,11 +1089,11 @@ class ATEN_PARSING_RCNN():
             model = ParallelModel(model, config.GPU_COUNT)
         import platform
         sys = platform.system()
-        # if sys == "Windows":
-        if self.mode == "training":
-            plot_model(model, "aten_training.jpg")
-        else:
-            plot_model(model, "aten_test.png")
+        if sys == "Windows":
+            if self.mode == "training":
+                plot_model(model, "aten_training.jpg")
+            else:
+                plot_model(model, "aten_test.png")
         return model
 
     def find_last(self):
