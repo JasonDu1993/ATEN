@@ -21,7 +21,7 @@ from models import aten_triplemodel_dilated as modellib
 
 
 class trainConfig(VideoModelConfig):
-    NAME = "vip_video_20190510va"
+    NAME = "vip_video_20190510vb"
     # NAME = "debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 2
@@ -35,7 +35,7 @@ class trainConfig(VideoModelConfig):
     # Image mean (RGB)
     MEAN_PIXEL = np.array([123.7, 116.8, 103.9])
     KEY_RANGE_L = 3
-    RECURRENT_UNIT = 'lstm'
+    RECURRENT_UNIT = 'gru'
 
 
 # Root directory of the project
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     # Fine tune all layers
     print("Fine tune all layers")
     model.train(dataset_train, dataset_val,
-                learning_rate=0.001,
+                learning_rate=0.0001,
                 epochs=200,
                 layers='all',
                 period=config.SAVE_MODEL_PERIOD)
