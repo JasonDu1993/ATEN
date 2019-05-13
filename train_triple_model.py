@@ -5,7 +5,7 @@ from time import time
 sys.path.insert(0, os.getcwd())
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 # config.gpu_options.per_process_gpu_memory_fraction = 0.3
@@ -14,14 +14,15 @@ import numpy as np
 
 from configs.vip import VideoModelConfig
 from configs.vipdataset_triple_model import VIPDatasetForTripleModel
-from models import aten_triplemodel_dilated as modellib
+# from models import aten_triplemodel_dilated as modellib
+from models import aten_triplemodel_dilated_se as modellib
 
 
 # from models import aten_model_dilated as modellib
 
 
 class trainConfig(VideoModelConfig):
-    NAME = "vip_video_20190510vb"
+    NAME = "vip_video_20190513va"
     # NAME = "debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 2
@@ -44,8 +45,8 @@ ROOT_DIR = os.getcwd()
 # PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "aten_p2l3.h5")
 # PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints",
 #                                    "parsing_rcnn_vip_singleframe_20190408a_epoch073_loss0.401_valloss0.391.h5")
-PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs_aten/vip_video_20190507va/checkpoints/" \
-                      "aten_vip_video_20190507va_epoch035_loss0.597_valloss0.547.h5"
+PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs_aten/vip_video_20190510vb/checkpoints" + "/" + \
+                      "triplemodel_vip_video_20190510vb_epoch011_loss0.596_valloss0.494.h5"
 PARSING_RCNN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
 FLOWNET_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "flownet2-S.h5")
 # Directory to save logs and model checkpoints, if not provided
@@ -117,7 +118,7 @@ if __name__ == '__main__':
     # Fine tune all layers
     print("Fine tune all layers")
     model.train(dataset_train, dataset_val,
-                learning_rate=0.0001,
+                learning_rate=0.001,
                 epochs=200,
                 layers='all',
                 period=config.SAVE_MODEL_PERIOD)
