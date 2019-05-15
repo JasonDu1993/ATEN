@@ -34,11 +34,11 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Download this file and place in the root of your
 # project (See README file for details)
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190513a/checkpoints" + "/" + \
-             "parsing_rcnn_vip_singleframe_20190513a_epoch040_loss0.371_valloss0.332.h5"
-RES_DIR = "./vis/test_vip_singleframe_20190513a_epoch040"
-# RES_DIR = "./vis/debug"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_test/checkpoints" + "/" + \
+             "parsing_rcnn_vip_singleframe_test_epoch003_loss2.476_valloss2.231.h5"
+# RES_DIR = "./vis/test_vip_singleframe_20190513a_epoch040"
+RES_DIR = "./vis/debug"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 # Directory of images to run detection on
 IMAGE_DIR = DATASET_DIR + "/Images"
@@ -61,7 +61,7 @@ class InferenceConfig(ParsingRCNNModelConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     GPU_COUNT = 1
-    PROCESS_COUNT = 3
+    PROCESS_COUNT = 1
     IMAGES_PER_GPU = 1
 
 
@@ -78,7 +78,7 @@ def worker(images, infer_config):
     # config.gpu_options.allow_growth = True
     config.gpu_options.per_process_gpu_memory_fraction = 0.3
     session = tf.Session(config=config)
-    from models.parsing_rcnn_model_dilated_se import PARSING_RCNN
+    from models.parsing_rcnn_model_resfpn_dilated_se import PARSING_RCNN
     if infer_config is None:
         infer_config = InferenceConfig()
     model = PARSING_RCNN(mode="inference", config=infer_config, model_dir=MODEL_DIR)
@@ -160,8 +160,9 @@ def multiprocess_main():
             split_data = images_list[start:end]
             # 各个进程开始
             proc = Process(target=worker, args=(split_data, infer_config))
-            print('process:%s, pid:%d, start:%d, end:%d' % (proc.name, proc.pid, start, end))
+
             proc.start()
+            print('process:%s, pid:%d, start:%d, end:%d' % (proc.name, proc.pid, start, end))
             procs.append(proc)
             # # 数据量，将queue中数据取出
             # for i in range(image_num):
