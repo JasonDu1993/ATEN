@@ -253,8 +253,8 @@ def deeplab_resnet(img_input, architecture):
     C4 = x
     # Stage 5
     x = atrous_conv_block(x, 3, [512, 512, 2048], stage=5, block='a', atrous_rate=(2, 2), use_bias=False)
-    x = atrous_identity_block(x, 3, [512, 512, 2048], stage=5, block='b', atrous_rate=(2, 2), use_bias=False)
-    C5 = x = atrous_identity_block(x, 3, [512, 512, 2048], stage=5, block='c', atrous_rate=(2, 2), use_bias=False)
+    x = atrous_identity_block(x, 3, [512, 512, 2048], stage=5, block='b', atrous_rate=(3, 3), use_bias=False)
+    C5 = x = atrous_identity_block(x, 3, [512, 512, 2048], stage=5, block='c', atrous_rate=(5, 5), use_bias=False)
 
     return [C1, C5]
 
@@ -1206,10 +1206,12 @@ def global_parsing_encoder(feature_map):
     return x
 
 
+
 def global_parsing_decoder(feature_map, low_feature_map):
     # navie upsample from 1/16(32) to 1/4(128), fit the low_feature_map
     top = KL.Lambda(lambda x: tf.image.resize_bilinear(
         x[0], tf.shape(x[1])[1:3], align_corners=True))([feature_map, low_feature_map])
+
     # low dim of low_feature_map by 1*1 conv
     low = KL.Conv2D(48, (1, 1), padding='same',
                     name='mrcnn_global_parsing_decoder_conv1')(low_feature_map)
@@ -1237,6 +1239,7 @@ def global_parsing_graph(feature_map, num_classes):
                    name='mrcnn_global_parsing_c3')(feature_map)
 
     x = KL.Add()([x1, x2, x3])
+    x = squeeze_excite_block(x)
     return x
 
 

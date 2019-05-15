@@ -40,15 +40,15 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs_aten")
 # MODEL_PATH = "./checkpoints/aten_p2l3.h5"
 # MODEL_PATH = "./outputs_aten/vip_video_20190103va/checkpoints/" \
 #              "aten_vip_video_20190103va_epoch200_loss1.441_valloss1.354.h5"
-MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs_aten/vip_video_20190510va/checkpoints/" \
-             "triplemodel_vip_video_20190510va_epoch039_loss0.599_valloss0.501.h5"
+MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs_aten/vip_video_20190513va/checkpoints/" \
+             "triplemodel_vip_video_20190513va_epoch014_loss0.599_valloss0.640.h5"
 IMAGE_DIR = DATASET_DIR + "/Images"
 FRONT_FRAME_LIST_DIR = DATASET_DIR + "/front_frame_list"
 BEHIND_FRAME_LIST_DIR = DATASET_DIR + "/behind_frame_list"
 IMAGE_LIST = DATASET_DIR + "/lists/test_id.txt"
 mode = "test"
 # RES_DIR = "./vis_aten/test_vip_video_20190103va_epoch169"
-RES_DIR = "./vis_aten/test_vip_video_20190510va_epoch039"
+RES_DIR = "./vis_aten/test_vip_video_20190513va_epoch014"
 
 
 # RES_DIR = "./vis_aten/debug"
@@ -66,11 +66,11 @@ def worker(image_ids, dataset, infer_config):
     # gpu数量
     t0 = time.time()
     import tensorflow as tf
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     import keras.backend as K
     config_tf = tf.ConfigProto()
     # config.gpu_options.allow_growth = True
-    config_tf.gpu_options.per_process_gpu_memory_fraction = 0.4
+    config_tf.gpu_options.per_process_gpu_memory_fraction = 0.3
     session = tf.Session(config=config_tf)
     from models.aten_triplemodel_dilated import ATEN_PARSING_RCNN
     model = ATEN_PARSING_RCNN(mode='inference', config=infer_config, model_dir=MODEL_DIR)

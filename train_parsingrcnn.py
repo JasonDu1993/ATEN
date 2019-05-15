@@ -13,12 +13,12 @@ session = tf.Session(config=config)
 from configs.vip import ParsingRCNNModelConfig
 from configs.vip import VIPDataset
 # from models.parsing_rcnn_model import PARSING_RCNN
-from models.parsing_rcnn_model_dilated import PARSING_RCNN
+from models.parsing_rcnn_model_resstage5_dilated_se import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    # NAME = "vip_singleframe_20190408a"
-    NAME = "vip_singleframe_test"
+    NAME = "vip_singleframe_20190515a"
+    # NAME = "vip_singleframe_test"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
     STEPS_PER_EPOCH = 2000
@@ -26,6 +26,7 @@ class trainConfig(ParsingRCNNModelConfig):
     VALIDATION_STEPS = 100
     # VALIDATION_STEPS = 10
     SAVE_MODEL_PERIOD = 1
+    KEY_RANGE_L = 3
 
 
 # Root directory of the project
@@ -33,8 +34,8 @@ ROOT_DIR = os.getcwd()
 
 # Path to trained weights file
 # PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
-PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190326a/checkpoints/" \
-                      "parsing_rcnn_vip_singleframe_20190326a_epoch038_loss0.491_valloss0.550.h5"
+PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190513a/checkpoints" + "/" + \
+                      "parsing_rcnn_vip_singleframe_20190513a_epoch047_loss0.363_valloss0.329.h5"
 
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs

@@ -2,7 +2,7 @@
 # @Time    : 2019/5/7 15:00
 # @Author  : Jason
 # @Email   : 1358681631@qq.com
-# @File    : test_parsingrcnn_speedly.py.py
+# @File    : test_parsingrcnn_multiprocessing.py
 # @Software: PyCharm
 import os
 import sys
@@ -20,8 +20,6 @@ from utils import visualize
 
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
-
 sys.path.insert(0, os.getcwd())
 
 matplotlib.use('Agg')
@@ -36,11 +34,12 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Download this file and place in the root of your
 # project (See README file for details)
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190408a/checkpoints/" \
-             "parsing_rcnn_vip_singleframe_20190408a_epoch073_loss0.401_valloss0.391.h5"
-# MODEL_PATH = "./outputs/vip_singleframe_20181229ma/checkpoints/parsing_rcnn_vip_singleframe_20181229ma_epoch086.h5"
-# MODEL_PATH = "./outputs/vip_singleframe_test/checkpoints/parsing_rcnn_vip_singleframe_test_epoch001.h5"
-# MODEL_PATH = "./checkpoints/parsing_rcnn.h5"
+MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190513a/checkpoints" + "/" + \
+             "parsing_rcnn_vip_singleframe_20190513a_epoch040_loss0.371_valloss0.332.h5"
+RES_DIR = "./vis/test_vip_singleframe_20190513a_epoch040"
+# RES_DIR = "./vis/debug"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
 # Directory of images to run detection on
 IMAGE_DIR = DATASET_DIR + "/Images"
 IMAGE_LIST = DATASET_DIR + "/lists/test_id.txt"
@@ -48,9 +47,7 @@ IMAGE_LIST = DATASET_DIR + "/lists/test_id.txt"
 # IMAGE_DIR = DATASET_DIR + "/videos/train_videos_frames"
 # IMAGE_LIST = DATASET_DIR + "/lists/train_all_frames_id_part3.txt"
 
-# RES_DIR = "./vis/origin_train_vip_singleframe_20190408a_epoch073"
-# RES_DIR = "./vis/test_vip_singleframe_20190326a_epoch032_t"
-RES_DIR = "./vis/debug"
+
 flag = False
 if not os.path.exists(RES_DIR):
     os.makedirs(RES_DIR)
@@ -64,7 +61,7 @@ class InferenceConfig(ParsingRCNNModelConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     GPU_COUNT = 1
-    PROCESS_COUNT = 2
+    PROCESS_COUNT = 3
     IMAGES_PER_GPU = 1
 
 
@@ -81,7 +78,7 @@ def worker(images, infer_config):
     # config.gpu_options.allow_growth = True
     config.gpu_options.per_process_gpu_memory_fraction = 0.3
     session = tf.Session(config=config)
-    from models.parsing_rcnn_model_dilated import PARSING_RCNN
+    from models.parsing_rcnn_model_dilated_se import PARSING_RCNN
     if infer_config is None:
         infer_config = InferenceConfig()
     model = PARSING_RCNN(mode="inference", config=infer_config, model_dir=MODEL_DIR)
@@ -163,7 +160,7 @@ def multiprocess_main():
             split_data = images_list[start:end]
             # 各个进程开始
             proc = Process(target=worker, args=(split_data, infer_config))
-            print('process:%d, start:%d, end:%d' % (i, start, end))
+            print('process:%s, pid:%d, start:%d, end:%d' % (proc.name, proc.pid, start, end))
             proc.start()
             procs.append(proc)
             # # 数据量，将queue中数据取出

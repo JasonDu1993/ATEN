@@ -386,13 +386,13 @@ def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, m
     t0 = time()
     parsing_map, parsing_prob = write_global_result(res_dir, color_dir, height, width, image_id, global_parsing_prob)
     t1 = time()
-    print("write_global_result", t1 - t0)
+    print("    write_global_result", t1 - t0)
     inst_map, inst_scores = write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks, scores,
                                               nms_like_thre)
     # inst_map, inst_scores = write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes, masks, scores,
     #                                                 nms_like_thre)
     t2 = time()
-    print("write_inst_result", t2 - t1)
+    print("    write_inst_result", t2 - t1)
     inst_part_map = np.zeros_like(inst_map)
     # build floder
     floder = os.path.join(res_dir, 'instance_parsing')
