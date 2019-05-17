@@ -102,7 +102,7 @@ for i in range(len(image_ids)):
     print("aten test one image", t2 - t1, "s")
     # print("detect out ", r['class_ids'].shape[0], "person")
     visualize.vis_insts(cur_frame, video_floder, im_name, r['rois'], r['masks'], r['class_ids'], r['scores'])
-    visualize.write_inst_part_result(video_floder, color_floder, cur_frame.shape[0], cur_frame.shape[1], im_name,
+    global_parsing_map, color_map=visualize.write_inst_part_result(video_floder, color_floder, cur_frame.shape[0], cur_frame.shape[1], im_name,
                                      r['rois'], r['masks'], r['scores'], r['global_parsing'])
     print("aten visualize results", time() - t2, "s")
 

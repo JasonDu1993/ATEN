@@ -257,7 +257,7 @@ def write_global_result(res_dir, color_dir, height, width, image_id, global_pars
         cv2.imwrite(img_global_path, global_parsing)
     if not os.path.exists(color_global_path):
         cv2.imwrite(color_global_path, global_parsing_map)
-    return global_parsing, global_parsing_max_prob
+    return global_parsing, global_parsing_max_prob, global_parsing_map
 
 
 def write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks, scores, nms_like_thre=0.7):
@@ -319,7 +319,7 @@ def write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks,
     if not os.path.exists(color_instance_segmentation_path):
         cv2.imwrite(color_instance_segmentation_path, color_map)
 
-    return gray_map, scores_boxes
+    return gray_map, scores_boxes, color_map
 
 
 def write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes, masks, scores, nms_like_thre=0.7):
@@ -384,11 +384,12 @@ def write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes
 def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, masks, scores, global_parsing_prob,
                            nms_like_thre=0.7, class_num=19):
     t0 = time()
-    parsing_map, parsing_prob = write_global_result(res_dir, color_dir, height, width, image_id, global_parsing_prob)
+    parsing_map, parsing_prob, global_parsing_map = write_global_result(res_dir, color_dir, height, width, image_id,
+                                                                        global_parsing_prob)
     t1 = time()
     print("    write_global_result", t1 - t0)
-    inst_map, inst_scores = write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks, scores,
-                                              nms_like_thre)
+    inst_map, inst_scores, color_map = write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks,
+                                                         scores, nms_like_thre)
     # inst_map, inst_scores = write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes, masks, scores,
     #                                                 nms_like_thre)
     t2 = time()
@@ -430,7 +431,9 @@ def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, m
     img_instance_parsing_path = os.path.join(floder, "%s.png" % image_id)
     if not os.path.exists(img_instance_parsing_path):
         cv2.imwrite(img_instance_parsing_path, inst_part_map)
+
         # print("save", time() - t4)
+    return global_parsing_map, color_map
 
 
 def vis_inst_parsings(image, res_dir, image_id, boxes, parts, class_ids,
@@ -650,6 +653,7 @@ def vis_insts_opencv(image, res_dir, image_id, boxes, masks, class_ids,
         cv2.imwrite(img_path, masked_image)
     t2 = time()
     # print("opencv", t2 - t1, "s")
+    return masked_image
 
 
 def draw_rois(image, rois, refined_rois, mask, class_ids, class_names, limit=10):

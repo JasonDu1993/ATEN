@@ -35,10 +35,10 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # project (See README file for details)
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
 MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_test/checkpoints" + "/" + \
-             "parsing_rcnn_vip_singleframe_test_epoch003_loss2.476_valloss2.231.h5"
-# RES_DIR = "./vis/test_vip_singleframe_20190513a_epoch040"
+             "parsing_rcnn_vip_singleframe_test_epoch003_loss3.459_valloss3.326.h5"
+# RES_DIR = "./vis/test_vip_singleframe_20190515b_epoch066"
 RES_DIR = "./vis/debug"
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 # Directory of images to run detection on
 IMAGE_DIR = DATASET_DIR + "/Images"
@@ -61,7 +61,7 @@ class InferenceConfig(ParsingRCNNModelConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     GPU_COUNT = 1
-    PROCESS_COUNT = 1
+    PROCESS_COUNT = 3
     IMAGES_PER_GPU = 1
 
 
@@ -78,7 +78,8 @@ def worker(images, infer_config):
     # config.gpu_options.allow_growth = True
     config.gpu_options.per_process_gpu_memory_fraction = 0.3
     session = tf.Session(config=config)
-    from models.parsing_rcnn_model_resfpn_dilated_se import PARSING_RCNN
+    # from models.parsing_rcnn_model_resfpn_dilated_se import PARSING_RCNN
+    from models.parsing_rcnn_model_dilated_mobilenetv3 import PARSING_RCNN
     if infer_config is None:
         infer_config = InferenceConfig()
     model = PARSING_RCNN(mode="inference", config=infer_config, model_dir=MODEL_DIR)
@@ -122,15 +123,19 @@ def worker(images, infer_config):
         # Visualize results
         r = results[0]
         # visualize.vis_insts(image, color_floder, image_id, r['rois'], r['masks'], r['class_ids'], r['scores'])
-        visualize.vis_insts_opencv(image[:, :, ::-1], color_floder, image_id, r['rois'], r['masks'], r['class_ids'],
-                                   r['scores'])
-        # visualize.vis_insts_opencv(image, color_floder, image_id, r['rois'], r['masks'], r['class_ids'],
+        masked_image = visualize.vis_insts_opencv(image[:, :, ::-1], color_floder, image_id, r['rois'], r['masks'],
+                                                  r['class_ids'], r['scores'])
+        # masked_image = visualize.vis_insts_opencv(image, color_floder, image_id, r['rois'], r['masks'], r['class_ids'],
         #                            r['scores'])
         t4 = time.time()
         # print("vis_insts", t3 - t2)
-        visualize.write_inst_part_result(video_floder, color_floder, image.shape[0], image.shape[1], image_id,
-                                         r['rois'], r['masks'],
-                                         r['scores'], r['global_parsing'])
+        global_parsing_map, color_map = visualize.write_inst_part_result(video_floder, color_floder, image.shape[0],
+                                                                         image.shape[1], image_id, r['rois'],
+                                                                         r['masks'], r['scores'], r['global_parsing'])
+        vis_global_image = cv2.addWeighted(masked_image, 1, global_parsing_map, 0.4, 0)
+        cv2.imwrite(os.path.join(color_floder, "color", "vis_global_%s.png" % image_id), vis_global_image)
+        # vis_inst_image = cv2.addWeighted(masked_image, 1, color_map, 0.4, 0)
+        # cv2.imwrite(os.path.join(color_floder, "color", "vis_ins_%s.png" % image_id), vis_inst_image)
         print("    write_inst_part_result", time.time() - t4, "s")
         print("  (2), visualize results", time.time() - t2, "s")
         print("  (3), test and visualize one image:", time.time() - t1, "s")
@@ -160,9 +165,8 @@ def multiprocess_main():
             split_data = images_list[start:end]
             # 各个进程开始
             proc = Process(target=worker, args=(split_data, infer_config))
-
+            print('process:%d, start:%d, end:%d' % (i, start, end))
             proc.start()
-            print('process:%s, pid:%d, start:%d, end:%d' % (proc.name, proc.pid, start, end))
             procs.append(proc)
             # # 数据量，将queue中数据取出
             # for i in range(image_num):

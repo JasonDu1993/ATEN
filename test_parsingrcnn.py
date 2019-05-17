@@ -110,15 +110,17 @@ def main():
         # Visualize results
         r = results[0]
         # visualize.vis_insts(image, color_floder, image_id, r['rois'], r['masks'], r['class_ids'], r['scores'])
-        visualize.vis_insts_opencv(image[:, :, ::-1], color_floder, image_id, r['rois'], r['masks'], r['class_ids'],
-                                   r['scores'])
-        # visualize.vis_insts_opencv(image, color_floder, image_id, r['rois'], r['masks'], r['class_ids'],
+        masked_image = visualize.vis_insts_opencv(image[:, :, ::-1], color_floder, image_id, r['rois'], r['masks'],
+                                                  r['class_ids'], r['scores'])
+        # masked_image = visualize.vis_insts_opencv(image, color_floder, image_id, r['rois'], r['masks'], r['class_ids'],
         #                            r['scores'])
         t4 = time()
         # print("vis_insts", t3 - t2)
-        visualize.write_inst_part_result(video_floder, color_floder, image.shape[0], image.shape[1], image_id,
-                                         r['rois'], r['masks'],
-                                         r['scores'], r['global_parsing'])
+        global_parsing_map, color_map = visualize.write_inst_part_result(video_floder, color_floder, image.shape[0],
+                                                                         image.shape[1], image_id, r['rois'],
+                                                                         r['masks'], r['scores'], r['global_parsing'])
+        vis_global_image = cv2.addWeighted(masked_image, 1, global_parsing_map, 0.4, 0)
+        cv2.imwrite(os.path.join(color_floder, "color", "vis_global_%s.png" % image_id), vis_global_image)
         print("    write_inst_part_result", time() - t4, "s")
         print("2, visualize results", time() - t2, "s")
         print("3, test and visualize one image:", time() - t1, "s")
