@@ -1251,7 +1251,7 @@ def global_parsing_encoder(feature_maps):
     # x = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn')(x)
     x = KL.Activation('relu')(x)
 
-    x = cbam_block(x)
+    x = cbam_block(x, attn_type="se")
 
     return x
 

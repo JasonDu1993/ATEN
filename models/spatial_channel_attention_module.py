@@ -45,12 +45,17 @@ def se_block(input_feature, ratio=8):
     return se_feature
 
 
-def cbam_block(cbam_feature, ratio=8):
+def cbam_block(cbam_feature, attn_type="channel_attention", ratio=8):
     """Contains the implementation of Convolutional Block Attention Module(CBAM) block.
     As described in https://arxiv.org/abs/1807.06521.
     """
-
-    cbam_feature_channel = channel_attention(cbam_feature, ratio)
+    assert attn_type in ["se", "channel_attention"]
+    if attn_type == "se":
+        cbam_feature_channel = se_block(cbam_feature, ratio)
+    elif attn_type == "channel_attention":
+        cbam_feature_channel = channel_attention(cbam_feature, ratio)
+    else:
+        cbam_feature_channel = channel_attention(cbam_feature, ratio)
     cbam_feature_spatial = spatial_attention(cbam_feature_channel)
     return cbam_feature_spatial
 
