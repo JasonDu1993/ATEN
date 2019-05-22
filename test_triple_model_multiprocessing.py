@@ -27,8 +27,8 @@ class InferenceConfig(vip.VideoModelConfig):
     GPU_COUNT = 1
     IMAGES_PER_GPU = 1
     KEY_RANGE_L = 3
-    PROCESS_COUNT = 2
-    RECURRENT_UNIT = "lstm"
+    PROCESS_COUNT = 3
+    RECURRENT_UNIT = "gru"
 
 
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
@@ -66,13 +66,13 @@ def worker(image_ids, dataset, infer_config):
     # gpu数量
     t0 = time.time()
     import tensorflow as tf
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "3"
     import keras.backend as K
     config_tf = tf.ConfigProto()
     # config.gpu_options.allow_growth = True
     config_tf.gpu_options.per_process_gpu_memory_fraction = 0.3
     session = tf.Session(config=config_tf)
-    from models.aten_triplemodel_dilated import ATEN_PARSING_RCNN
+    from models.aten_triplemodel_dilated_se import ATEN_PARSING_RCNN
     model = ATEN_PARSING_RCNN(mode='inference', config=infer_config, model_dir=MODEL_DIR)
     model.load_weights(MODEL_PATH, by_name=True)
 
@@ -126,7 +126,7 @@ def worker(image_ids, dataset, infer_config):
                                                                          cur_frame.shape[1], im_name, r['rois'],
                                                                          r['masks'], r['scores'], r['global_parsing'])
         vis_global_image = cv2.addWeighted(masked_image, 1, global_parsing_map, 0.4, 0)
-        cv2.imwrite(os.path.join(color_floder, "color", "vis_global_%s.png" % image_id), vis_global_image)
+        cv2.imwrite(os.path.join(color_floder, "color", "vis_global_%012d.png" % int(image_id)), vis_global_image)
         print("    write_inst_part_result", time.time() - t4, "s")
         print("  (2), visualize results", time.time() - t3, "s")
         print("  (3), test and visualize results", time.time() - t1, "s")
