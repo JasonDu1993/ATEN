@@ -34,11 +34,11 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Download this file and place in the root of your
 # project (See README file for details)
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_test/checkpoints" + "/" + \
-             "parsing_rcnn_vip_singleframe_test_epoch003_loss3.459_valloss3.326.h5"
-# RES_DIR = "./vis/test_vip_singleframe_20190515b_epoch066"
-RES_DIR = "./vis/debug"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190520a/checkpoints" + "/" + \
+             "parsing_rcnn_vip_singleframe_20190520a_epoch036_loss0.552_valloss0.540.h5"
+RES_DIR = "./vis/test_vip_singleframe_20190520a_epoch036"
+# RES_DIR = "./vis/debug"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 # Directory of images to run detection on
 IMAGE_DIR = DATASET_DIR + "/Images"
@@ -79,7 +79,7 @@ def worker(images, infer_config):
     config.gpu_options.per_process_gpu_memory_fraction = 0.3
     session = tf.Session(config=config)
     # from models.parsing_rcnn_model_resfpn_dilated_se import PARSING_RCNN
-    from models.parsing_rcnn_model_dilated_mobilenetv3 import PARSING_RCNN
+    from models.parsing_rcnn_model_resfpn_dilated_se_attention2 import PARSING_RCNN
     if infer_config is None:
         infer_config = InferenceConfig()
     model = PARSING_RCNN(mode="inference", config=infer_config, model_dir=MODEL_DIR)
