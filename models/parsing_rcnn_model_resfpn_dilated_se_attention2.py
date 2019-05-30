@@ -1436,7 +1436,7 @@ def mrcnn_mask_loss_graph(target_masks, target_class_ids, pred_masks):
     target_masks: [batch, num_rois, height, width].
         A float32 tensor of values 0 or 1. Uses zero padding to fill array.
     target_class_ids: [batch, num_rois]. Integer class IDs. Zero padded.
-    pred_masks: [batch, proposals, height, width, num_classes] float32 tensor
+    pred_masks: [batch, proposals=128, height=28, width=28, num_classes] float32 tensor
                 with values from 0 to 1.
     """
     # Reshape for simplicity. Merge first two dimensions into one.
@@ -2554,7 +2554,7 @@ class PARSING_RCNN():
         rois, rpn_class, rpn_bbox, mrcnn_global_parsing_prob = \
             self.keras_model.predict([molded_images, image_metas], verbose=0)
         t2 = time()
-        # print("mrcnn_global_parsing_prob", np.min(mrcnn_global_parsing_prob), np.max(mrcnn_global_parsing_prob))
+        print("mrcnn_global_parsing_prob", np.min(mrcnn_global_parsing_prob), np.max(mrcnn_global_parsing_prob))
         # print("Run object detection", t2 - t1, "s")
         # Process detections
         results = []

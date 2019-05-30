@@ -1472,8 +1472,7 @@ def mrcnn_mask_loss_graph(target_masks, target_class_ids, pred_masks):
 
 def focal_loss(gamma=2.):
     def focal_loss_fixed(y_true, y_pred):
-        y_pred = tf.where(y_pred > 1, tf.ones_like(y_pred), y_pred)
-        y_pred = tf.where(y_pred < 0, tf.zeros_like(y_pred), y_pred)
+        y_pred = tf.nn.softmax(y_pred, axis=-1)
         pt_1 = tf.where(tf.equal(y_true, 1), y_pred, tf.ones_like(y_pred))
         return -K.pow(1. - pt_1, gamma) * K.log(pt_1 + K.epsilon())
 
