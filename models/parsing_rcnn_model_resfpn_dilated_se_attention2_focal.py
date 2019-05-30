@@ -1470,13 +1470,41 @@ def mrcnn_mask_loss_graph(target_masks, target_class_ids, pred_masks):
     return K.cast(loss, dtype="float32")
 
 
-def focal_loss(gamma=2.):
-    def focal_loss_fixed(y_true, y_pred):
-        y_pred = tf.nn.softmax(y_pred, axis=-1)
-        pt_1 = tf.where(tf.equal(y_true, 1), y_pred, tf.ones_like(y_pred))
-        return -K.pow(1. - pt_1, gamma) * K.log(pt_1 + K.epsilon())
+def focal_loss(y_true, y_pred, alpha=0.25, gamma=2):
+    """
+    focal loss for multi-class classification
+    fl(pt) = -alpha*(1-pt)^(gamma)*log(pt)
+    :param y_true: ground truth one-hot vector shape of [batch_size, nb_class]
+    :param y_pred: prediction after softmax shape of [batch_size, nb_class]
+    :param alpha:
+    :param gamma:
+    :return:
+    """
+    # # parameters
+    # alpha = 0.25
+    # gamma = 2
 
-    return focal_loss_fixed
+    # To avoid divided by zero
+    y_pred += K.epsilon()
+
+    # Cross entropy
+    ce = -y_true * K.log(y_pred)
+
+    # Not necessary to multiply y_true(cause it will multiply with CE which has set unconcerned index to zero ),
+    # but refer to the definition of p_t, we do it
+    weight = K.pow(1 - y_pred, gamma) * y_true
+
+    # Now fl has a shape of [batch_size, nb_class]
+    # alpha should be a step function as paper mentioned, but it doesn't matter like reason mentioned above
+    # (CE has set unconcerned index to zero)
+    #
+    # alpha_step = tf.where(y_true, alpha*np.ones_like(y_true), 1-alpha*np.ones_like(y_true))
+    fl = ce * weight * alpha
+
+    # Both reduce_sum and reduce_max are ok
+    reduce_fl = K.sum(fl, axis=-1)
+
+    return reduce_fl
 
 
 def mrcnn_global_parsing_loss_graph(num_classes, gt_parsing_map, predict_parsing_map):
@@ -1500,13 +1528,14 @@ def mrcnn_global_parsing_loss_graph(num_classes, gt_parsing_map, predict_parsing
     indices = tf.squeeze(tf.where(tf.less_equal(raw_gt, num_classes - 1)), 1)
     gt = tf.gather(raw_gt, indices)  # shape = (K,) K 表示找到的符合tf.less_equal(raw_gt, num_classes - 1)的个数
     prediction = tf.gather(raw_prediction, indices)  # shape = （K, parsing_class_num)
+    prediction = tf.nn.softmax(prediction, axis=-1)
     gt = K.one_hot(gt, num_classes)
     # 交叉熵
     # loss = tf.nn.softmax_cross_entropy_with_logits(
     #     labels=gt, logits=prediction)  # (parsing_class_num, )
     # loss = tf.reduce_mean(loss)  # scalar
     # focal loss
-    loss = focal_loss()(gt, prediction)
+    loss = focal_loss(gt, prediction)
     loss = tf.reduce_mean(loss)  # scalar
     # loss = tf.reshape(loss, [1, 1])
     return K.cast(loss, dtype="float32")

@@ -231,8 +231,10 @@ def get_color_map(n=256):
     return color_map
 
 
-def write_global_result(res_dir, color_dir, height, width, image_id, global_parsing_prob):
-    """
+def write_part_result(res_dir, color_dir, height, width, image_id, global_parsing_prob):
+    """save the human parsing results (instance independent) in "vp_results/~videoid~/global_parsing/%s.png" % image_id
+    and save visualization results in "color_results/~videoid~/color/global_%s.png" % image_id
+
     Input:
     global_parsing_prob: [height, width, NUM_PART_CLASS]
     """
@@ -261,7 +263,11 @@ def write_global_result(res_dir, color_dir, height, width, image_id, global_pars
 
 
 def write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks, scores, nms_like_thre=0.7):
-    """
+    """save the instance segmentation results in "vp_results/~videoid~/instance_segmentation/%s.png" % image_id
+    and save visualization results in "color_results/~videoid~/color/inst_%s.png" % image_id
+    and save the dected person prob and bounding box(y1, x1, y2, x2) in vp_results/~videoid~/instance_segmentation/
+        %s.txt" % image_id
+
     input:
     boxes: [num_instance, (y1, x1, y2, x2)] in image coordinates.
     masks: [height, width, num_instance] of uint8
@@ -323,7 +329,11 @@ def write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks,
 
 
 def write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes, masks, scores, nms_like_thre=0.7):
-    """
+    """save the instance segmentation results in "vp_results/~videoid~/instance_segmentation/%s.png" % image_id
+    and save visualization results in "color_results/~videoid~/color/inst_%s.png" % image_id
+    and save the dected person prob and bounding box(y1, x1, y2, x2) in vp_results/~videoid~/instance_segmentation/
+        %s.txt" % image_id
+
     input:
     boxes: [num_instance, (y1, x1, y2, x2)] in image coordinates.
     masks: [height, width, num_instance] of uint8
@@ -384,10 +394,10 @@ def write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes
 def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, masks, scores, global_parsing_prob,
                            nms_like_thre=0.7, class_num=19):
     t0 = time()
-    parsing_map, parsing_prob, global_parsing_map = write_global_result(res_dir, color_dir, height, width, image_id,
-                                                                        global_parsing_prob)
+    parsing_map, parsing_prob, global_parsing_map = write_part_result(res_dir, color_dir, height, width, image_id,
+                                                                      global_parsing_prob)
     t1 = time()
-    print("    write_global_result", t1 - t0)
+    print("    write_part_result", t1 - t0)
     inst_map, inst_scores, color_map = write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks,
                                                          scores, nms_like_thre)
     # inst_map, inst_scores = write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes, masks, scores,

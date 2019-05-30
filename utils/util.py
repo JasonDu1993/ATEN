@@ -541,6 +541,7 @@ def unmold_mask(mask, bbox, image_shape):
     t1 = time.time()
     mask = scipy.misc.imresize(
         mask, (y2 - y1, x2 - x1), interp='bilinear').astype(np.float32) / 255.0
+    # mask = cv2.resize(mask, (y2 - y1, x2 - x1), interpolation=cv2.INTER_LINEAR).astype(np.float32) / 255.0
     # print("unmold_mask", time.time() - t1)
     mask = np.where(mask >= threshold, 1, 0).astype(np.uint8)
 
