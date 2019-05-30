@@ -13,11 +13,11 @@ session = tf.Session(config=config)
 from configs.vip import ParsingRCNNModelConfig
 from configs.vip import VIPDataset
 # from models.parsing_rcnn_model import PARSING_RCNN
-from models.parsing_rcnn_model_resfpn_dilated_se_attention2_focal import PARSING_RCNN
+from models.parsing_rcnn_model_resfpn_dilated_se_attention2_res1stage import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "vip_singleframe_20190530b"
+    NAME = "vip_singleframe_20190530a"
     # NAME = "vip_singleframe_debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
