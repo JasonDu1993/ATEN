@@ -127,7 +127,7 @@ def display_parsing(image, parsing, figsize=(16, 16), ax=None):
         _, ax = plt.subplots(1, figsize=figsize)
 
     # Generate random colors
-    colors = get_color_map()
+    colors = random_colors_opencv(20)
 
     # Show area outside image boundaries.
     height, width = image.shape[:2]
@@ -236,7 +236,14 @@ def write_part_result(res_dir, color_dir, height, width, image_id, global_parsin
     and save visualization results in "color_results/~videoid~/color/global_%s.png" % image_id
 
     Input:
-    global_parsing_prob: [height, width, NUM_PART_CLASS]
+        global_parsing_prob: [height, width, NUM_PART_CLASS]
+
+    Returns:
+        global_parsing: shape [height, width], the value in [0-19],0 represent the background,
+            1-19 represents the person part label
+        global_parsing_max_prob: shape [height, width], the value in [0-1] represent the max probility of person part
+            except background
+        global_parsing_map: shape [height, width, 3], which is used for visualized, 3 represent rgb,
     """
     if not os.path.exists(os.path.join(color_dir, 'color')):
         os.makedirs(os.path.join(color_dir, 'color'))
@@ -263,15 +270,21 @@ def write_part_result(res_dir, color_dir, height, width, image_id, global_parsin
 
 
 def write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks, scores, nms_like_thre=0.7):
-    """save the instance segmentation results in "vp_results/~videoid~/instance_segmentation/%s.png" % image_id
-    and save visualization results in "color_results/~videoid~/color/inst_%s.png" % image_id
-    and save the dected person prob and bounding box(y1, x1, y2, x2) in vp_results/~videoid~/instance_segmentation/
+    """
+    (1) save the instance segmentation results in "vp_results/~videoid~/instance_segmentation/%s.png" % image_id
+    (2) save the dected person prob and bounding box(y1, x1, y2, x2) in vp_results/~videoid~/instance_segmentation/
         %s.txt" % image_id
+    (3) save visualization results in "color_results/~videoid~/color/inst_%s.png" % image_id
 
-    input:
-    boxes: [num_instance, (y1, x1, y2, x2)] in image coordinates.
-    masks: [height, width, num_instance] of uint8
-    scores: [num_instance] confidence scores for each box
+    Args:
+        boxes: [num_instance, (y1, x1, y2, x2)] in image coordinates.
+        masks: [height, width, num_instance] of uint8
+        scores: [num_instance] confidence scores for each box
+
+    Returns:
+        gray_map:
+        scores_boxes:
+        color_map
     """
     if not os.path.exists(os.path.join(color_dir, 'color')):
         os.makedirs(os.path.join(color_dir, 'color'))
@@ -289,6 +302,7 @@ def write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks,
     scores_boxes = []
     txt_instance_segmentation = os.path.join(res_dir, 'instance_segmentation', '%s.txt' % image_id)
     # if not os.path.exists(txt_instance_segmentation):
+    # (2)
     wfp = open(txt_instance_segmentation, 'w')
     t3 = time()
     # print(t3 - t2)
@@ -318,9 +332,86 @@ def write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks,
         inst_count += 1
     # print("for", time() - t3)
     wfp.close()
+    # (1)
     img_instance_segmentation_path = os.path.join(res_dir, "instance_segmentation", "%s.png" % image_id)
     if not os.path.exists(img_instance_segmentation_path):
         cv2.imwrite(img_instance_segmentation_path, gray_map)
+    # (3)
+    color_instance_segmentation_path = os.path.join(color_dir, "color", "inst_%s.png" % image_id)
+    if not os.path.exists(color_instance_segmentation_path):
+        cv2.imwrite(color_instance_segmentation_path, color_map)
+
+    return gray_map, scores_boxes, color_map
+
+
+def write_inst_result_v2(res_dir, color_dir, height, width, image_id, boxes, masks, scores, nms_like_thre=0.7):
+    """
+    (1) save the instance segmentation results in "vp_results/~videoid~/instance_segmentation/%s.png" % image_id
+    (2) save the dected person prob and bounding box(y1, x1, y2, x2) in vp_results/~videoid~/instance_segmentation/
+        %s.txt" % image_id
+    (3) save visualization results in "color_results/~videoid~/color/inst_%s.png" % image_id
+
+    Args:
+        boxes: [num_instance, (y1, x1, y2, x2)] in image coordinates.
+        masks: [height, width, num_instance] of uint8
+        scores: [num_instance] confidence scores for each box
+
+    Returns:
+        gray_map:
+        scores_boxes:
+        color_map
+    """
+    if not os.path.exists(os.path.join(color_dir, 'color')):
+        os.makedirs(os.path.join(color_dir, 'color'))
+    if not os.path.exists(os.path.join(res_dir, 'instance_segmentation')):
+        os.makedirs(os.path.join(res_dir, 'instance_segmentation'))
+    t1 = time()
+    c_map = get_color_map()
+    t2 = time()
+    # print(t2 - t1)
+    masks = np.transpose(masks, (2, 0, 1))
+    N = boxes.shape[0]
+    color_map = np.zeros((height, width, 3), dtype=np.uint8)
+    gray_map = np.zeros((height, width), dtype=np.uint8)
+    inst_count = 1
+    scores_boxes = []
+    txt_instance_segmentation = os.path.join(res_dir, 'instance_segmentation', '%s.txt' % image_id)
+    # if not os.path.exists(txt_instance_segmentation):
+    # (2)
+    wfp = open(txt_instance_segmentation, 'w')
+    t3 = time()
+    # print(t3 - t2)
+    for i in range(N):
+        mask = masks[i]
+        box = boxes[i]
+        score = scores[i]
+        coo = np.where(mask > 0)
+        u_pixels = len(coo[0])
+
+        # nms-like postprocess
+        for k in range(len(coo[0])):
+            if gray_map[coo[0][k], coo[1][k]] > 0:
+                mask[coo[0][k], coo[1][k]] = 0
+        coo = np.where(mask > 0)
+        u1_pixels = len(coo[0])
+
+        if float(u1_pixels) / float(u_pixels) <= nms_like_thre:
+            continue
+
+        # write score and bbox
+        scores_boxes.append([score, box[0], box[1], box[2], box[3]])
+        wfp.write('%f %d %d %d %d\n' % (score, box[0], box[1], box[2], box[3]))
+        for k in range(len(coo[0])):
+            gray_map[coo[0][k], coo[1][k]] = inst_count
+            color_map[coo[0][k], coo[1][k], :] = c_map[inst_count][::-1]
+        inst_count += 1
+    # print("for", time() - t3)
+    wfp.close()
+    # (1)
+    img_instance_segmentation_path = os.path.join(res_dir, "instance_segmentation", "%s.png" % image_id)
+    if not os.path.exists(img_instance_segmentation_path):
+        cv2.imwrite(img_instance_segmentation_path, gray_map)
+    # (3)
     color_instance_segmentation_path = os.path.join(color_dir, "color", "inst_%s.png" % image_id)
     if not os.path.exists(color_instance_segmentation_path):
         cv2.imwrite(color_instance_segmentation_path, color_map)
@@ -334,10 +425,15 @@ def write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes
     and save the dected person prob and bounding box(y1, x1, y2, x2) in vp_results/~videoid~/instance_segmentation/
         %s.txt" % image_id
 
-    input:
-    boxes: [num_instance, (y1, x1, y2, x2)] in image coordinates.
-    masks: [height, width, num_instance] of uint8
-    scores: [num_instance] confidence scores for each box
+    Args:
+        boxes: [num_instance, (y1, x1, y2, x2)] in image coordinates.
+        masks: [height, width, num_instance] of uint8
+        scores: [num_instance] confidence scores for each box
+
+    Returns:
+        gray_map:
+        scores_boxes:
+        color_map
     """
     if not os.path.exists(os.path.join(color_dir, 'color')):
         os.makedirs(os.path.join(color_dir, 'color'))
@@ -392,10 +488,33 @@ def write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes
 
 
 def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, masks, scores, global_parsing_prob,
-                           nms_like_thre=0.7, class_num=19):
+                           nms_like_thre=0.7, class_num=20):
+    """save the instance segmentation results in "vp_results/~videoid~/instance_segmentation/%s.png" % image_id
+        and save visualization results in "color_results/~videoid~/color/inst_%s.png" % image_id
+        and save the dected person prob and bounding box(y1, x1, y2, x2) in vp_results/~videoid~/instance_segmentation/
+            %s.txt" % image_id
+
+    Args:
+        res_dir:
+        color_dir:
+        height:
+        width:
+        image_id:
+        boxes:
+        masks:
+        scores:
+        global_parsing_prob:
+        nms_like_thre:
+        class_num:
+
+
+    Returns:
+        global_parsing_map, color_map
+    """
     t0 = time()
-    parsing_map, parsing_prob, global_parsing_map = write_part_result(res_dir, color_dir, height, width, image_id,
-                                                                      global_parsing_prob)
+    global_parsing, global_parsing_max_prob, global_parsing_map = write_part_result(res_dir, color_dir, height, width,
+                                                                                    image_id,
+                                                                                    global_parsing_prob)
     t1 = time()
     print("    write_part_result", t1 - t0)
     inst_map, inst_scores, color_map = write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks,
@@ -413,10 +532,10 @@ def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, m
     wfp = open(instance_parsing_path, 'w')
     counter = 0
     t3 = time()
-    for k in range(1, class_num + 1):
+    for k in range(1, class_num):
         cur_counter = counter
         inst_part_prob_map = {}
-        cls_indices = (parsing_map == k).astype(np.uint8)
+        cls_indices = (global_parsing == k).astype(np.uint8)
         part_inst_map = cls_indices * inst_map
         inst_ids = np.unique(part_inst_map)
         for i in inst_ids:
@@ -428,7 +547,7 @@ def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, m
                 human_id = i
                 human_seg_sco = inst_scores[human_id - 1][0]
 
-                tmp_parsing_prob = parsing_prob[cls_inst_indices]
+                tmp_parsing_prob = global_parsing_max_prob[cls_inst_indices]
                 mean_parsing_prob = np.mean(tmp_parsing_prob)
 
                 inst_part_prob_map[counter] = mean_parsing_prob * human_seg_sco
@@ -514,7 +633,7 @@ def vis_inst_parsings(image, res_dir, image_id, boxes, parts, class_ids,
 
 def vis_insts(image, res_dir, image_id, boxes, masks, class_ids,
               scores=None, class_names=['BG', 'person'], figsize=(16, 16)):
-    """
+    """discarded
     Args:
         image: numpy.ndarray, shape=[height, width, num_instance] (720, 1280, 3), dtype=uint32
         boxes: numpy.ndarray, shape=[num_instance, (y1, x1, y2, x2)] in image coordinates.
@@ -601,15 +720,18 @@ def vis_insts(image, res_dir, image_id, boxes, masks, class_ids,
 
 def vis_insts_opencv(image, res_dir, image_id, boxes, masks, class_ids,
                      scores=None, class_names=['BG', 'person'], figsize=(16, 16)):
-    """针对每个人体画一个颜色
+    """write a bounding box for every person and contour
+
    Args:
-       image: numpy.ndarray, shape=[height, width, num_instance] (720, 1280, 3), dtype=uint8
+       image: numpy.ndarray, shape=[height, width, num_instance] (720, 1280, 3), dtype=uint8,3 represent rgb,
        boxes: numpy.ndarray, shape=[num_instance, (y1, x1, y2, x2)] in image coordinates.
        masks: numpy.ndarray, shape=[height, width, num_instance] (720, 1280, 3),dtype=uint8
        class_ids: list, len=num_instances
        class_names: list of class names of the dataset, default is ['BG', 'person']
        scores: (optional) confidence scores for each box,numpy.ndarray,shape=[num_instances], dtype=float32
        figsize: (optional) the size of the image.
+    Returns:
+        masked_image: shape [image_height, image_widht, 3], 3 represent rgb, wthe image including the bounding box
     """
     # Number of
     if not os.path.exists(os.path.join(res_dir, 'color')):
@@ -657,7 +779,6 @@ def vis_insts_opencv(image, res_dir, image_id, boxes, masks, class_ids,
         res = cv2.findContours(masked_image_binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         contours = res[-2]
         cv2.drawContours(masked_image, contours, -1, color=color, thickness=1)
-
     img_path = os.path.join(res_dir, 'color', 'vis_%s.png' % image_id)
     if not os.path.exists(img_path):
         cv2.imwrite(img_path, masked_image)

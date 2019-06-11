@@ -5,7 +5,7 @@ from time import time
 sys.path.insert(0, os.getcwd())
 import tensorflow as tf
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
@@ -13,11 +13,11 @@ session = tf.Session(config=config)
 from configs.vip import ParsingRCNNModelConfig
 from configs.vip import VIPDataset
 # from models.parsing_rcnn_model import PARSING_RCNN
-from models.parsing_rcnn_model_resfpn_dilated_se_attention2_focal import PARSING_RCNN
+from models.parsing_rcnn_model_resfpn_dilated_se_attention2 import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "vip_singleframe_20190530c"
+    NAME = "vip_singleframe_20190611a"
     # NAME = "vip_singleframe_debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
@@ -34,8 +34,8 @@ ROOT_DIR = os.getcwd()
 
 # Path to trained weights file
 # PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
-PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190520a/checkpoints" + "/" + \
-                      "parsing_rcnn_vip_singleframe_20190520a_epoch038_loss0.552_valloss0.538.h5"
+PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/checkpoints" + "/" + \
+                      "parsing_rcnn.h5"
 
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs

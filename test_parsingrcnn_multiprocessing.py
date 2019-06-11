@@ -34,10 +34,10 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Download this file and place in the root of your
 # project (See README file for details)
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_debug/checkpoints" + "/" + \
-                      "parsing_rcnn_vip_singleframe_debug_epoch002_loss0.526_valloss0.472.h5"
-# RES_DIR = "./vis/test_vip_singleframe_20190529a_epoch038"
-RES_DIR = "./vis/debug"
+MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190530c/checkpoints" + "/" + \
+                      "parsing_rcnn_vip_singleframe_20190530c_epoch025_loss0.477_valloss0.480.h5"
+RES_DIR = "./vis/test_vip_singleframe_20190530c_epoch025"
+# RES_DIR = "./vis/debug"
 # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 # Directory of images to run detection on
@@ -61,7 +61,7 @@ class InferenceConfig(ParsingRCNNModelConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     GPU_COUNT = 1
-    PROCESS_COUNT = 1
+    PROCESS_COUNT = 3
     IMAGES_PER_GPU = 1
 
 

@@ -2479,10 +2479,10 @@ class PARSING_RCNN():
         application.
         Args:
             detections: [N, (y1, x1, y2, x2, class_id, score)]
-            mrcnn_mask: [N, height, width, num_classes]
-            mrcnn_global_parsing: [resized_height, resized_width, num_classes]
-            image_shape: [height, width, depth] Original size of the image before resizing
-            window: [y1, x1, y2, x2] Box in the image where the real image is
+            mrcnn_mask: [N, height=28, width=28, num_classes=2]
+            mrcnn_global_parsing: [resized_height=512, resized_width=512, num_part_classes=20]
+            image_shape: [height=720, width=1080, depth=3] Original size of the image before resizing
+            window: [y1=112, x1=0, y2=400, x2=512] Box in the image where the real image is
                     excluding the padding.
 
         Returns:
@@ -2534,9 +2534,9 @@ class PARSING_RCNN():
             if full_masks else np.empty((0,) + masks.shape[1:3])
         global_parsing = mrcnn_global_parsing[window[0]:window[2], window[1]:window[3], :]
         # global_parsing = skimage.transform.resize(global_parsing, (image_shape[0], image_shape[1]), mode="constant")
-        # global_parsing = cv2.resize(global_parsing, (image_shape[1], image_shape[0]), interpolation=cv2.INTER_LINEAR)
-        # print("unmold_detections global_parsing", np.min(global_parsing), np.max(global_parsing))
-        global_parsing = cv2.resize(global_parsing, (image_shape[1], image_shape[0]), interpolation=cv2.INTER_CUBIC)
+        global_parsing = cv2.resize(global_parsing, (image_shape[1], image_shape[0]), interpolation=cv2.INTER_LINEAR)
+        print("unmold_detections global_parsing", np.min(global_parsing), np.max(global_parsing))
+        # global_parsing = cv2.resize(global_parsing, (image_shape[1], image_shape[0]), interpolation=cv2.INTER_CUBIC)
 
         return boxes, class_ids, scores, full_masks, global_parsing
 

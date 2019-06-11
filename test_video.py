@@ -8,10 +8,10 @@ import os
 import tensorflow as tf
 import numpy as np
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 config = tf.ConfigProto()
 # config.gpu_options.allow_growth = True
-config.gpu_options.per_process_gpu_memory_fraction = 0.15
+config.gpu_options.per_process_gpu_memory_fraction = 0.3
 session = tf.Session(config=config)
 import sys
 import cv2
@@ -46,7 +46,7 @@ def main():
     global config
     config = InferenceConfig()
     config.display()
-    read_video_path = "./utils/mp.mp4"
+    read_video_path = "./utils/赵丽颖古装合集国语高清_1分钟.mp4"
     vid = os.path.split(read_video_path)[-1].split(".")[0]
     print(vid)
     # Create model object in inference mode.
@@ -68,8 +68,9 @@ def main():
     print("fps", fps)
     # fps = int(cap.get(cv2.CAP_PROP_FPS))
     size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-    videoWriter = cv2.VideoWriter(os.path.join(save_dir, vid + "_test.avi"), cv2.VideoWriter_fourcc('I', '4', '2', '0'),
-                                  fps, size)
+    # videoWriter = cv2.VideoWriter(os.path.join(save_dir, vid + "_test.avi"), cv2.VideoWriter_fourcc('I', '4', '2', '0'),
+    #                               fps, size)
+    videoWriter = cv2.VideoWriter(os.path.join(save_dir, vid + "_test.mp4"), cv2.VideoWriter_fourcc(*"mp4v"), fps, size)
     idx = 0
     while success:
         t1 = time()
