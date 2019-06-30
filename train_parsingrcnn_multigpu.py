@@ -12,16 +12,17 @@ session = tf.Session(config=config)
 
 from configs.vip import ParsingRCNNModelConfig
 from configs.vip import VIPDataset
-from models.parsing_rcnn_model import PARSING_RCNN
+from models.parsing_rcnn_model_resfpn_dilated_dam import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "vip_singleframe_20181229ma"
+    NAME = "vip_singleframe_20190626ma"
     GPU_COUNT = 2
     IMAGES_PER_GPU = 4
     STEPS_PER_EPOCH = 2000
     VALIDATION_STEPS = 100
     SAVE_MODEL_PERIOD = 1
+    KEY_RANGE_L = 3
 
 
 # Root directory of the project
