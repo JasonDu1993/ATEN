@@ -5,7 +5,7 @@ from time import time
 sys.path.insert(0, os.getcwd())
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
@@ -17,10 +17,10 @@ from models.parsing_rcnn_model_resfpn_dilated_dam import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "vip_singleframe_20190626a"
+    NAME = "vip_singleframe_20190703a"
     # NAME = "vip_singleframe_debug"
     GPU_COUNT = 1
-    IMAGES_PER_GPU = 4
+    IMAGES_PER_GPU = 2
     STEPS_PER_EPOCH = 2000
     # STEPS_PER_EPOCH = 20
     VALIDATION_STEPS = 100

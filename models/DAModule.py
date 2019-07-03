@@ -8,6 +8,7 @@ import numpy as np
 from keras.layers import GlobalAveragePooling2D, GlobalMaxPooling2D, Reshape, Dense, Multiply
 from keras.layers import Permute, Concatenate, Conv2D, Add, Activation, Lambda, Input, Dot
 import keras.backend as K
+import tensorflow as tf
 
 
 def position_attention_module(inputs, name, ratio=8):
@@ -25,14 +26,13 @@ def position_attention_module(inputs, name, ratio=8):
     proj_key = Permute((2, 1), name="proj_key_transpose_" + name)(proj_key)  # (B, C, H*W)
     energy = Dot(axes=[2, 1], name="energy_" + name)([proj_query, proj_key])  # (B, H*W, H*W)
     # attention_map = Softmax(axis=-1, name="pos_att_" + name)(energy)
-    import tensorflow as tf
-    attention_map = tf.nn.softmax(energy, axis=-1)
+    attention_map = Lambda(lambda x: tf.nn.softmax(x, axis=-1), name="lambda_pos_attn_" + name)(energy)
 
     proj_value = Reshape((height * width, in_dim), name="proj_value_" + name)(value_conv)
     out = Dot(axes=[2, 1], name="out_" + name)([attention_map, proj_value])
     out = Reshape((height, width, in_dim), name="reshape_out_" + name)(out)
     # out_mul = Multiply()([out, gamma])
-    out = Add(name="position_add_"+name)([inputs, out])
+    out = Add(name="position_add_" + name)([inputs, out])
     return out
 
 
@@ -51,7 +51,7 @@ def channel_attention_module(inputs, name, ratio=8):
     proj_key = Reshape((height * width, in_dim), name="proj_key_" + name)(key_conv)  # (B, H*W, C)
 
     energy = Dot(axes=[2, 1], name="energy_" + name)([proj_query, proj_key])  # (B, C, C)
-    attention_map = Softmax(axis=-1, name="posistion_attention_" + name)(energy)
+    attention_map = Lambda(lambda x: tf.nn.softmax(x, axis=-1), name="lambda_chan_attn_" + name)(energy)
 
     proj_value = Reshape((height * width, in_dim), name="proj_value_" + name)(value_conv)
     out = Dot(axes=[2, 1], name="out_" + name)([proj_value, attention_map])
@@ -67,27 +67,30 @@ def cam(inputs, name):
     proj_query = Permute((2, 1), name="proj_key_transpose_" + name)(proj_query)  # (B, C, H*W)
     proj_key = Reshape((height * width, C), name="proj_key_" + name)(inputs)  # (B, H*W, C)
     energy = Dot(axes=[2, 1], name="energy_" + name)([proj_query, proj_key])  # (B, C, C)
-    energy_new = K.max(energy, axis=-1, keepdims=True) - energy
-    attention_map = Softmax(axis=-1, name="channel_attention_" + name)(energy_new)
+    # energy_new = K.max(energy, axis=-1, keepdims=True) - energy
+    energy_new = Lambda(lambda x: tf.reduce_max(x, axis=-1, keepdims=True) - x, name="lambda_reduce_max_" + name)(
+        energy)
+    attention_map = Lambda(lambda x: tf.nn.softmax(x, axis=-1), name="lambda_pos_attn_" + name)(energy_new)
 
     proj_value = Reshape((height * width, C), name="proj_value_" + name)(inputs)
-    out = Dot(axes=[2, 1], name="energy_" + name)([proj_value, attention_map])  # (B, H*W, C)
-    out = Reshape((height, width, C), name="proj_value_" + name)(out)
+    out = Dot(axes=[2, 1], name="out_" + name)([proj_value, attention_map])  # (B, H*W, C)
+    out = Reshape((height, width, C), name="reshape_out_" + name)(out)
 
     # gamma = K.variable(0)
     # out = gamma * out + inputs
-    out = Add(name="channel_add_"+name)([inputs, out])
+    out = Add(name="channel_add_" + name)([inputs, out])
     return out
 
 
 def DAModule(inputs, name, ratio=8):
     pa_out = position_attention_module(inputs, name="pam_" + name, ratio=8)
-    dam_out = pa_out
-    # ca_out = cam(inputs, name="cam_" + name)
+    # dam_out = pa_out
+    ca_out = cam(inputs, name="cam_" + name)
+    # dam_out = ca_out
     # w1 = K.variable(0)
     # w2 = K.variable(0)
     # dam_out = inputs + w1 * pa_out + w2 * ca_out
-    # dam_out = Add(name="add_"+name)([pa_out, ca_out])
+    dam_out = Add(name="add_"+name)([pa_out, ca_out])
     return dam_out
 
 
