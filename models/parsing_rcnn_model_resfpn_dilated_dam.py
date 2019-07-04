@@ -1215,8 +1215,8 @@ def resfpn(feature_stages, output_shape, base_name="resfpn"):
     return x
 
 
-def global_parsing_encoder(feature_maps):
-    feature_map = resfpn(feature_maps, output_shape=(32, 32))
+def global_parsing_encoder(feature_maps, h, w):
+    feature_map = resfpn(feature_maps, output_shape=(h, w))
     print("feature_maps", feature_map)
     x1 = KL.Conv2D(256, (1, 1), padding='same',
                    name='mrcnn_global_parsing_encoder_c1')(feature_map)
@@ -1872,6 +1872,7 @@ class PARSING_RCNN():
 
         # Image size must be dividable by 2 multiple times
         h, w = config.IMAGE_SHAPE[:2]
+        h_int, w_int = config.IMAGE_SHAPE[:2]
         if h / 2 ** 4 != int(h / 2 ** 4) or w / 2 ** 4 != int(w / 2 ** 4):
             raise Exception("Image size must be dividable by 2 at least 4 times "
                             "to avoid fractions when downscaling and upscaling.")
@@ -1924,7 +1925,7 @@ class PARSING_RCNN():
         c1, c2, c3, c4, c5 = deeplab_resnet(input_image, 'resnet50')
         t2 = time()
         print("deeplab_resnet", t2 - t1, "s")
-        coarse_feature = global_parsing_encoder([c3, c4, c5])
+        coarse_feature = global_parsing_encoder([c3, c4, c5], h=h_int // 16, w=w_int // 16)
         t3 = time()
         print("global_parsing_encoder", t3 - t2, "s")
         fine_feature = global_parsing_decoder(coarse_feature, c1)
@@ -2155,7 +2156,7 @@ class PARSING_RCNN():
         print("load model", filepath)
 
         if by_name:
-            s.load_weights_from_hdf5_group_by_name(f, layers, skip_mismatch=True)
+            s.load_weights_from_hdf5_group_by_name(f, layers)
         else:
             s.load_weights_from_hdf5_group(f, layers)
         if hasattr(f, 'close'):

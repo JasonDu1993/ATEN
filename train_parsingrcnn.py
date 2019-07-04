@@ -20,7 +20,7 @@ class trainConfig(ParsingRCNNModelConfig):
     NAME = "vip_singleframe_20190703a"
     # NAME = "vip_singleframe_debug"
     GPU_COUNT = 1
-    IMAGES_PER_GPU = 2
+    IMAGES_PER_GPU = 3
     STEPS_PER_EPOCH = 2000
     # STEPS_PER_EPOCH = 20
     VALIDATION_STEPS = 100
