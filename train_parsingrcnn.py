@@ -17,7 +17,7 @@ from models.parsing_rcnn_model_resfpn_dilated_dam import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "vip_singleframe_20190703a"
+    NAME = "vip_singleframe_20190705a"
     # NAME = "vip_singleframe_debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 3
@@ -34,8 +34,8 @@ ROOT_DIR = os.getcwd()
 
 # Path to trained weights file
 # PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
-PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/checkpoints" + "/" + \
-                      "parsing_rcnn.h5"
+PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190703a/checkpoints" + "/" + \
+                      "parsing_rcnn_vip_singleframe_20190703a_epoch045_loss0.810_valloss0.928.h5"
 
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
@@ -109,7 +109,7 @@ if __name__ == '__main__':
     # Fine tune all layers
 
     model.train(dataset_train, dataset_val,
-                learning_rate=0.001,
+                learning_rate=0.0001,
                 epochs=200,
                 layers='all',
                 period=config.SAVE_MODEL_PERIOD)
