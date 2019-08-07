@@ -34,11 +34,11 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Download this file and place in the root of your
 # project (See README file for details)
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190703a/checkpoints" + "/" + \
-                      "parsing_rcnn_vip_singleframe_20190703a_epoch053_loss0.802_valloss0.897.h5"
-RES_DIR = "./vis/test_vip_singleframe_20190703a_epoch053_input512"
+MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_multi_20190713ma/checkpoints" + "/" + \
+                      "parsing_rcnn_vip_singleframe_multi_20190713ma_epoch170_loss0.242_valloss0.232.h5"
+RES_DIR = "./vis/test_vip_singleframe_multi_20190713ma_epoch170"
 # RES_DIR = "./vis/debug"
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 # Directory of images to run detection on
 IMAGE_DIR = DATASET_DIR + "/Images"
@@ -61,7 +61,7 @@ class InferenceConfig(ParsingRCNNModelConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     GPU_COUNT = 1
-    PROCESS_COUNT = 2
+    PROCESS_COUNT = 1
     IMAGES_PER_GPU = 1
 
 
@@ -76,10 +76,10 @@ def worker(images, infer_config):
     import keras.backend as K
     config = tf.ConfigProto()
     # config.gpu_options.allow_growth = True
-    config.gpu_options.per_process_gpu_memory_fraction = 0.4
+    config.gpu_options.per_process_gpu_memory_fraction = 0.3
     session = tf.Session(config=config)
     # from models.parsing_rcnn_model_resfpn_dilated_se import PARSING_RCNN
-    from models.parsing_rcnn_model_resfpn_dilated_dam import PARSING_RCNN
+    from models.parsing_rcnn_model_resfpn_dilated_se_attention2 import PARSING_RCNN
     if infer_config is None:
         infer_config = InferenceConfig()
     model = PARSING_RCNN(mode="inference", config=infer_config, model_dir=MODEL_DIR)
