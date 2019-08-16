@@ -373,7 +373,8 @@ class Dataset(object):
         """
         # Load image
         print("img name:", self.image_info[image_id]['path'])
-        image = skimage.io.imread(self.image_info[image_id]['path'])
+        # [TODO] change to  opencv imread
+        image = skimage.io.imread(self.image_info[image_id]['path'])  # shape [h, w, 3], 3 represent RGB
         # If grayscale. Convert to RGB for consistency.
         if image.ndim != 3:
             image = skimage.color.gray2rgb(image)
@@ -642,6 +643,14 @@ def generate_anchors(scales, ratios, shape, feature_stride, anchor_stride):
     # Convert to corner coordinates (y1, x1, y2, x2) shape: (245760, 4) min： -271.5290039756342 max:779.5290039756342
     boxes = np.concatenate([box_centers - 0.5 * box_sizes,
                             box_centers + 0.5 * box_sizes], axis=1)
+    # boxes: shape shape: (245760, 4)
+    # [[-22.627417   -11.3137085   22.627417    11.3137085 ]
+    #  [-45.254834   -22.627417    45.254834    22.627417  ]
+    #  [-90.50966799 -45.254834    90.50966799  45.254834  ]
+    #  ...
+    #  [444.         444.         572.         572.        ]
+    #  [380.         380.         636.         636.        ]
+    #  [316.         316.         700.         700.        ]
     return boxes
 
 

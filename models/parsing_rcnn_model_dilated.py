@@ -1525,14 +1525,14 @@ def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
     gt_boxes: [num_gt_boxes, (y1, x1, y2, x2)]
 
     Returns:
-    rpn_match: [N] (int32) matches between anchors and GT boxes.
+    rpn_match: [N=246760=128*128*5*3] (int32) matches between anchors and GT boxes.
                1 = positive anchor, -1 = negative anchor, 0 = neutral
-    rpn_bbox: [N, (dy, dx, log(dh), log(dw))] Anchor bbox deltas.
+    rpn_bbox: [N=256, (dy, dx, log(dh), log(dw))] Anchor bbox deltas.
     """
     # RPN Match: 1 = positive anchor, -1 = negative anchor, 0 = neutral
-    rpn_match = np.zeros([anchors.shape[0]], dtype=np.int32)  # shape [246760=5*3*
+    rpn_match = np.zeros([anchors.shape[0]], dtype=np.int32)  # shape [246760=128*128*5*3, ]
     # RPN bounding boxes: [max anchors per image, (dy, dx, log(dh), log(dw))]
-    rpn_bbox = np.zeros((config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4))
+    rpn_bbox = np.zeros((config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4))  # shape (256, 4)
 
     # Compute overlaps [num_anchors, num_gt_boxes]
     overlaps = util.compute_overlaps(anchors, gt_boxes)
@@ -1547,13 +1547,13 @@ def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
     #
     # 1. Set negative anchors first. They get overwritten below if a GT box is
     # matched to them. Skip boxes in crowd areas.
-    anchor_iou_argmax = np.argmax(overlaps, axis=1)
-    anchor_iou_max = overlaps[np.arange(overlaps.shape[0]), anchor_iou_argmax]
+    anchor_iou_argmax = np.argmax(overlaps, axis=1)  # shape [246760=128*128*5*3, ]
+    anchor_iou_max = overlaps[np.arange(overlaps.shape[0]), anchor_iou_argmax]  # shape [246760=128*128*5*3, ]
     rpn_match[(anchor_iou_max < 0.3)] = -1
     # 2. Set an anchor for each GT box (regardless of IoU value).
     # TODO: If multiple anchors have the same IoU match all of them
-    gt_iou_argmax = np.argmax(overlaps, axis=0)
-    rpn_match[gt_iou_argmax] = 1
+    gt_iou_argmax = np.argmax(overlaps, axis=0)  # shape [num_gt_boxes, ]
+    rpn_match[gt_iou_argmax] = 1  # shape [246760=128*128*5*3, ]
     # 3. Set anchors with high overlap as positive.
     rpn_match[anchor_iou_max >= 0.7] = 1
 
@@ -1707,14 +1707,14 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
                     (batch_size, config.MAX_GT_INSTANCES), dtype=np.int32)
                 batch_gt_boxes = np.zeros(
                     (batch_size, config.MAX_GT_INSTANCES, 4), dtype=np.int32)
-                if config.USE_MINI_MASK:
+                if config.USE_MINI_MASK:  # True
                     batch_gt_masks = np.zeros((batch_size, config.MINI_MASK_SHAPE[0], config.MINI_MASK_SHAPE[1],
                                                config.MAX_GT_INSTANCES))
                 else:
                     batch_gt_masks = np.zeros(
                         (batch_size, image.shape[0], image.shape[1], config.MAX_GT_INSTANCES))
                 batch_gt_parts = np.zeros((batch_size, image.shape[0], image.shape[1]), dtype=np.uint8)
-                if random_rois:
+                if random_rois:  # 0
                     batch_rpn_rois = np.zeros(
                         (batch_size, rpn_rois.shape[0], 4), dtype=rpn_rois.dtype)
                     if detection_targets:
