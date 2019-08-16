@@ -4,18 +4,28 @@
 # @Email   : 1358681631@qq.com
 # @File    : triple_model.py.py
 # @Software: PyCharm
+import keras
+import re
+import datetime
+import os
+import numpy as np
+import tensorflow as tf
+from time import time
 
 import keras.backend as K
 from keras.layers import Input, Conv2D, AtrousConv2D, BatchNormalization, ReLU, Reshape, Activation
 from keras.layers import Add, Deconv2D, Dense, Lambda, Concatenate, Multiply
 from keras.layers import Conv3D, Deconv3D
 from keras.layers import LSTM, ConvLSTM2D, ConvLSTM2DCell
+from keras.optimizers import Adam
+from keras.callbacks import ReduceLROnPlateau, TensorBoard, ModelCheckpoint, EarlyStopping, CSVLogger
 from models.convolutional_recurrent import ConvGRU2D
 from keras.models import Model
 from keras.utils.vis_utils import plot_model
-import tensorflow as tf
+
 from configs.vip import VIPDataset
 from configs.vip import VideoModelConfig
+from utils import util
 
 sess = tf.Session()
 
@@ -258,17 +268,224 @@ def load_image_gt(dataset):
     dataset.
 
 
+def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
+                   batch_size=1, detection_targets=False):
+    """
+
+    Args:
+
+    Returns:
+
+    """
+    b = 0  # batch item index
+    image_index = -1
+    image_ids = np.copy(dataset.image_ids)
+    error_count = 0
+    # Anchors
+    # [anchor_count, (y1, x1, y2, x2)]
+    anchors = util.generate_anchors(config.RPN_ANCHOR_SCALES,
+                                    config.RPN_ANCHOR_RATIOS,
+                                    config.BACKBONE_SHAPES[0],
+                                    config.BACKBONE_STRIDES[0],
+                                    config.RPN_ANCHOR_STRIDE)
+
+    # Keras requires a generator to run indefinately.
+    while True:
+        try:
+            # Increment index to pick next image. Shuffle if at the start of an epoch.
+            image_index = (image_index + 1) % len(image_ids)
+            if shuffle and image_index == 0:
+                np.random.shuffle(image_ids)
+
+            # Get GT bounding boxes and masks for image.
+            image_id = image_ids[image_index]
+            image, key1, key2, key3, identity_ind, image_meta, gt_class_ids, gt_boxes, gt_masks, gt_parts = \
+                load_image_gt(dataset, config, image_id, augment=augment,
+                              use_mini_mask=config.USE_MINI_MASK)
+
+            # Skip images that have no instances. This can happen in cases
+            # where we train on a subset of classes and the image doesn't
+            # have any of the classes we care about.
+            if not np.any(gt_class_ids > 0):
+                continue
+
+            # RPN Targets
+            rpn_match, rpn_bbox = build_rpn_targets(image.shape, anchors,
+                                                    gt_class_ids, gt_boxes, config)
+
+            # Mask R-CNN Targets
+            if random_rois:
+                rpn_rois = generate_random_rois(
+                    image.shape, random_rois, gt_class_ids, gt_boxes)
+                if detection_targets:
+                    rois, mrcnn_class_ids, mrcnn_bbox, mrcnn_mask, mrcnn_part = \
+                        build_detection_targets(
+                            rpn_rois, gt_class_ids, gt_boxes, gt_masks, gt_parts, config)
+
+            # Init batch arrays
+            if b == 0:
+                batch_image_meta = np.zeros(
+                    (batch_size,) + image_meta.shape, dtype=image_meta.dtype)
+                batch_rpn_match = np.zeros(
+                    [batch_size, anchors.shape[0], 1], dtype=rpn_match.dtype)
+                batch_rpn_bbox = np.zeros(
+                    [batch_size, config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4], dtype=rpn_bbox.dtype)
+                batch_images = np.zeros(
+                    (batch_size,) + image.shape, dtype=np.float32)
+
+                batch_key1s = np.zeros(
+                    (batch_size,) + image.shape, dtype=np.float32)
+                batch_key2s = np.zeros(
+                    (batch_size,) + image.shape, dtype=np.float32)
+                batch_key3s = np.zeros(
+                    (batch_size,) + image.shape, dtype=np.float32)
+                batch_identity_inds = np.zeros((batch_size, 1), dtype=np.int32)
+
+                batch_gt_class_ids = np.zeros(
+                    (batch_size, config.MAX_GT_INSTANCES), dtype=np.int32)
+                batch_gt_boxes = np.zeros(
+                    (batch_size, config.MAX_GT_INSTANCES, 4), dtype=np.int32)
+                if config.USE_MINI_MASK:
+                    batch_gt_masks = np.zeros((batch_size, config.MINI_MASK_SHAPE[0], config.MINI_MASK_SHAPE[1],
+                                               config.MAX_GT_INSTANCES))
+                else:
+                    batch_gt_masks = np.zeros(
+                        (batch_size, image.shape[0], image.shape[1], config.MAX_GT_INSTANCES))
+                batch_gt_parts = np.zeros((batch_size, image.shape[0], image.shape[1]), dtype=np.uint8)
+                if random_rois:
+                    batch_rpn_rois = np.zeros(
+                        (batch_size, rpn_rois.shape[0], 4), dtype=rpn_rois.dtype)
+                    if detection_targets:
+                        batch_rois = np.zeros(
+                            (batch_size,) + rois.shape, dtype=rois.dtype)
+                        batch_mrcnn_class_ids = np.zeros(
+                            (batch_size,) + mrcnn_class_ids.shape, dtype=mrcnn_class_ids.dtype)
+                        batch_mrcnn_bbox = np.zeros(
+                            (batch_size,) + mrcnn_bbox.shape, dtype=mrcnn_bbox.dtype)
+                        batch_mrcnn_mask = np.zeros(
+                            (batch_size,) + mrcnn_mask.shape, dtype=mrcnn_mask.dtype)
+                        batch_mrcnn_part = np.zeros(
+                            (batch_size,) + mrcnn_part.shape, dtype=mrcnn_part.dtype)
+
+            # If more instances than fits in the array, sub-sample from them.
+            if gt_boxes.shape[0] > config.MAX_GT_INSTANCES:
+                ids = np.random.choice(
+                    np.arange(gt_boxes.shape[0]), config.MAX_GT_INSTANCES, replace=False)
+                gt_class_ids = gt_class_ids[ids]
+                gt_boxes = gt_boxes[ids]
+                gt_masks = gt_masks[:, :, ids]
+
+            # Add to batch
+            batch_image_meta[b] = image_meta
+            batch_rpn_match[b] = rpn_match[:, np.newaxis]
+            batch_rpn_bbox[b] = rpn_bbox
+            batch_images[b] = mold_image(image.astype(np.float32), config)
+            batch_key1s[b] = mold_image(key1.astype(np.float32), config)
+            batch_key2s[b] = mold_image(key2.astype(np.float32), config)
+            batch_key3s[b] = mold_image(key3.astype(np.float32), config)
+            batch_identity_inds[b, :] = identity_ind
+            batch_gt_class_ids[b, :gt_class_ids.shape[0]] = gt_class_ids
+            batch_gt_boxes[b, :gt_boxes.shape[0]] = gt_boxes
+            batch_gt_masks[b, :, :, :gt_masks.shape[-1]] = gt_masks
+            batch_gt_parts[b, :, :] = gt_parts
+            if random_rois:
+                batch_rpn_rois[b] = rpn_rois
+                if detection_targets:
+                    batch_rois[b] = rois
+                    batch_mrcnn_class_ids[b] = mrcnn_class_ids
+                    batch_mrcnn_bbox[b] = mrcnn_bbox
+                    batch_mrcnn_mask[b] = mrcnn_mask
+                    batch_mrcnn_part[b] = mrcnn_part
+            b += 1
+
+            # Batch full?
+            if b >= batch_size:
+                inputs = [batch_images, batch_key1s, batch_key2s, batch_key3s, batch_identity_inds,
+                          batch_image_meta, batch_rpn_match, batch_rpn_bbox,
+                          batch_gt_class_ids, batch_gt_boxes, batch_gt_masks, batch_gt_parts]
+                outputs = []
+
+                if random_rois:
+                    inputs.extend([batch_rpn_rois])
+                    if detection_targets:
+                        inputs.extend([batch_rois])
+                        # Keras requires that output and targets have the same number of dimensions
+                        batch_mrcnn_class_ids = np.expand_dims(
+                            batch_mrcnn_class_ids, -1)
+                        outputs.extend(
+                            [batch_mrcnn_class_ids, batch_mrcnn_bbox, batch_mrcnn_mask, batch_mrcnn_part])
+
+                yield inputs, outputs
+
+                # start a new batch
+                b = 0
+        except (GeneratorExit, KeyboardInterrupt):
+            raise
+        except:
+            # Log it and skip the image
+            logging.exception("Error processing image {}".format(
+                dataset.image_info[image_id]))
+            error_count += 1
+            if error_count > 5:
+                raise
+
+
 class TripleCNN(object):
     def __init__(self, mode, input_shape, config):
         assert mode in ['training', 'inference']
         self.mode = mode
         self.input_shape = input_shape
-        self.keras_model = self.build(mode, input_shape, config)
+        self.config = config
+        self.set_log_dir()
+        self.keras_model = self.build_model(mode, input_shape, config)
 
-    def build(self, mode, input_shape, config=None, image_nums=5):
+    def set_log_dir(self, model_path=None):
+        """Sets the model log directory and epoch counter.
+
+        model_path: If None, or a format different from what this code uses
+            then set a new log directory and start epochs from 0. Otherwise,
+            extract the log directory and the epoch counter from the file
+            name.
+        """
+        # Set date and epoch counter as if starting a new model
+        self.epoch = 0
+        now = datetime.datetime.now()
+
+        # If we have a model path with date and epochs use them
+        if model_path:
+            # Continue from we left of. Get epoch and date from the file name
+            # A sample model path might look like:
+            # /path/to/logs/coco20171029T2315/mask_rcnn_coco_0001.h5
+            regex = r".*/\w+(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})/aten\_\w+(\d{4})\.h5"
+            m = re.match(regex, model_path)
+            if m:
+                now = datetime.datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)),
+                                        int(m.group(4)), int(m.group(5)))
+                self.epoch = int(m.group(6)) + 1
+
+        # Directory for training logs
+        self.log_dir = os.path.join(self.model_dir, "{}".format(self.config.NAME.lower()))
+
+        # Path to save after each epoch. Include placeholders that get filled by Keras.
+        # self.checkpoint_path = os.path.join(self.log_dir, "checkpoints",
+        #                                     "parsing_rcnn_" + self.config.NAME.lower() +
+        #                                     "_epoch{epoch:03d}_loss{loss:.3f}_valloss{val_loss:.3f}.h5")
+        self.checkpoint_path = os.path.join(self.log_dir, "checkpoints",
+                                            "aten_" + self.config.NAME.lower() +
+                                            "_epoch{epoch:03d}_loss{loss:.3f}_valloss{val_loss:.3f}.h5")
+        if not os.path.exists(os.path.dirname(self.checkpoint_path)):
+            os.makedirs(os.path.dirname(self.checkpoint_path))
+
+        self.log_path = os.path.join(self.log_dir, "logs", "aten_{}_{:%Y%m%dT%H%M}.csv".format(
+            self.config.NAME.lower(), now))
+        if not os.path.exists(os.path.dirname(self.log_path)):
+            os.makedirs(os.path.dirname(self.log_path))
+
+        self.tensorboard_dir = os.path.join(self.log_dir, "tensorboard")
+
+    def build_model(self, input_shape, config=None, image_nums=5):
         if not config:
             config = VideoModelConfig()
-        assert mode in ["training", "inference"]
         h, w, c = input_shape
         inputs = Input(shape=(h, w, c), name="input_image")
         inputs_image_keys = []
@@ -284,133 +501,82 @@ class TripleCNN(object):
         print(model.summary())
         plot_model(model, "triple_single_model.png")
         # plot_model(model, "triple_multi_model.png")
-        if mode == "training":
-
-            # Network Heads
-            # TODO: verify that this handles zero padded ROIs
-            mrcnn_class_logits, mrcnn_class, mrcnn_bbox = \
-                fpn_classifier_graph(rois, mrcnn_feature_map, config.IMAGE_SHAPE,
-                                     config.POOL_SIZE, config.NUM_CLASSES)
-
-            mrcnn_mask = build_fpn_mask_graph(rois, mrcnn_feature_map,
-                                              config.IMAGE_SHAPE,
-                                              config.MASK_POOL_SIZE,
-                                              config.NUM_CLASSES)
-
-            # TODO: clean up (use tf.identify if necessary)
-            output_rois = KL.Lambda(lambda x: x * 1, name="output_rois")(rois)
-
-            global_parsing_loss = KL.Lambda(lambda x: mrcnn_global_parsing_loss_graph(config.NUM_PART_CLASS, *x),
-                                            name="mrcnn_global_parsing_loss")(
-                [input_gt_part, global_parsing_map])
-
-            # Losses
-            rpn_class_loss = KL.Lambda(lambda x: rpn_class_loss_graph(*x), name="rpn_class_loss")(
-                [input_rpn_match, rpn_class_logits])
-            rpn_bbox_loss = KL.Lambda(lambda x: rpn_bbox_loss_graph(config, *x), name="rpn_bbox_loss")(
-                [input_rpn_bbox, input_rpn_match, rpn_bbox])
-            class_loss = KL.Lambda(lambda x: mrcnn_class_loss_graph(*x), name="mrcnn_class_loss")(
-                [target_class_ids, mrcnn_class_logits, active_class_ids])
-            bbox_loss = KL.Lambda(lambda x: mrcnn_bbox_loss_graph(*x), name="mrcnn_bbox_loss")(
-                [target_bbox, target_class_ids, mrcnn_bbox])
-            mask_loss = KL.Lambda(lambda x: mrcnn_mask_loss_graph(*x), name="mrcnn_mask_loss")(
-                [target_mask, target_class_ids, mrcnn_mask])
-
-            # Model
-            inputs = [input_image, input_image_key1, input_image_key2, input_image_key3,
-                      input_key_identity, input_image_meta, input_rpn_match, input_rpn_bbox,
-                      input_gt_class_ids, input_gt_boxes, input_gt_masks, input_gt_part]
-            if not config.USE_RPN_ROIS:
-                inputs.append(input_rois)
-            outputs = [rpn_class_logits, rpn_class, rpn_bbox,
-                       mrcnn_class_logits, mrcnn_class, mrcnn_bbox, mrcnn_mask,
-                       rpn_rois, output_rois,
-                       rpn_class_loss, rpn_bbox_loss, class_loss, bbox_loss, mask_loss,
-                       global_parsing_loss]
-            model = KM.Model(inputs, outputs, name='aten')
-        else:
-            # Network Heads
-            # Proposal classifier and BBox regressor heads
-            mrcnn_class_logits, mrcnn_class, mrcnn_bbox = \
-                fpn_classifier_graph(rpn_rois, mrcnn_feature_map, config.IMAGE_SHAPE,
-                                     config.POOL_SIZE, config.NUM_CLASSES)
-
-            # Detections
-            # output is [batch, num_detections, (y1, x1, y2, x2, class_id, score)] in image coordinates
-            detections = DetectionLayer(config, name="mrcnn_detection")(
-                [rpn_rois, mrcnn_class, mrcnn_bbox, input_image_meta])
-
-            # Convert boxes to normalized coordinates
-            # TODO: let DetectionLayer return normalized coordinates to avoid
-            #       unnecessary conversions
-            h, w = config.IMAGE_SHAPE[:2]
-            detection_boxes = KL.Lambda(
-                lambda x: x[..., :4] / np.array([h, w, h, w]))(detections)
-
-            # Create masks for detections
-            mrcnn_mask = build_fpn_mask_graph(detection_boxes, mrcnn_feature_map,
-                                              config.IMAGE_SHAPE,
-                                              config.MASK_POOL_SIZE,
-                                              config.NUM_CLASSES)
-
-            global_parsing_prob = KL.Lambda(lambda x: post_processing_graph(*x))([global_parsing_map, input_image])
-
-            model = KM.Model([input_image, input_image_key1, input_image_key2, input_image_key3,
-                              input_key_identity, input_image_meta],
-                             [detections, mrcnn_class, mrcnn_bbox,
-                              mrcnn_mask, rpn_rois, rpn_class, rpn_bbox, global_parsing_prob],
-                             name='aten')
-
-        # Add multi-GPU support.
-        if config.GPU_COUNT > 1:
-            from utils.parallel_model import ParallelModel
-            model = ParallelModel(model, config.GPU_COUNT)
-        import platform
-        sys = platform.system()
-        # if sys == "Windows":
-        if self.mode == "training":
-            plot_model(model, "aten_training.jpg")
-        else:
-            plot_model(model, "aten_test.png")
         return model
 
-    def train(self, lr, batch_size, model, input_shape, annotation_path, image_path, anchors, num_classes, model_name,
-              log_dir='./checkpoints/csvlogs/'):
-        """retrain/fine-tune the model"""
-        model.compile(optimizer=Adam(lr=lr), loss={
-            # use custom yolo_loss Lambda layer.
-            'yolo_loss': lambda y_true, y_pred: y_pred})
-        lr_reduce = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=8, verbose=1, mode='min')
-        logging = TensorBoard(log_dir=log_dir)
-        checkpointer = ModelCheckpoint(
-            filepath='./checkpoints/models/' + model_name + '.{epoch:03d}-{loss:.3f}-{val_loss:.3f}.h5',
-            verbose=2,
-            monitor='val_loss',
-            save_weights_only=True,
-            save_best_only=True)
-        early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=8, verbose=1, mode='auto')
-        timestamp = time.time()
-        csv_logger = CSVLogger('./checkpoints/csvlogs/' + model_name + str(timestamp) + '.log')
+    def train(self, train_dataset, val_dataset, learning_rate, epochs, layers, period):
+        """Train the model.
+        train_dataset, val_dataset: Training and validation Dataset objects.
+        learning_rate: The learning rate to train with
+        epochs: Number of training epochs. Note that previous training epochs
+                are considered to be done alreay, so this actually determines
+                the epochs to train in total rather than in this particaular
+                call.
+        layers: Allows selecting wich layers to train. It can be:
+            - A regular expression to match layer names to train
+            - One of these predefined values:
+              heaads: The RPN, classifier and mask heads of the network
+              all: All the layers
+              3+: Train Resnet stage 3 and up
+              4+: Train Resnet stage 4 and up
+              5+: Train Resnet stage 5 and up
+        """
+        assert self.mode == "training", "Create model in training mode."
+        # Pre-defined layer regular expressions
+        layer_regex = {
+            # all layers but the backbone
+            "mask_heads": r"(mrcnn\_bbox\_.*)|(rpn\_.*)|(mrcnn\_class\_.*)|(mrcnn\_mask\_.*)|(mrcnn\_share\_.*)",
+            "heads": r"(mrcnn\_.*)|(rpn\_.*)",
+            # From a specific Resnet stage and up
+            "3+": r"(res3.*)|(bn3.*)|(res4.*)|(bn4.*)|(res5.*)|(bn5.*)|(mrcnn\_.*)|(rpn\_.*)",
+            "4+": r"(res4.*)|(bn4.*)|(res5.*)|(bn5.*)|(mrcnn\_.*)|(rpn\_.*)",
+            "5+": r"(res5.*)|(bn5.*)|(mrcnn\_.*)|(rpn\_.*)",
+            # All layers
+            "all": ".*",
+            "first_stage": r"(.*\_recurrent\_unit)|(mrcnn\_bbox\_.*)|(rpn\_.*)|(mrcnn\_class\_.*)|(mrcnn\_mask\_.*)|(mrcnn\_share\_.*)|(mrcnn\_global\_parsing\_c.*)",
+            "second_stage": r"(.*\_recurrent\_unit)|(mrcnn\_.*)|(rpn\_.*)|(flownet\_.*)",
+        }
+        if layers in layer_regex.keys():
+            layers = layer_regex[layers]
 
-        val_split = 0.1
-        with open(annotation_path) as f:
-            lines = f.readlines()
-        np.random.seed(10101)
-        np.random.shuffle(lines)
-        np.random.seed(None)
-        num_val = int(len(lines) * val_split)
-        num_train = len(lines) - num_val
-        print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
-        image_data, box_data = get_training_data(annotation_path, image_path, "./datas/train.npz", input_shape,
-                                                 max_boxes=20)
-        image_data = image_data / 255.0
-        y_true = preprocess_true_boxes(box_data, input_shape, anchors, num_classes)
-        model.fit([image_data, *y_true],
-                  np.zeros(len(image_data)),
-                  validation_split=.1,
-                  batch_size=batch_size,
-                  epochs=100,
-                  callbacks=[logging, checkpointer, csv_logger, early_stopping, lr_reduce])
+        # Data generators
+        train_generator = data_generator(train_dataset, self.config, shuffle=True,
+                                         batch_size=self.config.BATCH_SIZE)
+        val_generator = data_generator(val_dataset, self.config, shuffle=True,
+                                       batch_size=self.config.BATCH_SIZE)
+
+        # Callbacks
+        callbacks = [
+            keras.callbacks.TensorBoard(log_dir=self.tensorboard_dir,
+                                        histogram_freq=0, write_graph=True, write_images=False),
+            # keras.callbacks.ModelCheckpoint(self.checkpoint_path, period=period,
+            #                                 verbose=0, save_weights_only=True),
+            keras.callbacks.ModelCheckpoint(self.checkpoint_path, verbose=0, save_best_only=True,
+                                            save_weights_only=True),
+            keras.callbacks.CSVLogger(self.log_path),
+            keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, verbose=1),
+            keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=12, verbose=1),
+        ]
+
+        # Train
+        log("\nStarting at epoch {}. LR={}\n".format(self.epoch, learning_rate))
+        log("Checkpoint Path: {}".format(self.checkpoint_path))
+        self.set_trainable(layers)
+        self.compile(learning_rate, self.config.LEARNING_MOMENTUM)
+
+        self.keras_model.fit_generator(
+            train_generator,
+            initial_epoch=self.epoch,
+            epochs=epochs,
+            steps_per_epoch=self.config.STEPS_PER_EPOCH,
+            callbacks=callbacks,
+            validation_data=next(val_generator),
+            validation_steps=self.config.VALIDATION_STEPS,
+            # max_queue_size=100,
+            # workers=max(self.config.BATCH_SIZE // 2, 2),
+            # use_multiprocessing=True,
+            verbose=1,
+        )
+        self.epoch = max(self.epoch, epochs)
 
 
 if __name__ == '__main__':

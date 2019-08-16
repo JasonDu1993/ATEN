@@ -1,4 +1,5 @@
 import tensorflow as tf
+import keras.backend as K
 
 
 def mrcnn_global_parsing_loss_graph(num_classes, gt_parsing_map, predict_parsing_map):
@@ -28,3 +29,4 @@ def mrcnn_global_parsing_loss_graph(num_classes, gt_parsing_map, predict_parsing
     loss = tf.reduce_mean(loss)
     # loss = tf.reshape(loss, [1, 1])
     return K.cast(loss, dtype="float32")
+

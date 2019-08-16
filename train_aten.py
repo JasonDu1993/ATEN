@@ -5,7 +5,7 @@ from time import time
 sys.path.insert(0, os.getcwd())
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 config = tf.ConfigProto()
 # config.gpu_options.allow_growth = True
 config.gpu_options.per_process_gpu_memory_fraction = 0.3
@@ -14,8 +14,8 @@ import numpy as np
 
 from configs.vip import VideoModelConfig
 from configs.vip import VIPDataset
-# from models import aten_model as modellib
-from models import aten_model_dilated as modellib
+from models import aten_model as modellib
+# from models import aten_model_dilated as modellib
 
 
 class trainConfig(VideoModelConfig):

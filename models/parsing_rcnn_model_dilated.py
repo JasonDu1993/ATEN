@@ -2034,9 +2034,9 @@ class PARSING_RCNN():
         sys = platform.system()
         if sys == "Windows":
             if self.mode == "training":
-                plot_model(model, "parsing_rcnn_training.jpg")
+                plot_model(model, "parsing_rcnn_training1.jpg")
             else:
-                plot_model(model, "parsing_rcnn_inference.png")
+                plot_model(model, "parsing_rcnn_inference1.png")
         return model
 
     def find_last(self):
