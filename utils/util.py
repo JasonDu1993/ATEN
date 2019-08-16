@@ -265,7 +265,7 @@ class Dataset(object):
         # {'source': 'VIP', 'id': 17, 'name': 'right-leg'},
         # {'source': 'VIP', 'id': 18, 'name': 'left-shoe'},
         # {'source': 'VIP', 'id': 19, 'name': 'right-shoe'}]
-        self.source_class_ids = {}
+        self.source_class_ids = {} # {'': [0], 'VIP': [0, 1]}
 
     def add_class(self, source, class_id, class_name):
         assert "." not in source, "Source name cannot contain a dot"
@@ -581,7 +581,7 @@ def generate_anchors(scales, ratios, shape, feature_stride, anchor_stride):
     scales: 1D array of anchor sizes in pixels. For example,vip: [32, 64, 128, 356, 384]
     ratios: 1D array of anchor ratios of width/height. Example: [0.5, 0.75, 1]
     shape: [height, width] spatial shape of the feature map over which
-            to generate anchors.
+            to generate anchors. For vip is [128, 128]
     feature_stride: Stride of the feature map relative to the image in pixels.For vip is 4
     anchor_stride: Stride of anchors on the feature map. For example, if the
         value is 2 then generate anchors for every other feature map pixel.
@@ -599,20 +599,59 @@ def generate_anchors(scales, ratios, shape, feature_stride, anchor_stride):
     shifts_y = np.arange(0, shape[0], anchor_stride) * feature_stride  # shape: (128,) min:0 max: 508
     shifts_x = np.arange(0, shape[1], anchor_stride) * feature_stride  # shape: (128,) min:0 max: 508
     shifts_x, shifts_y = np.meshgrid(shifts_x, shifts_y)
-
-    # Enumerate combinations of shifts, widths, and heights # box_widths: (16384=128*128,15)  box_centers_x: (16384,15)
+    # shifts_x: shape(128, 128), such as
+    #   [[  0   4   8 ... 500 504 508]...[  0   4   8 ... 500 504 508]]
+    # shifts_y: shape(128, 128), such as
+    #   [[  0   0   0 ...   0   0   0] [  4   4   4 ...   4   4   4] ...[508 508 508 ... 508 508 508]]
+    # Enumerate combinations of shifts, widths, and heights
     box_widths, box_centers_x = np.meshgrid(widths, shifts_x)
+    # box_widths: shape(16384=128*128,15=3*5):
+    #   [[ 22.62 45.25 ... 256. 384.](len 15) [ 22.62 45.25 ... 256. 384.] ...[ 22.62 45.25 ... 256. 384.]]
+    # box_centers_x: shape(16384=128*128,15=3*5)
+    #   [[  0   0 ...   0   0](len 15) [  4   4 ... 4   4]  ... [508 508 ... 508 508](before 128 list) ...
+    #   [  0   0 ...   0   0] [  4   4 ... 4   4]  ... [508 508 ... 508 508]]
     box_heights, box_centers_y = np.meshgrid(heights, shifts_y)
+    # box_heights: shape(16384=128*128,15=3*5)
+    #   [[ 45.25 90.51  ... 256. 384.] (len 15)[ 45.25 90.51  ... 256. 384.] ... [ 45.25 90.51  ... 256. 384.]]
+    # box_centers_y: shape(16384=128*128,15=3*5)
+    #   [[  0   0 ...  0   0](len 15) [  0   0 ...  0   0] ...[  0   0 ...  0   0](before 128 list)
+    #   [4 4 ... 4 4] ...
+    #   [508 508 ... 508 508] [508 508 ... 508 508]]
 
     # Reshape to get a list of (y, x) and a list of (h, w)
     box_centers = np.stack(
-        [box_centers_y, box_centers_x], axis=2).reshape([-1, 2])  # box_centers shape: (245760=128*128*15, 2)
-    box_sizes = np.stack([box_heights, box_widths], axis=2).reshape([-1, 2])  # box_sizes shape: (245760=128*128*15, 2)
+        [box_centers_y, box_centers_x], axis=2).reshape([-1, 2])
+    # box_centers shape: (245760=128*128*5*3, 2)
+    # [[  0   0] [  0   0] ... [  0   0] (before 15 list)
+    #  [  0   4] [  0   4] ... [  0   4] (before 15 list)
+    #  ...
+    #  [  0   508] [  0   508] ... [  0   508] (before 15 list)
+    #  (before 1920=128*15 list)
+    #  ...
+    #  [  4   0] [  4   0] ... [  4   0] (before 15 list)
+    #  [  4   4] [  4   4] ... [  4   4] (before 15 list)
+    #  ...
+    #  [508 508] [508 508] ... [508 508]](before 15 list)
+    box_sizes = np.stack([box_heights, box_widths], axis=2).reshape([-1, 2])
+    # box_sizes shape: (245760=128*128*15, 2)
+    # [[ 45.25    22.62][ 90.51  45.25]  ... [256. 256.] [384. 384.] (before 15 list)
+    #  [ 45.25    22.62][ 90.51  45.25]  ... [256. 256.] [384. 384.] (before 15 list)
+    #  ...
+    #  [ 45.25    22.62][ 90.51  45.25]  ... [256. 256.] [384. 384.]] (before 15 list)
 
     # Convert to corner coordinates (y1, x1, y2, x2) shape: (245760, 4) min： -271.5290039756342 max:779.5290039756342
     boxes = np.concatenate([box_centers - 0.5 * box_sizes,
                             box_centers + 0.5 * box_sizes], axis=1)
+    # boxes: shape shape: (245760, 4)
+    # [[-22.627417   -11.3137085   22.627417    11.3137085 ]
+    #  [-45.254834   -22.627417    45.254834    22.627417  ]
+    #  [-90.50966799 -45.254834    90.50966799  45.254834  ]
+    #  ...
+    #  [444.         444.         572.         572.        ]
+    #  [380.         380.         636.         636.        ]
+    #  [316.         316.         700.         700.        ]
     return boxes
+
 
 
 def generate_pyramid_anchors(scales, ratios, feature_shapes, feature_strides,
