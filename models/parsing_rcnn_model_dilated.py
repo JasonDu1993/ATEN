@@ -1503,12 +1503,12 @@ def load_image_gt(dataset, config, image_id, augment=False,
     # Active classes
     # Different datasets have different classes, so track the
     # classes supported in the dataset of this image.
-    active_class_ids = np.zeros([dataset.num_classes], dtype=np.int32)
-    source_class_ids = dataset.source_class_ids[dataset.image_info[image_id]["source"]]
-    active_class_ids[source_class_ids] = 1
+    active_class_ids = np.zeros([dataset.num_classes], dtype=np.int32)  # [0, 0]
+    source_class_ids = dataset.source_class_ids[dataset.image_info[image_id]["source"]]  # if source is VIP, [0, 1]
+    active_class_ids[source_class_ids] = 1  # [1,1]
 
     # Resize masks to smaller size to reduce memory usage
-    if use_mini_mask:
+    if use_mini_mask:  # True
         mask = util.minimize_mask(bbox, mask, config.MINI_MASK_SHAPE)
 
     # Image meta data
@@ -1530,7 +1530,7 @@ def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
     rpn_bbox: [N, (dy, dx, log(dh), log(dw))] Anchor bbox deltas.
     """
     # RPN Match: 1 = positive anchor, -1 = negative anchor, 0 = neutral
-    rpn_match = np.zeros([anchors.shape[0]], dtype=np.int32)
+    rpn_match = np.zeros([anchors.shape[0]], dtype=np.int32)  # shape [246760=5*3*
     # RPN bounding boxes: [max anchors per image, (dy, dx, log(dh), log(dw))]
     rpn_bbox = np.zeros((config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4))
 
@@ -1655,12 +1655,12 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
     # Anchors
     # [anchor_count, (y1, x1, y2, x2)]
     t0 = time()
-    anchors = util.generate_anchors(config.RPN_ANCHOR_SCALES,
-                                    config.RPN_ANCHOR_RATIOS,
-                                    config.BACKBONE_SHAPES[0],
-                                    config.BACKBONE_STRIDES[0],
-                                    config.RPN_ANCHOR_STRIDE)
-    print("generate_anchors", time() - t0, "s")  # 16ms
+    anchors = util.generate_anchors(config.RPN_ANCHOR_SCALES,  # <class 'tuple'>: (32, 64, 128, 256, 384)
+                                    config.RPN_ANCHOR_RATIOS,  # <class 'list'>: [0.5, 0.75, 1]
+                                    config.BACKBONE_SHAPES[0],  # [[128 128] [ 64  64] [ 32  32] [ 32  32] [ 16  16]]
+                                    config.BACKBONE_STRIDES[0],  # <class 'list'>: [4, 8, 16, 16, 32]
+                                    config.RPN_ANCHOR_STRIDE)  # int, 1
+    print("generate_anchors", time() - t0, "s")  # 16ms anchors shape (245760=128*128*3*5, 4)
     # Keras requires a generator to run indefinately.
     while True:
         try:
@@ -2031,11 +2031,11 @@ class PARSING_RCNN():
             model = ParallelModel(model, config.GPU_COUNT)
         import platform
         sys = platform.system()
-        if sys == "Windows":
-            if self.mode == "training":
-                plot_model(model, "parsing_rcnn_training.jpg")
-            else:
-                plot_model(model, "parsing_rcnn_inference.png")
+        # if sys == "Windows":
+        #     if self.mode == "training":
+        #         plot_model(model, "parsing_rcnn_training1.jpg")
+        #     else:
+        #         plot_model(model, "parsing_rcnn_inference1.png")
         return model
 
     def find_last(self):
@@ -2541,7 +2541,7 @@ def compose_image_meta(image_id, image_shape, window, active_class_ids):
         list(image_shape) +  # size=3
         list(window) +  # size=4 (y1, x1, y2, x2) in image cooredinates
         list(active_class_ids)  # size=num_classes
-    )
+    )  # For example: meta=[  20  720 1280    3  112    0  400  512    1    1], numpy.ndarray, shape [10,]
     return meta
 
 

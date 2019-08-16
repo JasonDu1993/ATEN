@@ -140,11 +140,17 @@ if __name__ == "__main__":
     NUM_TOP_FRAMES = 50
 
     # Video path of the source file
+<<<<<<< Updated upstream
     videopath = 'videos3.mp4'
     # Directory to store the processed frames
     dir = './video3/'
     if not os.path.exists(dir):
         os.makedirs(dir)
+=======
+    videopath = 'videos1.mp4'
+    # Directory to store the processed frames
+    dir = './extract_result/'
+>>>>>>> Stashed changes
     dir_frame = './frames/'
     # smoothing window size
     len_window = int(50)

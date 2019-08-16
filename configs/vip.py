@@ -133,7 +133,6 @@ class VideoModelConfig(ParsingRCNNModelConfig):
     assert RECURRENT_UNIT in ["gru", "lstm"]
 
 
-
 class VIPDataset(Dataset):
     """Generates the shapes synthetic dataset. The dataset consists of simple
     shapes (triangles, squares, circles) placed randomly on a blank surface.

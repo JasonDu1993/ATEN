@@ -1496,8 +1496,8 @@ def load_image_gt(dataset, config, image_id, augment=False,
 
     image, window, scale, padding = util.resize_image(
         image,
-        max_dim=config.IMAGE_MAX_DIM,
-        padding=config.IMAGE_PADDING)
+        max_dim=config.IMAGE_MAX_DIM,  # 512
+        padding=config.IMAGE_PADDING)  # True
     mask = util.resize_mask(mask, scale, padding)
     part = util.resize_part(part, scale, padding[:2])
     part_rev = util.resize_part(part_rev, scale, padding[:2])
