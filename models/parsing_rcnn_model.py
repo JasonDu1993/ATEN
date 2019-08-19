@@ -1393,7 +1393,7 @@ def mrcnn_bbox_loss_graph(target_bbox, target_class_ids, pred_bbox):
 def mrcnn_mask_loss_graph(target_masks, target_class_ids, pred_masks):
     """Mask binary cross-entropy loss for the masks head.
 
-    target_masks: [batch, num_rois, height, width].
+    target_masks: [batch, num_rois, height=28, width=28].
         A float32 tensor of values 0 or 1. Uses zero padding to fill array.
     target_class_ids: [batch, num_rois]. Integer class IDs. Zero padded.
     pred_masks: [batch, proposals, height, width, num_classes] float32 tensor
@@ -1432,29 +1432,31 @@ def mrcnn_mask_loss_graph(target_masks, target_class_ids, pred_masks):
 
 def mrcnn_global_parsing_loss_graph(num_classes, gt_parsing_map, predict_parsing_map):
     """
-    gt_parsing_map: [batch, image_height, image_width] of uint8
-    predict_parsing_map: [batch, height, width, parsing_class_num]
+    num_classes: for part parsing is 20= 1 + 19 (background + classes)
+    gt_parsing_map: [batch, image_height=512, image_width=512] of uint8
+    predict_parsing_map: [batch, height=128, width=128, parsing_class_num] parsing_class_num=20=num_classes
     """
-    gt_shape = tf.shape(gt_parsing_map)
-    predict_parsing_map = tf.image.resize_bilinear(predict_parsing_map, gt_shape[1:3])
+    gt_shape = tf.shape(gt_parsing_map)  # the value is [batch, 512, 512]
+    predict_parsing_map = tf.image.resize_bilinear(predict_parsing_map, gt_shape[1:3])  # shape [batch, 512, 512, 20]
 
-    pred_shape = tf.shape(predict_parsing_map)
+    pred_shape = tf.shape(predict_parsing_map)  # the value is [batch, 512, 512, 20]
 
-    raw_gt = tf.expand_dims(gt_parsing_map, -1)
+    raw_gt = tf.expand_dims(gt_parsing_map, -1)  # shape [batch, 512, 512, 1]
     # raw_gt = tf.image.resize_nearest_neighbor(raw_gt, pred_shape[1:3])
-    raw_gt = tf.reshape(raw_gt, [-1, ])
+    raw_gt = tf.reshape(raw_gt, [-1, ])  # shape [batch*512*512*1, ]
     raw_gt = tf.cast(raw_gt, tf.int32)
 
-    raw_prediction = tf.reshape(predict_parsing_map, [-1, pred_shape[-1]])
+    raw_prediction = tf.reshape(predict_parsing_map, [-1, pred_shape[-1]])  # shape [batch*512*512, 20]
 
     # Predictions: ignoring all predictions with labels greater or equal than n_classes
-    indices = tf.squeeze(tf.where(tf.less_equal(raw_gt, num_classes - 1)), 1)
-    gt = tf.gather(raw_gt, indices)
-    prediction = tf.gather(raw_prediction, indices)
-
+    indices = tf.squeeze(tf.where(tf.less_equal(raw_gt, num_classes - 1)), 1)  # shape [K=(batch*512*512 - ignore_num),]
+    gt = tf.gather(raw_gt, indices)  # shape = (K,) K 表示找到的符合tf.less_equal(raw_gt, num_classes - 1)的个数
+    prediction = tf.gather(raw_prediction, indices)  # shape = （K, parsing_class_num=20)
+    # gt: shape [K,], the value is [0,19], 0 is bg, other represent the part lable,
+    # prediction: shape[K, parsing_class_num=20],
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        labels=gt, logits=prediction)
-    loss = tf.reduce_mean(loss)
+        labels=gt, logits=prediction)  # (parsing_class_num, )
+    loss = tf.reduce_mean(loss)  # scalar
     # loss = tf.reshape(loss, [1, 1])
     return K.cast(loss, dtype="float32")
 
@@ -2015,11 +2017,11 @@ class PARSING_RCNN():
             model = ParallelModel(model, config.GPU_COUNT)
         import platform
         sys = platform.system()
-        if sys == "Windows":
-            if self.mode == "training":
-                plot_model(model, "parsing_rcnn_training.jpg")
-            else:
-                plot_model(model, "parsing_rcnn_inference.png")
+        # if sys == "Windows":
+        #     if self.mode == "training":
+        #         plot_model(model, "parsing_rcnn_training.jpg")
+        #     else:
+        #         plot_model(model, "parsing_rcnn_inference.png")
         return model
 
     def find_last(self):

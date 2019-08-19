@@ -2,8 +2,10 @@ import os
 from PIL import Image
 import numpy as np
 
-PREDICT_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20181229a_epoch040'
-INST_PART_GT_DIR = '/home/sk49/workspace/dataset/VIP/Instance_ids'
+# PREDICT_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20181229a_epoch040'
+PREDICT_DIR = r'D:\workspaces\ATEN\vis\viptiny_test\vp_results'
+# INST_PART_GT_DIR = '/home/sk49/workspace/dataset/VIP/Instance_ids'
+INST_PART_GT_DIR = r'D:\dataset\VIP_tiny\Instance_ids'
 
 CLASSES = ['background', 'hat', 'hair', 'gloves', 'sun-glasses', 'upper-clothes', 'dress',
            'coat', 'socks', 'pants', 'torso-skin', 'scarf', 'skirt',
@@ -15,10 +17,10 @@ IOU_THRE = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 # compute mask overlap
 def compute_mask_iou(mask_gt, masks_pre, mask_gt_area, masks_pre_area):
     """Calculates IoU of the given box with the array of the given boxes.
-    mask_gt: [H,W] #一个gt的mask
-    masks_pre: [num_instances， height, width] predict Instance masks
-    mask_gt_area: the gt_mask_area , int
-    masks_pre_area: array of length masks_count.包含了所有预测的mask的sum
+    mask_gt: ndarray, [H,W] #一个gt的mask
+    masks_pre: ndarray, [num_instances， height, width] predict Instance masks
+    mask_gt_area: int, the gt_mask_area
+    masks_pre_area: tuple, array of length masks_count.包含了所有预测的mask的sum
 
     Note: the areas are passed in rather than calculated here for
           efficency. Calculate once in the caller to avoid duplicate work.
@@ -55,10 +57,13 @@ def NonZero(masks):
 
 def compute_mask_overlaps(masks_pre, masks_gt):
     """Computes IoU overlaps between two sets of boxes.
-    masks_pre, masks_gt:
-    masks_pre 表示待计算的mask [num_instances,height, width] Instance masks
-    masks_gt 表示的是ground truth
     For better performance, pass the largest set first and the smaller second.
+    Args:
+        masks_pre, masks_gt:
+        masks_pre 表示待计算的mask [num_instances_pre,height, width] Instance masks
+        masks_gt 表示的是ground truth [num_instances_gt,height, width]
+    Returns:
+        overlaps: ndarray, shape [num_instances_pre, num_instances_gt]
     """
     # Areas of masks_pre and masks_gt 获得所有非零数值个数
     area1 = NonZero(masks_pre)
@@ -70,7 +75,7 @@ def compute_mask_overlaps(masks_pre, masks_gt):
     # Each cell contains the IoU value.
     # print('area1',len(area1))
     # print('area1',len(area2))
-    overlaps = np.zeros((masks_pre.shape[0], masks_gt.shape[0]))
+    overlaps = np.zeros((masks_pre.shape[0], masks_gt.shape[0]))  # shape [num_instances_pre, num_instances_gt]
     # print('overlaps ： ',overlaps.shape)
     for i in range(overlaps.shape[1]):
         mask_gt = masks_gt[i]
@@ -120,30 +125,30 @@ def voc_ap(rec, prec, use_07_metric=False):
     return ap
 
 
-def convert2evalformat(inst_id_map, id_to_convert=None):
+def convert2evalformat(inst_id_map_gt, id_to_convert=None):
     """
     param: 
-        inst_id_map:[h, w]
+        inst_id_map_gt:[h, w]
         id_to_convert: a set
     return: 
         masks:[instances,h, w]
     """
     masks = []
 
-    inst_ids = np.unique(inst_id_map)
+    inst_ids = np.unique(inst_id_map_gt)
     # print("inst_ids:", inst_ids)
     background_ind = np.where(inst_ids == 0)[0]
     inst_ids = np.delete(inst_ids, background_ind)
 
-    if id_to_convert == None:
+    if id_to_convert is None:
         for i in inst_ids:
-            im_mask = (inst_id_map == i).astype(np.uint8)
+            im_mask = (inst_id_map_gt == i).astype(np.uint8)
             masks.append(im_mask)
     else:
         for i in inst_ids:
             if i not in id_to_convert:
                 continue
-            im_mask = (inst_id_map == i).astype(np.uint8)
+            im_mask = (inst_id_map_gt == i).astype(np.uint8)
             masks.append(im_mask)
 
     return masks, len(masks)
@@ -151,22 +156,21 @@ def convert2evalformat(inst_id_map, id_to_convert=None):
 
 def compute_class_ap(image_id_list, class_id, iou_threshold):
     """Compute Average Precision at a set IoU threshold (default 0.5).
-    Input:
-    image_id_list : all pictures id list
-    gt_masks：all mask  [N_pictures,num_inst,H,W]
-    pre_masks：all predict masks [N_pictures,num_inst,H,W]
-    pred_scores：scores for every predicted mask [N_pre_mask]
-    pred_class_ids: the indices of all predicted masks
+    Args:
+        image_id_list : list(list), all pictures id list, the second list len is 2, [videoid, imageid]
+        class_id：int, the CLASSES index, 0 is background index, 1-19 is person part label index
+        iou_threshold：list, for example IOU_THRE = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 
     Returns:
-    AP: Average Precision of specific class
+        AP: list, Average Precision of specific class
+
     """
 
     iou_thre_num = len(iou_threshold)
     ap = np.zeros((iou_thre_num,))
 
-    gt_mask_num = 0
-    pre_mask_num = 0
+    gt_mask_num = 0  # record
+    pre_mask_num = 0  #
     tp = []
     fp = []
     scores = []
@@ -187,9 +191,9 @@ def compute_class_ap(image_id_list, class_id, iou_threshold):
             gt_part_id.append([int(line[0]), int(line[1])])
         rfp.close()
 
-        pre_img = Image.open(os.path.join(PREDICT_DIR, image_id[0], 'instance_part', '%s.png' % image_id[1]))
+        pre_img = Image.open(os.path.join(PREDICT_DIR, image_id[0], 'instance_parsing', '%s.png' % image_id[1]))
         pre_img = np.array(pre_img)
-        rfp = open(os.path.join(PREDICT_DIR, image_id[0], 'instance_part', '%s.txt' % image_id[1]), 'r')
+        rfp = open(os.path.join(PREDICT_DIR, image_id[0], 'instance_parsing', '%s.txt' % image_id[1]), 'r')
         items = [x.strip().split(' ') for x in rfp.readlines()]
         rfp.close()
 
@@ -204,7 +208,8 @@ def compute_class_ap(image_id_list, class_id, iou_threshold):
         for i in range(len(gt_part_id)):
             if gt_part_id[i][1] == class_id:
                 gt_id.append(gt_part_id[i][0])
-
+        # gt_mask: list, len n_gt_inst, the value is a ndarray,
+        #   ndarray value is 0 and 1, 0 is bg, 1 represent that there are one person part from gt_id
         gt_mask, n_gt_inst = convert2evalformat(inst_part_gt, set(gt_id))
         pre_mask, n_pre_inst = convert2evalformat(pre_img, set(pre_id))
 
@@ -223,17 +228,17 @@ def compute_class_ap(image_id_list, class_id, iou_threshold):
                     tp[k].append(0)
             continue
 
-        gt_mask = np.stack(gt_mask)
-        pre_mask = np.stack(pre_mask)
+        gt_mask = np.stack(gt_mask)  # ndarray, shape [n_gt_inst, height, width]
+        pre_mask = np.stack(pre_mask)  # ndarray, shape [n_pre_inst, height, width]
         # Compute IoU overlaps [pred_masks, gt_makss]
-        overlaps = compute_mask_overlaps(pre_mask, gt_mask)
+        overlaps = compute_mask_overlaps(pre_mask, gt_mask)  # shape [num_instances_pre, num_instances_gt]
 
         # print('overlaps.shape',overlaps.shape)
 
         max_overlap_ind = np.argmax(overlaps, axis=1)
 
         # l = len(overlaps[:,max_overlap_ind])
-        for i in np.arange(len(max_overlap_ind)):
+        for i in np.arange(len(max_overlap_ind)):  # pred inst number
             max_iou = overlaps[i][max_overlap_ind[i]]
             # print('max_iou :', max_iou)
             for k in range(iou_thre_num):
@@ -271,9 +276,9 @@ def compute_class_ap(image_id_list, class_id, iou_threshold):
 if __name__ == '__main__':
     print("result of", PREDICT_DIR)
 
-    image_list = []
+    image_list = []  # list, the value is also a list, len 2, [videoid, imageid]
     for vid in os.listdir(PREDICT_DIR):
-        for img in os.listdir(os.path.join(PREDICT_DIR, vid, 'instance_part')):
+        for img in os.listdir(os.path.join(PREDICT_DIR, vid, 'instance_parsing')):
             j = img.find('.')
             if img[j + 1:] == 'txt':
                 image_list.append([vid, img[:j]])

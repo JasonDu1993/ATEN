@@ -368,10 +368,12 @@ class Dataset(object):
         """
         return self.image_info[image_id]["path"]
 
-    def load_image(self, image_id):
+    def load_image(self, image_id, debug=False):
         """Load the specified image and return a [H,W,3] Numpy array.
         """
         # Load image
+        if debug:
+            print("img name:", self.image_info[image_id]['path'])
         image = skimage.io.imread(self.image_info[image_id]['path'])
         # If grayscale. Convert to RGB for consistency.
         if image.ndim != 3:

@@ -12,8 +12,8 @@ import tensorflow as tf
 
 from configs.vip import ParsingRCNNModelConfig
 from configs.vip import VIPDataset
-# from models.parsing_rcnn_model import PARSING_RCNN
-from models.parsing_rcnn_model_dilated import PARSING_RCNN
+from models.parsing_rcnn_model import PARSING_RCNN
+# from models.parsing_rcnn_model_dilated import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
@@ -32,14 +32,15 @@ class trainConfig(ParsingRCNNModelConfig):
 ROOT_DIR = os.getcwd()
 
 # Path to trained weights file
-# PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
-PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190326a/checkpoints/" \
-                      "parsing_rcnn_vip_singleframe_20190326a_epoch038_loss0.491_valloss0.550.h5"
+PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
+# PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190326a/checkpoints/" \
+#                       "parsing_rcnn_vip_singleframe_20190326a_epoch038_loss0.491_valloss0.550.h5"
 
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
 DEFAULT_LOGS_DIR = "./outputs"
-DEFAULT_DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+# DEFAULT_DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+DEFAULT_DATASET_DIR = "D:\dataset\VIP_tiny"
 
 ############################################################
 #  Training
@@ -97,10 +98,16 @@ if __name__ == '__main__':
     dataset_train = VIPDataset()
     dataset_train.load_vip(args.dataset, "trainval")
     dataset_train.prepare()
+    dataset_train = VIPDataset()
+    dataset_train.load_vip(args.dataset, "traintiny")
+    dataset_train.prepare()
 
     # Validation dataset
+    # dataset_val = VIPDataset()
+    # dataset_val.load_vip(args.dataset, "val")
+    # dataset_val.prepare()
     dataset_val = VIPDataset()
-    dataset_val.load_vip(args.dataset, "val")
+    dataset_val.load_vip(args.dataset, "traintiny")
     dataset_val.prepare()
 
     # *** This training schedule is an example. Update to your needs ***

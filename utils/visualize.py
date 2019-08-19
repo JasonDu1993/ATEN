@@ -113,7 +113,7 @@ def apply_parsing(image, part, color_map, alpha=0.7):
     for i in range(len(coordinates[0])):
         image[coordinates[0][i], coordinates[1][i], :] = color_map[part[
             coordinates[0][i], coordinates[1][i]]] * alpha + image[coordinates[0][i], coordinates[1][i], :] * (
-            1 - alpha)
+                                                                 1 - alpha)
     return image
 
 
@@ -232,17 +232,17 @@ def get_color_map(n=256):
 
 
 def write_part_result(res_dir, color_dir, height, width, image_id, global_parsing_prob):
-    """save the human parsing results (instance independent) in "vp_results/~videoid~/global_parsing/%s.png" % image_id
-    and save visualization results in "color_results/~videoid~/color/global_%s.png" % image_id
+    """save the human parsing results (instance independent) in "vp_results/videoid/global_parsing/imageid.png"
+    and save visualization results in "color_results/videoid/color/global_imageid.png"
 
     Input:
-        global_parsing_prob: [height, width, NUM_PART_CLASS]
+        global_parsing_prob: [height, width, NUM_PART_CLASS=20]
 
     Returns:
         global_parsing: shape [height, width], the value in [0-19],0 represent the background,
             1-19 represents the person part label
         global_parsing_max_prob: shape [height, width], the value in [0-1] represent the max probility of person part
-            except background
+            except background, 0 represent background
         global_parsing_map: shape [height, width, 3], which is used for visualized, 3 represent rgb,
     """
     if not os.path.exists(os.path.join(color_dir, 'color')):
@@ -250,15 +250,15 @@ def write_part_result(res_dir, color_dir, height, width, image_id, global_parsin
     if not os.path.exists(os.path.join(res_dir, 'global_parsing')):
         os.makedirs(os.path.join(res_dir, 'global_parsing'))
     c_map = np.array(random_colors_opencv(20))
-    global_parsing = np.argmax(global_parsing_prob, axis=-1)
+    global_parsing = np.argmax(global_parsing_prob, axis=-1)  # shape [height, width],
 
-    global_parsing_max_prob = np.max(global_parsing_prob, axis=-1)
+    global_parsing_max_prob = np.max(global_parsing_prob, axis=-1)  # shape [height, width]
     forground_map = (global_parsing > 0)
     global_parsing_max_prob = np.multiply(global_parsing_max_prob, forground_map)
 
     global_parsing_map = np.zeros((height, width, 3), dtype=np.uint8)
 
-    coo = np.where(global_parsing > 0)
+    coo = np.where(global_parsing > 0)  # tuple, len 2, coo[0] axis=0 index, coo[1] axis=1 index
     global_parsing_map[coo[0], coo[1], :] = c_map[global_parsing[coo[0], coo[1]]]
     img_global_path = os.path.join(res_dir, "global_parsing", "%s.png" % image_id)
     color_global_path = os.path.join(color_dir, "color", "global_%s.png" % image_id)
@@ -271,10 +271,10 @@ def write_part_result(res_dir, color_dir, height, width, image_id, global_parsin
 
 def write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks, scores, nms_like_thre=0.7):
     """
-    (1) save the instance segmentation results in "vp_results/~videoid~/instance_segmentation/%s.png" % image_id
-    (2) save the dected person prob and bounding box(y1, x1, y2, x2) in vp_results/~videoid~/instance_segmentation/
-        %s.txt" % image_id
-    (3) save visualization results in "color_results/~videoid~/color/inst_%s.png" % image_id
+    (1) save the instance segmentation results in "vp_results/videoid/instance_segmentation/imageid.png"
+    (2) save the detected person prob and bounding box(y1, x1, y2, x2) in vp_results/videoid/instance_segmentation/
+        imageid.txt"
+    (3) save visualization results in "color_results/videoid/color/inst_imageid.png"
 
     Args:
         boxes: [num_instance, (y1, x1, y2, x2)] in image coordinates.
@@ -282,9 +282,10 @@ def write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks,
         scores: [num_instance] confidence scores for each box
 
     Returns:
-        gray_map:
-        scores_boxes:
-        color_map
+        gray_map: ndarray, shape [height, width], the value is [0, num_instance], 0 is background,
+            1-num_instance is the person label
+        scores_boxes: [num_instance, (score, y1, x1, y2, x2)]
+        color_map: [height, width, 3], the inst result will save in "color_results/videoid/color/inst_imageid.png"
     """
     if not os.path.exists(os.path.join(color_dir, 'color')):
         os.makedirs(os.path.join(color_dir, 'color'))
@@ -313,14 +314,14 @@ def write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks,
         coo = np.where(mask > 0)
         u_pixels = len(coo[0])
 
-        # nms-like postprocess
+        # nms-like postprocess, 假设有2个人，可能预测的2个mask中有部分地方有重叠，则处理第二个人时把重叠的部分设置为0
         for k in range(len(coo[0])):
             if gray_map[coo[0][k], coo[1][k]] > 0:
                 mask[coo[0][k], coo[1][k]] = 0
         coo = np.where(mask > 0)
         u1_pixels = len(coo[0])
 
-        if float(u1_pixels) / float(u_pixels) <= nms_like_thre:
+        if float(u1_pixels) / float(u_pixels) <= nms_like_thre:  # 由于重叠部分过多则直接舍弃到该实例mask
             continue
 
         # write score and bbox
@@ -346,10 +347,10 @@ def write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks,
 
 def write_inst_result_v2(res_dir, color_dir, height, width, image_id, boxes, masks, scores, nms_like_thre=0.7):
     """
-    (1) save the instance segmentation results in "vp_results/~videoid~/instance_segmentation/%s.png" % image_id
-    (2) save the dected person prob and bounding box(y1, x1, y2, x2) in vp_results/~videoid~/instance_segmentation/
-        %s.txt" % image_id
-    (3) save visualization results in "color_results/~videoid~/color/inst_%s.png" % image_id
+    (1) save the instance segmentation results in "vp_results/videoid/instance_segmentation/imageid.png"
+    (2) save the dected person prob and bounding box(y1, x1, y2, x2) in vp_results/videoid/instance_segmentation/
+        imageid.txt"
+    (3) save visualization results in "color_results/videoid/color/inst_imageid.png"
 
     Args:
         boxes: [num_instance, (y1, x1, y2, x2)] in image coordinates.
@@ -357,9 +358,10 @@ def write_inst_result_v2(res_dir, color_dir, height, width, image_id, boxes, mas
         scores: [num_instance] confidence scores for each box
 
     Returns:
-        gray_map:
-        scores_boxes:
-        color_map
+        gray_map: ndarray, shape [height, width], the value is [0, num_instance], 0 is background,
+            1-num_instance is the person label
+        scores_boxes: [num_instance, (score, y1, x1, y2, x2)]
+        color_map: [height, width, 3], the inst result will save in "color_results/videoid/color/inst_imageid.png"
     """
     if not os.path.exists(os.path.join(color_dir, 'color')):
         os.makedirs(os.path.join(color_dir, 'color'))
@@ -420,10 +422,11 @@ def write_inst_result_v2(res_dir, color_dir, height, width, image_id, boxes, mas
 
 
 def write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes, masks, scores, nms_like_thre=0.7):
-    """save the instance segmentation results in "vp_results/~videoid~/instance_segmentation/%s.png" % image_id
-    and save visualization results in "color_results/~videoid~/color/inst_%s.png" % image_id
-    and save the dected person prob and bounding box(y1, x1, y2, x2) in vp_results/~videoid~/instance_segmentation/
-        %s.txt" % image_id
+    """
+    (1) save the instance segmentation results in "vp_results/videoid/instance_segmentation/imageid.png"
+    (2) save the detected person prob and bounding box(y1, x1, y2, x2) in vp_results/videoid/instance_segmentation/
+        imageid.txt"
+    (3) save visualization results in "color_results/videoid/color/inst_imageid.png"
 
     Args:
         boxes: [num_instance, (y1, x1, y2, x2)] in image coordinates.
@@ -431,9 +434,10 @@ def write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes
         scores: [num_instance] confidence scores for each box
 
     Returns:
-        gray_map:
-        scores_boxes:
-        color_map
+        gray_map: ndarray, shape [height, width], the value is [0, num_instance], 0 is background,
+            [1 - num_instance] is the person label
+        scores_boxes: [num_instance, (score, y1, x1, y2, x2)]
+        color_map: [height, width, 3], the inst result will save in "color_results/videoid/color/inst_imageid.png"
     """
     if not os.path.exists(os.path.join(color_dir, 'color')):
         os.makedirs(os.path.join(color_dir, 'color'))
@@ -462,7 +466,7 @@ def write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes
         u_pixels = len(coo[0])
 
         # nms-like postprocess
-        mask[gray_map[mask > 0] > 0] = 0
+        mask[(mask > 0) & (gray_map > 0)] = 0
         coo = np.where(mask > 0)
         u1_pixels = len(coo[0])
 
@@ -484,47 +488,69 @@ def write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes
     if not os.path.exists(color_instance_segmentation_path):
         cv2.imwrite(color_instance_segmentation_path, color_map)
 
-    return gray_map, scores_boxes
+    return gray_map, scores_boxes, color_map
 
 
 def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, masks, scores, global_parsing_prob,
-                           nms_like_thre=0.7, class_num=20):
-    """save the instance segmentation results in "vp_results/~videoid~/instance_segmentation/%s.png" % image_id
-        and save visualization results in "color_results/~videoid~/color/inst_%s.png" % image_id
-        and save the dected person prob and bounding box(y1, x1, y2, x2) in vp_results/~videoid~/instance_segmentation/
-            %s.txt" % image_id
+                           nms_like_thre=0.7, class_num=20, is_combine_inst_part=True):
+    """
+        A. write_part_result function:
+            (1)the human global parsing results (instance independent) in "vp_results/videoid/global_parsing/imageid.png"
+            (2)save visualization results in "color_results/videoid/color/global_imageid.png"
+        B. write_inst_result_quickly or write_inst_result function:
+            (1) save the instance segmentation results in "vp_results/videoid/instance_segmentation/imageid.png"
+            (2) save the detected person prob and bounding box(y1, x1, y2, x2) in vp_results/videoid/instance_segmentation/
+                imageid.txt"
+            (3) save visualization results in "color_results/videoid/color/inst_imageid.png"
+        C. is_combine_inst_part is True
+            (1) save the combined inst and part results into "vp_results/videoid/instance_parsing/imageid.png"
+            (2) save the every person and every part results into "vp_results/videoid/instance_parsing/imageid.txt"
 
     Args:
-        res_dir:
-        color_dir:
-        height:
-        width:
-        image_id:
-        boxes:
-        masks:
-        scores:
-        global_parsing_prob:
-        nms_like_thre:
-        class_num:
-
+        res_dir: str, save into os.path.join(RES_DIR, "vp_results", videoid) such as RES_DIR/vp_results/videos45
+        color_dir: str, save into os.path.join(RES_DIR, "color_results", videoid) such as RES_DIR/color_results/videos45
+        height: int, for VIP is 720
+        width: int, for VIP is 1280
+       image_id: str, for example '000000000176'
+        boxes: numpy.ndarray, shape=[num_instance, (y1, x1, y2, x2)] in image coordinates.
+        masks: numpy.ndarray, shape=[height, width, num_instance] (720, 1280, 3),dtype=uint8
+        scores: [num_instance] confidence scores for each box
+        global_parsing_prob: [height=720, width=1280, NUM_PART_CLASS=20]
+        nms_like_thre: float, default 0.7, used in write_inst_result_quickly function or write_inst_result function
+        class_num: int, for VIP is 20=1+19, 1 is bg, 19 is person part label num
+        is_combine_inst_part: bool, default True, for test, need save the instance parsing result
 
     Returns:
         global_parsing_map, color_map
     """
     t0 = time()
+    # global_parsing: shape [height, width], the value in [0-19],0 represent the background,
+    #   1-19 represents the person part label
+    # global_parsing_max_prob: shape [height, width], the value in [0-1] represent the max probility of person part
+    #   except background, 0 represent background
+    # global_parsing_map: shape [height, width, 3], which is used for visualized, 3 represent rgb,
     global_parsing, global_parsing_max_prob, global_parsing_map = write_part_result(res_dir, color_dir, height, width,
                                                                                     image_id,
                                                                                     global_parsing_prob)
     t1 = time()
-    print("    write_part_result", t1 - t0)
-    inst_map, inst_scores, color_map = write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks,
-                                                         scores, nms_like_thre)
-    # inst_map, inst_scores = write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes, masks, scores,
-    #                                                 nms_like_thre)
+    print("        A. write_part_result:", t1 - t0)
+    # inst_map, inst_scores, color_map = write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks,
+    #                                                      scores, nms_like_thre)
+
+    # inst_map(gray_map): ndarray, shape [height, width], the value is [0, num_instance], 0 is background,
+    #   [1 - num_instance] is the person label
+    # inst_scores(scores_boxes): [num_instance, (score, y1, x1, y2, x2)]
+    # color_map: [height, width, 3], the inst result will save in "color_results/videoid/color/inst_imageid.png"
+    inst_map, inst_scores, color_map = write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes,
+                                                                 masks, scores, nms_like_thre)
     t2 = time()
-    print("    write_inst_result", t2 - t1)
-    inst_part_map = np.zeros_like(inst_map)
-    # build floder
+    print("        B. write_inst_result:", t2 - t1)
+    # C. combine inst and part, need `global_parsing`, `global_parsing_max_prob`, `inst_map`, `inst_scores`
+
+    # inst_part_map:shape [height, width], the value is counter used label, every person every part have different label
+    inst_part_map = np.zeros_like(inst_map)  # shape [height, width], will save the result into picture
+    if not is_combine_inst_part:
+        return global_parsing_map, color_map
     floder = os.path.join(res_dir, 'instance_parsing')
     if not os.path.exists(floder):
         os.makedirs(floder)
@@ -532,16 +558,16 @@ def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, m
     wfp = open(instance_parsing_path, 'w')
     counter = 0
     t3 = time()
-    for k in range(1, class_num):
+    for k in range(1, class_num):  # class_num=20
         cur_counter = counter
-        inst_part_prob_map = {}
-        cls_indices = (global_parsing == k).astype(np.uint8)
-        part_inst_map = cls_indices * inst_map
-        inst_ids = np.unique(part_inst_map)
+        inst_part_prob_map = {}  # dict, key is counter(every person every part have different label), value is float
+        cls_indices = (global_parsing == k).astype(np.uint8)  # shape [height, width]
+        part_inst_map = cls_indices * inst_map  # the person inst with the same part label
+        inst_ids = np.unique(part_inst_map)  # for example [0 2 3], 0 is bg, 2 inst person label, 3 is the same to 2
         for i in inst_ids:
             if i != 0:
                 counter = counter + 1
-                cls_inst_indices = np.where(part_inst_map == i)
+                cls_inst_indices = np.where(part_inst_map == i)  # tuple, len is 2
                 inst_part_map[cls_inst_indices] = counter
 
                 human_id = i
@@ -553,15 +579,13 @@ def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, m
                 inst_part_prob_map[counter] = mean_parsing_prob * human_seg_sco
         if cur_counter < counter:
             for i in range(cur_counter, counter):
-                wfp.write('%d %f\n' % (k, inst_part_prob_map[i + 1]))
+                wfp.write('%d %f\n' % (k, inst_part_prob_map[i + 1]))  # k is part label
     wfp.close()
-    t4 = time()
-    # print("for", t4 - t3)
     img_instance_parsing_path = os.path.join(floder, "%s.png" % image_id)
     if not os.path.exists(img_instance_parsing_path):
         cv2.imwrite(img_instance_parsing_path, inst_part_map)
-
-        # print("save", time() - t4)
+    t4 = time()
+    print("        C. combine every person  and every part:", t4 - t3, "s")
     return global_parsing_map, color_map
 
 
@@ -716,27 +740,30 @@ def vis_insts(image, res_dir, image_id, boxes, masks, class_ids,
     plt.close()
     t4 = time()
     print("savefig", t4 - t3)
+    return masked_image
 
 
-def vis_insts_opencv(image, res_dir, image_id, boxes, masks, class_ids,
+def vis_insts_opencv(image, color_dir, image_id, boxes, masks, class_ids,
                      scores=None, class_names=['BG', 'person'], figsize=(16, 16)):
-    """write a bounding box for every person and contour
+    """write a bounding box for every person and contour, the image saves in RES_DIR/color_results/videoid/vis_%s.png
 
    Args:
        image: numpy.ndarray, shape=[height, width, num_instance] (720, 1280, 3), dtype=uint8,3 represent rgb,
+       color_dir: str, save the os.path.join(RES_DIR, "color_results", videoid) such as RES_DIR/color_results/videos45
+       image_id: str, for example '000000000176'
        boxes: numpy.ndarray, shape=[num_instance, (y1, x1, y2, x2)] in image coordinates.
        masks: numpy.ndarray, shape=[height, width, num_instance] (720, 1280, 3),dtype=uint8
        class_ids: list, len=num_instances
        class_names: list of class names of the dataset, default is ['BG', 'person']
        scores: (optional) confidence scores for each box,numpy.ndarray,shape=[num_instances], dtype=float32
-       figsize: (optional) the size of the image.
+       figsize: (not used) the size of the image.
     Returns:
-        masked_image: shape [image_height, image_widht, 3], 3 represent rgb, wthe image including the bounding box
+        masked_image: shape [height, widht, 3], 3 represent rgb, wthe image including the bounding box
     """
-    # Number of
-    if not os.path.exists(os.path.join(res_dir, 'color')):
-        os.makedirs(os.path.join(res_dir, 'color'))
-
+    # create the saved dir
+    if not os.path.exists(os.path.join(color_dir, 'color')):
+        os.makedirs(os.path.join(color_dir, 'color'))
+    # Number of person
     N = boxes.shape[0]
     if not N:
         print("\n*** No instances to display *** \n")
@@ -779,7 +806,7 @@ def vis_insts_opencv(image, res_dir, image_id, boxes, masks, class_ids,
         res = cv2.findContours(masked_image_binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         contours = res[-2]
         cv2.drawContours(masked_image, contours, -1, color=color, thickness=1)
-    img_path = os.path.join(res_dir, 'color', 'vis_%s.png' % image_id)
+    img_path = os.path.join(color_dir, 'color', 'vis_%s.png' % image_id)
     if not os.path.exists(img_path):
         cv2.imwrite(img_path, masked_image)
     t2 = time()

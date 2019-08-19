@@ -1,11 +1,11 @@
 import os
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-config = tf.ConfigProto()
-# config.gpu_options.allow_growth = True
-config.gpu_options.per_process_gpu_memory_fraction = 0.3
-session = tf.Session(config=config)
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# config = tf.ConfigProto()
+# # config.gpu_options.allow_growth = True
+# config.gpu_options.per_process_gpu_memory_fraction = 0.3
+# session = tf.Session(config=config)
 import sys
 import cv2
 
@@ -17,8 +17,8 @@ import matplotlib
 matplotlib.use('Agg')
 from configs.vip import ParsingRCNNModelConfig
 
-# from models.parsing_rcnn_model import PARSING_RCNN
-from models.parsing_rcnn_model_dilated import PARSING_RCNN
+from models.parsing_rcnn_model import PARSING_RCNN
+# from models.parsing_rcnn_model_dilated import PARSING_RCNN
 from utils import visualize
 from time import time
 
@@ -32,20 +32,21 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Path to trained weights file
 # Download this file and place in the root of your 
 # project (See README file for details)
-DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190408a/checkpoints/" \
-             "parsing_rcnn_vip_singleframe_20190408a_epoch073_loss0.401_valloss0.391.h5"
+# DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+DATASET_DIR = "D:\dataset\VIP_tiny"
+# MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190408a/checkpoints/" \
+#              "parsing_rcnn_vip_singleframe_20190408a_epoch073_loss0.401_valloss0.391.h5"
 # MODEL_PATH = "./outputs/vip_singleframe_20181229ma/checkpoints/parsing_rcnn_vip_singleframe_20181229ma_epoch086.h5"
 # MODEL_PATH = "./outputs/vip_singleframe_test/checkpoints/parsing_rcnn_vip_singleframe_test_epoch001.h5"
-# MODEL_PATH = "./checkpoints/parsing_rcnn.h5"
+MODEL_PATH = "./checkpoints/parsing_rcnn.h5"
 # Directory of images to run detection on
 IMAGE_DIR = DATASET_DIR + "/Images"
-# IMAGE_LIST = DATASET_DIR + "/lists/test_id.txt"
-IMAGE_LIST = DATASET_DIR + "/lists/trainval_id.txt"
+IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
+# IMAGE_LIST = DATASET_DIR + "/lists/trainval_id.txt"
 
 # RES_DIR = "./vis/trainval_vip_singleframe_20190408a_epoch073000"
 # RES_DIR = "./vis/test_vip_singleframe_20190326a_epoch032_t"
-RES_DIR = "./vis/vip_test"
+RES_DIR = "./vis/viptiny_test"
 flag = False
 if not os.path.exists(RES_DIR):
     os.makedirs(RES_DIR)
@@ -106,24 +107,24 @@ def main():
         t2 = time()
         results = model.detect([image])
         t3 = time()
-        print("1, model test one image:", t3 - t2, "s")
+        print("  1, model test one image:", t3 - t2, "s")
         # Visualize results
         r = results[0]
-        # visualize.vis_insts(image, color_floder, image_id, r['rois'], r['masks'], r['class_ids'], r['scores'])
+        # masked_image = visualize.vis_insts(image, color_floder, image_id, r['rois'], r['masks'], r['class_ids'], r['scores'])
         masked_image = visualize.vis_insts_opencv(image[:, :, ::-1], color_floder, image_id, r['rois'], r['masks'],
                                                   r['class_ids'], r['scores'])
         # masked_image = visualize.vis_insts_opencv(image, color_floder, image_id, r['rois'], r['masks'], r['class_ids'],
         #                            r['scores'])
         t4 = time()
-        # print("vis_insts", t3 - t2)
+        print("    (1)vis_insts:", t4 - t3)
         global_parsing_map, color_map = visualize.write_inst_part_result(video_floder, color_floder, image.shape[0],
                                                                          image.shape[1], image_id, r['rois'],
                                                                          r['masks'], r['scores'], r['global_parsing'])
         vis_global_image = cv2.addWeighted(masked_image, 1, global_parsing_map, 0.4, 0)
         cv2.imwrite(os.path.join(color_floder, "color", "vis_global_%s.png" % image_id), vis_global_image)
-        print("    write_inst_part_result", time() - t4, "s")
-        print("2, visualize results", time() - t2, "s")
-        print("3, test and visualize one image:", time() - t1, "s")
+        print("    (2)write_inst_part_result(A and B total time):", time() - t4, "s")
+        print("  2, visualize results total time:", time() - t3, "s")
+        print("  3, test and visualize one image:", time() - t1, "s")
     print("total", time() - t0, "s")
 
 
