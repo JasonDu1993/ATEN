@@ -335,7 +335,7 @@ class ProposalLayer(KE.Layer):
         self.nms_threshold = nms_threshold
         self.anchors = anchors.astype(np.float32)
 
-    def call(self, inputs):          #
+    def call(self, inputs):  #
         """ Box Scores. Use the foreground class confidence. [Batch, num_rois, 1]
 
         Args:
@@ -1433,8 +1433,8 @@ def mrcnn_mask_loss_graph(target_masks, target_class_ids, pred_masks):
 def mrcnn_global_parsing_loss_graph(num_classes, gt_parsing_map, predict_parsing_map):
     """
     num_classes: for part parsing is 20= 1 + 19 (background + classes)
-    gt_parsing_map: [batch, image_height=512, image_width=512] of uint8
-    predict_parsing_map: [batch, height=128, width=128, parsing_class_num] parsing_class_num=20=num_classes
+    gt_parsing_map: [batch, resize_height=512, resize_width=512] of uint8
+    predict_parsing_map: [batch, net_height=128, net_width=128, num_classes=20]
     """
     gt_shape = tf.shape(gt_parsing_map)  # the value is [batch, 512, 512]
     predict_parsing_map = tf.image.resize_bilinear(predict_parsing_map, gt_shape[1:3])  # shape [batch, 512, 512, 20]
@@ -1459,6 +1459,34 @@ def mrcnn_global_parsing_loss_graph(num_classes, gt_parsing_map, predict_parsing
     loss = tf.reduce_mean(loss)  # scalar
     # loss = tf.reshape(loss, [1, 1])
     return K.cast(loss, dtype="float32")
+
+
+def mrcnn_global_parsing_miou_loss_graph(num_classes, gt_parsing_map, predict_parsing_map):
+    """mask iou loss
+    num_classes: for part parsing is 20= 1 + 19 (background + classes)
+    gt_parsing_map: [batch, resize_height=512, resize_width=512] of uint8
+    predict_parsing_map: [batch, net_height=128, net_width=128, num_classes]
+    """
+    gt_shape = tf.shape(gt_parsing_map)  # the value is [batch, 512, 512]
+    predict_parsing_map = tf.image.resize_bilinear(predict_parsing_map, gt_shape[1:3])  # shape [batch, 512, 512, 20]
+
+    raw_gt = []
+    for class_id in range(num_classes):  # person part label
+        raw_gt.append(
+            tf.where(tf.equal(gt_parsing_map, class_id), tf.ones_like(gt_parsing_map, dtype=predict_parsing_map.dtype),
+                     tf.zeros_like(gt_parsing_map, dtype=predict_parsing_map.dtype)))
+    raw_gt = tf.stack(raw_gt, axis=-1)  # shape [batch, resize_height, resize_width, num_classes=20]
+
+    predict_parsing_map = tf.sigmoid(predict_parsing_map)
+    predict_parsing_map = tf.where(tf.greater_equal(predict_parsing_map, 0.5), tf.ones_like(predict_parsing_map),
+                                   tf.zeros_like(predict_parsing_map))
+    intersection = raw_gt * predict_parsing_map
+    intersection_sum = tf.reduce_sum(intersection, axis=[1, 2])  # shape [batch, num_classes]
+    raw_gt_sum = tf.reduce_sum(raw_gt, axis=[1, 2])  # shape [batch, num_classes]
+    predict_parsing_map_sum = tf.reduce_sum(predict_parsing_map, axis=[1, 2])  # shape [batch, num_classes]
+    miou = intersection_sum / (raw_gt_sum + predict_parsing_map_sum - intersection_sum)  # shape [batch, num_classes]
+    miou = tf.reduce_mean(miou)
+    return K.cast(miou, dtype="float32")
 
 
 def post_processing_graph(parts, input_image):
@@ -1950,10 +1978,14 @@ class PARSING_RCNN():
             # TODO: clean up (use tf.identify if necessary)
             output_rois = KL.Lambda(lambda x: x * 1, name="output_rois")(rois)
 
+            # global part loss
             global_parsing_loss = KL.Lambda(lambda x: mrcnn_global_parsing_loss_graph(config.NUM_PART_CLASS, *x),
                                             name="mrcnn_global_parsing_loss")(
                 [input_gt_part, global_parsing_map])
-
+            global_parsing_miou_loss = KL.Lambda(
+                lambda x: mrcnn_global_parsing_miou_loss_graph(config.NUM_PART_CLASS, *x),
+                name="mrcnn_global_parsing_miou_loss")(
+                [input_gt_part, global_parsing_map])
             # Losses
             rpn_class_loss = KL.Lambda(lambda x: rpn_class_loss_graph(*x), name="rpn_class_loss")(
                 [input_rpn_match, rpn_class_logits])
@@ -1976,7 +2008,7 @@ class PARSING_RCNN():
                        mrcnn_class_logits, mrcnn_class, mrcnn_bbox, mrcnn_mask,
                        rpn_rois, output_rois,
                        rpn_class_loss, rpn_bbox_loss, class_loss, bbox_loss, mask_loss,
-                       global_parsing_loss]
+                       global_parsing_loss, global_parsing_miou_loss]
             model = KM.Model(inputs, outputs, name='parsing_rcnn')
         else:
             # Network Heads
@@ -2107,7 +2139,7 @@ class PARSING_RCNN():
         self.keras_model._per_input_losses = {}
         loss_names = ["rpn_class_loss", "rpn_bbox_loss",
                       "mrcnn_class_loss", "mrcnn_bbox_loss", "mrcnn_mask_loss",
-                      "mrcnn_global_parsing_loss"]
+                      "mrcnn_global_parsing_loss", "mrcnn_global_parsing_miou_loss"]
         for name in loss_names:
             layer = self.keras_model.get_layer(name)
             if layer.output in self.keras_model.losses:

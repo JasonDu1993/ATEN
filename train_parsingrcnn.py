@@ -12,7 +12,7 @@ import tensorflow as tf
 
 from configs.vip import ParsingRCNNModelConfig
 from configs.vip import VIPDataset
-from models.parsing_rcnn_model import PARSING_RCNN
+from models.parsing_rcnn_model_miouloss import PARSING_RCNN
 # from models.parsing_rcnn_model_dilated import PARSING_RCNN
 
 
@@ -20,11 +20,12 @@ class trainConfig(ParsingRCNNModelConfig):
     # NAME = "vip_singleframe_20190408a"
     NAME = "vip_singleframe_test"
     GPU_COUNT = 1
-    IMAGES_PER_GPU = 4
-    STEPS_PER_EPOCH = 2000
-    # STEPS_PER_EPOCH = 20
-    VALIDATION_STEPS = 100
-    # VALIDATION_STEPS = 10
+    # IMAGES_PER_GPU = 4
+    IMAGES_PER_GPU = 1
+    # STEPS_PER_EPOCH = 2000
+    STEPS_PER_EPOCH = 2
+    # VALIDATION_STEPS = 100
+    VALIDATION_STEPS = 1
     SAVE_MODEL_PERIOD = 1
 
 
@@ -95,9 +96,9 @@ if __name__ == '__main__':
     print("Loaded weights ", time() - t0, "s")
     # Training dataset. Use the training set and 35K from the
     # validation set, as as in the Mask RCNN paper.
-    dataset_train = VIPDataset()
-    dataset_train.load_vip(args.dataset, "trainval")
-    dataset_train.prepare()
+    # dataset_train = VIPDataset()
+    # dataset_train.load_vip(args.dataset, "trainval")
+    # dataset_train.prepare()
     dataset_train = VIPDataset()
     dataset_train.load_vip(args.dataset, "traintiny")
     dataset_train.prepare()
