@@ -1,11 +1,12 @@
+import time
 import os
 from PIL import Image
 import numpy as np
 
-# PREDICT_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20181229a_epoch040'
-PREDICT_DIR = r'D:\workspaces\ATEN\vis\viptiny_test\vp_results'
-# INST_PART_GT_DIR = '/home/sk49/workspace/dataset/VIP/Instance_ids'
-INST_PART_GT_DIR = r'D:\dataset\VIP_tiny\Instance_ids'
+PREDICT_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190520a_epoch038/vp_results'
+# PREDICT_DIR = r'D:\workspaces\ATEN\vis\viptiny_test\vp_results'
+INST_PART_GT_DIR = '/home/sk49/workspace/dataset/VIP/Instance_ids'
+# INST_PART_GT_DIR = r'D:\dataset\VIP_tiny\Instance_ids'
 
 CLASSES = ['background', 'hat', 'hair', 'gloves', 'sun-glasses', 'upper-clothes', 'dress',
            'coat', 'socks', 'pants', 'torso-skin', 'scarf', 'skirt',
@@ -275,7 +276,7 @@ def compute_class_ap(image_id_list, class_id, iou_threshold):
 
 if __name__ == '__main__':
     print("result of", PREDICT_DIR)
-
+    t0 = time.time()
     image_list = []  # list, the value is also a list, len 2, [videoid, imageid]
     for vid in os.listdir(PREDICT_DIR):
         for img in os.listdir(os.path.join(PREDICT_DIR, vid, 'instance_parsing')):
@@ -286,7 +287,9 @@ if __name__ == '__main__':
     AP = np.zeros((len(CLASSES) - 1, len(IOU_THRE)))
 
     for ind in range(1, len(CLASSES)):
+        t1 = time.time()
         AP[ind - 1, :] = compute_class_ap(image_list, ind, IOU_THRE)
+        print("eval", CLASSES[ind], "cost", time.time() - t1, "s")
     print("-----------------AP-----------------")
     print(AP)
     print("-------------------------------------")
@@ -295,3 +298,4 @@ if __name__ == '__main__':
     print(mAP)
     print(np.mean(mAP))
     print("-------------------------------------")
+    print("total time:", time.time() - t0, "s")

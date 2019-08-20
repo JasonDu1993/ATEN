@@ -17,15 +17,15 @@ from models.parsing_rcnn_model_miouloss import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    # NAME = "vip_singleframe_20190408a"
-    NAME = "vip_singleframe_test"
+    NAME = "vip_singleframe_20190820a"
+    # NAME = "vip_singleframe_test"
     GPU_COUNT = 1
-    # IMAGES_PER_GPU = 4
-    IMAGES_PER_GPU = 1
-    # STEPS_PER_EPOCH = 2000
-    STEPS_PER_EPOCH = 2
-    # VALIDATION_STEPS = 100
-    VALIDATION_STEPS = 1
+    IMAGES_PER_GPU = 4
+    # IMAGES_PER_GPU = 1
+    STEPS_PER_EPOCH = 2000
+    # STEPS_PER_EPOCH = 2
+    VALIDATION_STEPS = 100
+    # VALIDATION_STEPS = 1
     SAVE_MODEL_PERIOD = 1
 
 
@@ -40,8 +40,8 @@ PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
 DEFAULT_LOGS_DIR = "./outputs"
-# DEFAULT_DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-DEFAULT_DATASET_DIR = "D:\dataset\VIP_tiny"
+DEFAULT_DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+# DEFAULT_DATASET_DIR = "D:\dataset\VIP_tiny"
 
 ############################################################
 #  Training
@@ -96,20 +96,20 @@ if __name__ == '__main__':
     print("Loaded weights ", time() - t0, "s")
     # Training dataset. Use the training set and 35K from the
     # validation set, as as in the Mask RCNN paper.
-    # dataset_train = VIPDataset()
-    # dataset_train.load_vip(args.dataset, "trainval")
-    # dataset_train.prepare()
     dataset_train = VIPDataset()
-    dataset_train.load_vip(args.dataset, "traintiny")
+    dataset_train.load_vip(args.dataset, "train")
     dataset_train.prepare()
+    # dataset_train = VIPDataset()
+    # dataset_train.load_vip(args.dataset, "traintiny")
+    # dataset_train.prepare()
 
     # Validation dataset
-    # dataset_val = VIPDataset()
-    # dataset_val.load_vip(args.dataset, "val")
-    # dataset_val.prepare()
     dataset_val = VIPDataset()
-    dataset_val.load_vip(args.dataset, "traintiny")
+    dataset_val.load_vip(args.dataset, "val")
     dataset_val.prepare()
+    # dataset_val = VIPDataset()
+    # dataset_val.load_vip(args.dataset, "traintiny")
+    # dataset_val.prepare()
 
     # *** This training schedule is an example. Update to your needs ***
 
