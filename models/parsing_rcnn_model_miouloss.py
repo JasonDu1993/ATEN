@@ -1473,18 +1473,18 @@ def mrcnn_global_parsing_miou_loss_graph(num_classes, gt_parsing_map, predict_pa
     raw_gt = []
     for class_id in range(num_classes):  # person part label
         raw_gt.append(
-            tf.where(tf.equal(gt_parsing_map, class_id), tf.ones_like(gt_parsing_map, dtype=predict_parsing_map.dtype),
-                     tf.zeros_like(gt_parsing_map, dtype=predict_parsing_map.dtype)))
-    raw_gt = tf.stack(raw_gt, axis=-1)  # shape [batch, resize_height, resize_width, num_classes=20]
+            tf.where(tf.equal(gt_parsing_map, class_id), tf.ones_like(gt_parsing_map),
+                     tf.zeros_like(gt_parsing_map)))
+    raw_gt = tf.stack(raw_gt, axis=-1)  # shape [batch, resize_height=512, resize_width=512, num_classes=20]
 
     predict_parsing_map = tf.sigmoid(predict_parsing_map)
-    predict_parsing_map = tf.where(tf.greater_equal(predict_parsing_map, 0.5), tf.ones_like(predict_parsing_map),
-                                   tf.zeros_like(predict_parsing_map))
-    intersection = raw_gt * predict_parsing_map
-    intersection_sum = tf.reduce_sum(intersection, axis=[1, 2])  # shape [batch, num_classes]
-    raw_gt_sum = tf.reduce_sum(raw_gt, axis=[1, 2])  # shape [batch, num_classes]
-    predict_parsing_map_sum = tf.reduce_sum(predict_parsing_map, axis=[1, 2])  # shape [batch, num_classes]
-    miou = intersection_sum / (raw_gt_sum + predict_parsing_map_sum - intersection_sum)  # shape [batch, num_classes]
+    predict_parsing_map = tf.where(tf.greater_equal(predict_parsing_map, 0.5),
+                                   tf.ones_like(predict_parsing_map, dtype=raw_gt.dtype),
+                                   tf.zeros_like(predict_parsing_map, dtype=raw_gt.dtype))
+    intersection = tf.cast(tf.equal(raw_gt, predict_parsing_map), tf.int32)   # shape [batch, 512, 512, 20]
+    intersection_sum = tf.reduce_sum(intersection, axis=[0, 1, 2])  # shape [num_classes, ]
+    union = gt_shape[0] * gt_shape[1] * gt_shape[2]
+    miou = 1 - intersection_sum / union  # shape [num_classes, ]
     miou = tf.reduce_mean(miou)
     return K.cast(miou, dtype="float32")
 

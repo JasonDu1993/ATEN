@@ -17,7 +17,7 @@ from models.parsing_rcnn_model_miouloss import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "vip_singleframe_20190820a"
+    NAME = "vip_singleframe_20190821a"
     # NAME = "vip_singleframe_test"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
@@ -116,7 +116,7 @@ if __name__ == '__main__':
     # Fine tune all layers
 
     model.train(dataset_train, dataset_val,
-                learning_rate=0.001,
+                learning_rate=0.0001,
                 epochs=200,
                 layers='all',
                 period=config.SAVE_MODEL_PERIOD)

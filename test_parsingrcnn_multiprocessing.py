@@ -34,11 +34,11 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Download this file and place in the root of your
 # project (See README file for details)
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190520a/checkpoints" + "/" + \
-                      "parsing_rcnn_vip_singleframe_20190520a_epoch038_loss0.552_valloss0.538.h5"
-RES_DIR = "./vis/val_vip_singleframe_20190520a_epoch038"
+MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190821a/checkpoints" + "/" + \
+                      "parsing_rcnn_vip_singleframe_20190821a_epoch009_loss0.942_valloss0.919.h5"
+RES_DIR = "./vis/val_vip_singleframe_20190821a_epoch009"
 # RES_DIR = "./vis/debug"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # Directory of images to run detection on
 IMAGE_DIR = DATASET_DIR + "/Images"
@@ -61,7 +61,7 @@ class InferenceConfig(ParsingRCNNModelConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     GPU_COUNT = 1
-    PROCESS_COUNT = 3
+    PROCESS_COUNT = 4
     IMAGES_PER_GPU = 1
 
 
@@ -76,10 +76,10 @@ def worker(images, infer_config):
     import keras.backend as K
     config = tf.ConfigProto()
     # config.gpu_options.allow_growth = True
-    config.gpu_options.per_process_gpu_memory_fraction = 0.3
+    config.gpu_options.per_process_gpu_memory_fraction = 0.2
     session = tf.Session(config=config)
     # from models.parsing_rcnn_model_resfpn_dilated_se import PARSING_RCNN
-    from models.parsing_rcnn_model_resfpn_dilated_se_attention2 import PARSING_RCNN
+    from models.parsing_rcnn_model_miouloss import PARSING_RCNN
     if infer_config is None:
         infer_config = InferenceConfig()
     model = PARSING_RCNN(mode="inference", config=infer_config, model_dir=MODEL_DIR)
@@ -119,7 +119,7 @@ def worker(images, infer_config):
         t2 = time.time()
         results = model.detect([image])
         t3 = time.time()
-        print("  (1), model test one image:", t3 - t2, "s")
+        print("  1, model test one image:", t3 - t2, "s")
         # Visualize results
         r = results[0]
         # visualize.vis_insts(image, color_floder, image_id, r['rois'], r['masks'], r['class_ids'], r['scores'])
@@ -128,7 +128,7 @@ def worker(images, infer_config):
         # masked_image = visualize.vis_insts_opencv(image, color_floder, image_id, r['rois'], r['masks'], r['class_ids'],
         #                            r['scores'])
         t4 = time.time()
-        # print("vis_insts", t3 - t2)
+        print("    (1)vis_insts:", t4 - t3)
         global_parsing_map, color_map = visualize.write_inst_part_result(video_floder, color_floder, image.shape[0],
                                                                          image.shape[1], image_id, r['rois'],
                                                                          r['masks'], r['scores'], r['global_parsing'])
@@ -136,9 +136,9 @@ def worker(images, infer_config):
         cv2.imwrite(os.path.join(color_floder, "color", "vis_global_%s.png" % image_id), vis_global_image)
         # vis_inst_image = cv2.addWeighted(masked_image, 1, color_map, 0.4, 0)
         # cv2.imwrite(os.path.join(color_floder, "color", "vis_ins_%s.png" % image_id), vis_inst_image)
-        print("    write_inst_part_result", time.time() - t4, "s")
-        print("  (2), visualize results", time.time() - t2, "s")
-        print("  (3), test and visualize one image:", time.time() - t1, "s")
+        print("    (2)write_inst_part_result(A and B total time):", time() - t4, "s")
+        print("  2, visualize results total time:", time() - t3, "s")
+        print("  3, test and visualize one image:", time() - t1, "s")
     print("total", time.time() - t0, "s")
     session.close()
 
