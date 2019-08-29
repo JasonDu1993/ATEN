@@ -2,6 +2,7 @@ import time
 import os
 from PIL import Image
 import numpy as np
+import multiprocessing
 
 PREDICT_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190520a_epoch038/vp_results'
 # PREDICT_DIR = r'D:\workspaces\ATEN\vis\viptiny_test\vp_results'
@@ -128,10 +129,10 @@ def voc_ap(rec, prec, use_07_metric=False):
 
 def convert2evalformat(inst_id_map_gt, id_to_convert=None):
     """
-    param: 
+    param:
         inst_id_map_gt:[h, w]
         id_to_convert: a set
-    return: 
+    return:
         masks:[instances,h, w]
     """
     masks = []
@@ -275,8 +276,13 @@ def compute_class_ap(image_id_list, class_id, iou_threshold):
 
 
 if __name__ == '__main__':
+    """command
+    1: nohup python3 -u evaluate/evalute_inst_part_ap.py >> outs/eval_20190520a_epoch038.txt &
+    2: tail -f outs/eval_20190520a_epoch038.txt
+    """
     print("result of", PREDICT_DIR)
     t0 = time.time()
+    pool = multiprocessing.Pool(processes=5)
     image_list = []  # list, the value is also a list, len 2, [videoid, imageid]
     for vid in os.listdir(PREDICT_DIR):
         for img in os.listdir(os.path.join(PREDICT_DIR, vid, 'instance_parsing')):
@@ -285,11 +291,18 @@ if __name__ == '__main__':
                 image_list.append([vid, img[:j]])
 
     AP = np.zeros((len(CLASSES) - 1, len(IOU_THRE)))
-
+    res = {}
     for ind in range(1, len(CLASSES)):
         t1 = time.time()
-        AP[ind - 1, :] = compute_class_ap(image_list, ind, IOU_THRE)
+        print("start:", CLASSES[ind], ind)
+        a = pool.apply_async(compute_class_ap, args=(image_list, ind, IOU_THRE))
+        res[ind - 1] = a
         print("eval", CLASSES[ind], "cost", time.time() - t1, "s")
+    pool.close()
+    pool.join()
+    for r in sorted(res):
+        print("r", r)
+        AP[r, :] = res[r].get()
     print("-----------------AP-----------------")
     print(AP)
     print("-------------------------------------")
