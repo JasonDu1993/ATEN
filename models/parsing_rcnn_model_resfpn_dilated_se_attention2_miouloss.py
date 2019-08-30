@@ -1498,6 +1498,36 @@ def mrcnn_global_parsing_loss_graph(num_classes, gt_parsing_map, predict_parsing
     # loss = tf.reshape(loss, [1, 1])
     return K.cast(loss, dtype="float32")
 
+def mrcnn_global_parsing_miou_loss_graph(num_classes, gt_parsing_map, predict_parsing_map):
+    """mask iou loss
+    num_classes: for part parsing is 20= 1 + 19 (background + classes)
+    gt_parsing_map: [batch, resize_height=512, resize_width=512] of uint8
+    predict_parsing_map: [batch, net_height=128, net_width=128, num_classes]
+    """
+    gt_shape = tf.shape(gt_parsing_map)  # the value is [batch, 512, 512]
+    predict_parsing_map = tf.image.resize_bilinear(predict_parsing_map, gt_shape[1:3])  # shape [batch, 512, 512, 20]
+
+    raw_gt = []
+    for class_id in range(num_classes):  # person part label
+        raw_gt.append(
+            tf.where(tf.equal(gt_parsing_map, class_id), tf.ones_like(gt_parsing_map),
+                     tf.zeros_like(gt_parsing_map)))
+    raw_gt = tf.stack(raw_gt, axis=-1)  # shape [batch, resize_height=512, resize_width=512, num_classes=20]
+
+    predict_parsing_map = tf.sigmoid(predict_parsing_map)
+    THR = [0.5, 0.6, 0.7, 0.8]
+    mious = []
+    for t in THR:
+        predict_parsing_map_t = tf.where(tf.greater_equal(predict_parsing_map, t),
+                                       tf.ones_like(predict_parsing_map, dtype=raw_gt.dtype),
+                                       tf.zeros_like(predict_parsing_map, dtype=raw_gt.dtype))
+        intersection = tf.cast(tf.equal(raw_gt, predict_parsing_map_t), tf.int32)  # shape [batch, 512, 512, 20]
+        intersection_sum = tf.reduce_sum(intersection, axis=[0, 1, 2])  # shape [num_classes, ]
+        union = gt_shape[0] * gt_shape[1] * gt_shape[2]
+        miou = 1 - intersection_sum / union  # shape [num_classes, ]
+        mious.append(tf.reduce_mean(miou) / 10)
+    mious = tf.reduce_mean(mious)
+    return K.cast(mious, dtype="float32")
 
 def post_processing_graph(parts, input_image):
     parts = tf.image.resize_bilinear(parts, tf.shape(input_image)[1:3, ])
@@ -2011,6 +2041,11 @@ class PARSING_RCNN():
             global_parsing_loss = KL.Lambda(lambda x: mrcnn_global_parsing_loss_graph(config.NUM_PART_CLASS, *x),
                                             name="mrcnn_global_parsing_loss")(
                 [input_gt_part, global_parsing_map])
+            global_parsing_miou_loss = KL.Lambda(
+                lambda x: mrcnn_global_parsing_miou_loss_graph(config.NUM_PART_CLASS, *x),
+                name="mrcnn_global_parsing_miou_loss")(
+                [input_gt_part, global_parsing_map])
+
             t13 = time()
             print("train mrcnn_global_parsing_loss_graph", t13 - t12, "s")
             # Losses
@@ -2036,7 +2071,7 @@ class PARSING_RCNN():
                        mrcnn_class_logits, mrcnn_class, mrcnn_bbox, mrcnn_mask,
                        rpn_rois, output_rois,
                        rpn_class_loss, rpn_bbox_loss, class_loss, bbox_loss, mask_loss,
-                       global_parsing_loss]
+                       global_parsing_loss, global_parsing_miou_loss]
             model = KM.Model(inputs, outputs, name='parsing_rcnn')
             t15 = time()
             print("train Model", t15 - t14, "s")
@@ -2153,8 +2188,8 @@ class PARSING_RCNN():
         print("load model", filepath)
 
         if by_name:
-            # s.load_weights_from_hdf5_group_by_name(f, layers, skip_mismatch=True)
-            s.load_weights_from_hdf5_group_by_name(f, layers,)
+            s.load_weights_from_hdf5_group_by_name(f, layers, skip_mismatch=True)
+            # s.load_weights_from_hdf5_group_by_name(f, layers,)
         else:
             s.load_weights_from_hdf5_group(f, layers)
         if hasattr(f, 'close'):
@@ -2176,7 +2211,7 @@ class PARSING_RCNN():
         self.keras_model._per_input_losses = {}
         loss_names = ["rpn_class_loss", "rpn_bbox_loss",
                       "mrcnn_class_loss", "mrcnn_bbox_loss", "mrcnn_mask_loss",
-                      "mrcnn_global_parsing_loss"]
+                      "mrcnn_global_parsing_loss", "mrcnn_global_parsing_miou_loss"]
         for name in loss_names:
             layer = self.keras_model.get_layer(name)
             if layer.output in self.keras_model.losses:
