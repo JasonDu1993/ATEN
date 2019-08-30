@@ -3,6 +3,7 @@ import logging
 import os
 import random
 import re
+import cv2
 # Requires TensorFlow 1.3+ and Keras 2.0.8+.
 from distutils.version import LooseVersion
 
@@ -14,12 +15,15 @@ import keras.models as KM
 import numpy as np
 import skimage.transform
 import tensorflow as tf
-
+from time import time
 from keras.utils.vis_utils import plot_model
 from utils import util
+from models.se_block import squeeze_excite_block
+from models.spatial_channel_attention_module import cbam_block
 
 assert LooseVersion(tf.__version__) >= LooseVersion("1.3")
 assert LooseVersion(keras.__version__) >= LooseVersion('2.0.8')
+from models.convolutional_recurrent import ConvGRU2D
 
 
 ############################################################
@@ -175,13 +179,13 @@ def atrous_identity_block(input_tensor, kernel_size, filters, stage,
 
 def atrous_conv_block(input_tensor, kernel_size, filters, stage,
                       block, strides=(1, 1), atrous_rate=(2, 2), use_bias=True, roi_res=False):
-    '''conv_block is the block that has a conv layer at shortcut
+    """conv_block is the block that has a conv layer at shortcut
     # Arguments
         kernel_size: defualt 3, the kernel size of middle conv layer at main path
         filters: list of integers, the nb_filters of 3 conv layer at main path
         stage: integer, current stage label, used for generating layer names
         block: 'a','b'..., current block label, used for generating layer names
-    '''
+    """
     nb_filter1, nb_filter2, nb_filter3 = filters
     conv_name_base = 'res' + str(stage) + block + '_branch'
     bn_name_base = 'bn' + str(stage) + block + '_branch'
@@ -251,29 +255,26 @@ def deeplab_resnet(img_input, architecture):
     C4 = x
     # Stage 5
     x = atrous_conv_block(x, 3, [512, 512, 2048], stage=5, block='a', atrous_rate=(2, 2), use_bias=False)
-    x = atrous_identity_block(x, 3, [512, 512, 2048], stage=5, block='b', atrous_rate=(2, 2), use_bias=False)
-    C5 = x = atrous_identity_block(x, 3, [512, 512, 2048], stage=5, block='c', atrous_rate=(2, 2), use_bias=False)
+    x = atrous_identity_block(x, 3, [512, 512, 2048], stage=5, block='b', atrous_rate=(3, 3), use_bias=False)
+    C5 = x = atrous_identity_block(x, 3, [512, 512, 2048], stage=5, block='c', atrous_rate=(5, 5), use_bias=False)
 
-    return [C1, C5]
+    return [C1, C2, C3, C4, C5]
 
 
 ############################################################
 #  Proposal Layer
 ############################################################
 
-def apply_box_deltas_graph(anchors, deltas):
-    """Applies the given deltas to the given anchors.
-    Args:
-        anchors: Tensor, shape=(N, 4) where each row is y1, x1, y2, x2
-        deltas: Tensor, shape=(N, 4) where each row is [dy, dx, log(dh), log(dw)]
-    Returns:
-        result: Tensor, shape=(N, 4) where each row is y1, x1, y2, x2
+def apply_box_deltas_graph(boxes, deltas):
+    """Applies the given deltas to the given boxes.
+    boxes: [N, 4] where each row is y1, x1, y2, x2
+    deltas: [N, 4] where each row is [dy, dx, log(dh), log(dw)]
     """
     # Convert to y, x, h, w
-    height = anchors[:, 2] - anchors[:, 0]
-    width = anchors[:, 3] - anchors[:, 1]
-    center_y = anchors[:, 0] + 0.5 * height
-    center_x = anchors[:, 1] + 0.5 * width
+    height = boxes[:, 2] - boxes[:, 0]
+    width = boxes[:, 3] - boxes[:, 1]
+    center_y = boxes[:, 0] + 0.5 * height
+    center_x = boxes[:, 1] + 0.5 * width
     # Apply deltas
     center_y += deltas[:, 0] * height
     center_x += deltas[:, 1] * width
@@ -289,19 +290,19 @@ def apply_box_deltas_graph(anchors, deltas):
 
 
 def clip_boxes_graph(boxes, window):
-    """去除预测出来的boxes坐标限制在window所在范围内
-    boxes: numpy.ndarray, [N, 4] each row is y1, x1, y2, x2
-    window: Tensor, [4] in the form y1, x1, y2, x2
+    """
+    boxes: [N, 4] each row is y1, x1, y2, x2
+    window: [4] in the form y1, x1, y2, x2
     """
     # Split corners
     wy1, wx1, wy2, wx2 = tf.split(window, 4)
     y1, x1, y2, x2 = tf.split(boxes, 4, axis=1)
     # Clip
-    y1 = tf.maximum(tf.minimum(y1, wy2), wy1)  # shape (N=12000, 1)
+    y1 = tf.maximum(tf.minimum(y1, wy2), wy1)
     x1 = tf.maximum(tf.minimum(x1, wx2), wx1)
     y2 = tf.maximum(tf.minimum(y2, wy2), wy1)
     x2 = tf.maximum(tf.minimum(x2, wx2), wx1)
-    clipped = tf.concat([y1, x1, y2, x2], axis=1, name="clipped_boxes")  # shape (N=12000, 4)
+    clipped = tf.concat([y1, x1, y2, x2], axis=1, name="clipped_boxes")
     return clipped
 
 
@@ -322,11 +323,7 @@ class ProposalLayer(KE.Layer):
     def __init__(self, proposal_count, pre_proposal_count, nms_threshold, anchors,
                  config=None, **kwargs):
         """
-        Args:
-            proposal_count:training default 2000, inference default 1000
-            pre_proposal_count:training default 12000, inference default 6000
-            nms_threshold: default 0.7
-            anchors: [N, (y1, x1, y2, x2)] anchors defined in image coordinates
+        anchors: [N, (y1, x1, y2, x2)] anchors defined in image coordinates
         """
         super(ProposalLayer, self).__init__(**kwargs)
         self.config = config
@@ -335,42 +332,34 @@ class ProposalLayer(KE.Layer):
         self.nms_threshold = nms_threshold
         self.anchors = anchors.astype(np.float32)
 
-    def call(self, inputs):  #
-        """ Box Scores. Use the foreground class confidence. [Batch, num_rois, 1]
-
-        Args:
-            inputs: list: [<tf.Tensor 'rpn_class_xxx/truediv:0' shape=(1, 245760, 2) dtype=float32>,
-                            <tf.Tensor 'lambda_63/Reshape:0' shape=(1, 245760, 4) dtype=float32>]
-        Returns:
-            proposals: [B, proposal_count, 4], the coordinate is normalized to 1
-
-        """
-        scores = inputs[0][:, :, 1]  # shape (1, 245760=128*128*5*3)
+    def call(self, inputs):
+        # Box Scores. Use the foreground class confidence. [Batch, num_rois, 1]
+        scores = inputs[0][:, :, 1]
         # Box deltas [batch, num_rois, 4]
-        deltas = inputs[1]  # shape (1, 245760, 4)
-        deltas = deltas * np.reshape(self.config.RPN_BBOX_STD_DEV, [1, 1, 4])  # shape (1, 245760, 4)
+        deltas = inputs[1]
+        deltas = deltas * np.reshape(self.config.RPN_BBOX_STD_DEV, [1, 1, 4])
         # Base anchors
-        anchors = self.anchors  # shape (245760, 4)
+        anchors = self.anchors
 
         # Improve performance by trimming to top anchors by score
         # and doing the rest on the smaller subset.
         pre_nms_limit = min(self.pre_proposal_count, self.anchors.shape[0])
         ix = tf.nn.top_k(scores, pre_nms_limit, sorted=True,
-                         name="top_anchors").indices  # (1, pre_nms_limit)
+                         name="top_anchors").indices
         scores = util.batch_slice([scores, ix], lambda x, y: tf.gather(x, y),
-                                  self.config.IMAGES_PER_GPU)  # shape(1, pre_nms_limit)
+                                  self.config.IMAGES_PER_GPU)
         deltas = util.batch_slice([deltas, ix], lambda x, y: tf.gather(x, y),
-                                  self.config.IMAGES_PER_GPU)  # shape(1, pre_nms_limit, 4)
+                                  self.config.IMAGES_PER_GPU)
         anchors = util.batch_slice(ix, lambda x: tf.gather(anchors, x),
                                    self.config.IMAGES_PER_GPU,
-                                   names=["pre_nms_anchors"])  # shape(1, pre_nms_limit, 4)
+                                   names=["pre_nms_anchors"])
 
         # Apply deltas to anchors to get refined anchors.
         # [batch, N, (y1, x1, y2, x2)]
         boxes = util.batch_slice([anchors, deltas],
                                  lambda x, y: apply_box_deltas_graph(x, y),
                                  self.config.IMAGES_PER_GPU,
-                                 names=["refined_anchors"])  # shape(1, pre_nms_limit, 4)
+                                 names=["refined_anchors"])
 
         # Clip to image boundaries. [batch, N, (y1, x1, y2, x2)]
         height, width = self.config.IMAGE_SHAPE[:2]
@@ -378,7 +367,7 @@ class ProposalLayer(KE.Layer):
         boxes = util.batch_slice(boxes,
                                  lambda x: clip_boxes_graph(x, window),
                                  self.config.IMAGES_PER_GPU,
-                                 names=["refined_anchors_clipped"])  # shape (1, 12000, 4)
+                                 names=["refined_anchors_clipped"])
 
         # Filter out small boxes
         # According to Xinlei Chen's paper, this reduces detection accuracy
@@ -639,17 +628,17 @@ class ROIAlign(KE.Layer):
 #  Detection Target Layer
 ############################################################
 
-def overlaps_graph(proposals, gt_boxes):
+def overlaps_graph(boxes1, boxes2):
     """Computes IoU overlaps between two sets of boxes.
-    proposals, gt_boxes: [N1, (y1, x1, y2, x2)], [N2, (y1,x1,y2,x2)].overlaps shape [N1, N2]
+    boxes1, boxes2: [N, (y1, x1, y2, x2)].
     """
-    # 1. Tile gt_boxes and repeate proposals. This allows us to compare
-    # every proposals against every gt_boxes without loops.
+    # 1. Tile boxes2 and repeate boxes1. This allows us to compare
+    # every boxes1 against every boxes2 without loops.
     # TF doesn't have an equivalent to np.repeate() so simulate it
     # using tf.tile() and tf.reshape.
-    b1 = tf.reshape(tf.tile(tf.expand_dims(proposals, 1),
-                            [1, 1, tf.shape(gt_boxes)[0]]), [-1, 4])
-    b2 = tf.tile(gt_boxes, [tf.shape(proposals)[0], 1])
+    b1 = tf.reshape(tf.tile(tf.expand_dims(boxes1, 1),
+                            [1, 1, tf.shape(boxes2)[0]]), [-1, 4])
+    b2 = tf.tile(boxes2, [tf.shape(boxes1)[0], 1])
     # 2. Compute intersections
     b1_y1, b1_x1, b1_y2, b1_x2 = tf.split(b1, 4, axis=1)
     b2_y1, b2_x1, b2_y2, b2_x2 = tf.split(b2, 4, axis=1)
@@ -662,9 +651,9 @@ def overlaps_graph(proposals, gt_boxes):
     b1_area = (b1_y2 - b1_y1) * (b1_x2 - b1_x1)
     b2_area = (b2_y2 - b2_y1) * (b2_x2 - b2_x1)
     union = b1_area + b2_area - intersection
-    # 4. Compute IoU and reshape to [proposals, gt_boxes]
+    # 4. Compute IoU and reshape to [boxes1, boxes2]
     iou = intersection / union
-    overlaps = tf.reshape(iou, [tf.shape(proposals)[0], tf.shape(gt_boxes)[0]])
+    overlaps = tf.reshape(iou, [tf.shape(boxes1)[0], tf.shape(boxes2)[0]])
     return overlaps
 
 
@@ -672,21 +661,21 @@ def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config)
     """Generates detection targets for one image. Subsamples proposals and
     generates target class IDs, bounding box deltas, and masks for each.
 
-    Args:
-        proposals: [N, (y1, x1, y2, x2)] in normalized coordinates. Might
-                   be zero padded if there are not enough proposals.
-        gt_class_ids: [MAX_GT_INSTANCES] int class IDs
-        gt_boxes: [MAX_GT_INSTANCES, (y1, x1, y2, x2)] in normalized coordinates.
-        gt_masks: [height, width, MAX_GT_INSTANCES] of boolean type.
+    Inputs:
+    proposals: [N, (y1, x1, y2, x2)] in normalized coordinates. Might
+               be zero padded if there are not enough proposals.
+    gt_class_ids: [MAX_GT_INSTANCES] int class IDs
+    gt_boxes: [MAX_GT_INSTANCES, (y1, x1, y2, x2)] in normalized coordinates.
+    gt_masks: [height, width, MAX_GT_INSTANCES] of boolean type.
 
     Returns: Target ROIs and corresponding class IDs, bounding box shifts,
     and masks.
-        rois: [TRAIN_ROIS_PER_IMAGE, (y1, x1, y2, x2)] in normalized coordinates
-        class_ids: [TRAIN_ROIS_PER_IMAGE]. Integer class IDs. Zero padded.
-        deltas: [TRAIN_ROIS_PER_IMAGE, NUM_CLASSES, (dy, dx, log(dh), log(dw))]
-                Class-specific bbox refinments.
-        masks: [TRAIN_ROIS_PER_IMAGE, height, width). Masks cropped to bbox
-               boundaries and resized to neural network output size.
+    rois: [TRAIN_ROIS_PER_IMAGE, (y1, x1, y2, x2)] in normalized coordinates
+    class_ids: [TRAIN_ROIS_PER_IMAGE]. Integer class IDs. Zero padded.
+    deltas: [TRAIN_ROIS_PER_IMAGE, NUM_CLASSES, (dy, dx, log(dh), log(dw))]
+            Class-specific bbox refinments.
+    masks: [TRAIN_ROIS_PER_IMAGE, height, width). Masks cropped to bbox
+           boundaries and resized to neural network output size.
 
     Note: Returned arrays might be zero padded if not enough target ROIs.
     """
@@ -707,7 +696,7 @@ def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config)
                          name="trim_gt_masks")
 
     # Compute overlaps matrix [proposals, gt_boxes]
-    overlaps = overlaps_graph(proposals, gt_boxes)  # overlaps shape [tf.shape(proposals)[0], tf.shape(gt_boxes)[0]]
+    overlaps = overlaps_graph(proposals, gt_boxes)
 
     # Determine postive and negative ROIs
     roi_iou_max = tf.reduce_max(overlaps, axis=1)
@@ -721,22 +710,22 @@ def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config)
     # Subsample ROIs. Aim for 33% positive
     # Positive ROIs
     positive_count = int(config.TRAIN_ROIS_PER_IMAGE *
-                         config.ROI_POSITIVE_RATIO)  # int(128*0.33)等于42
+                         config.ROI_POSITIVE_RATIO)
     positive_indices = tf.random_shuffle(positive_indices)[:positive_count]
     positive_count = tf.shape(positive_indices)[0]
     # Negative ROIs. Add enough to maintain positive:negative ratio.
-    r = 1.0 / config.ROI_POSITIVE_RATIO  # r=1/0.33等于3.0303...
+    r = 1.0 / config.ROI_POSITIVE_RATIO
     negative_count = tf.cast(r * tf.cast(positive_count, tf.float32), tf.int32) - positive_count
-    negative_indices = tf.random_shuffle(negative_indices)[:negative_count]  # int(1/0.33 * 42)等于127
+    negative_indices = tf.random_shuffle(negative_indices)[:negative_count]
     # Gather selected ROIs
-    positive_rois = tf.gather(proposals, positive_indices)  # shape (positive_count, 4)
-    negative_rois = tf.gather(proposals, negative_indices)  # shape (negative_count, 4)
+    positive_rois = tf.gather(proposals, positive_indices)
+    negative_rois = tf.gather(proposals, negative_indices)
 
     # Assign positive ROIs to GT boxes.
-    positive_overlaps = tf.gather(overlaps, positive_indices)  # shape (positive_count, tf.shape(gt_boxes)[0])
-    roi_gt_box_assignment = tf.argmax(positive_overlaps, axis=1)  # shape (positive_count,)
-    roi_gt_boxes = tf.gather(gt_boxes, roi_gt_box_assignment)  # shape (positive_count, 4)
-    roi_gt_class_ids = tf.gather(gt_class_ids, roi_gt_box_assignment)  # shape (positive_count,)
+    positive_overlaps = tf.gather(overlaps, positive_indices)
+    roi_gt_box_assignment = tf.argmax(positive_overlaps, axis=1)
+    roi_gt_boxes = tf.gather(gt_boxes, roi_gt_box_assignment)
+    roi_gt_class_ids = tf.gather(gt_class_ids, roi_gt_box_assignment)
 
     # Compute bbox refinement for positive ROIs
     deltas = util.box_refinement_graph(positive_rois, roi_gt_boxes)
@@ -744,9 +733,9 @@ def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config)
 
     # Assign positive ROIs to GT masks
     # Permute masks to [N, height, width, 1]
-    transposed_masks = tf.expand_dims(tf.transpose(gt_masks, [2, 0, 1]), -1)  # shape (N, 56, 56, 1)
+    transposed_masks = tf.expand_dims(tf.transpose(gt_masks, [2, 0, 1]), -1)
     # Pick the right mask for each ROI
-    roi_masks = tf.gather(transposed_masks, roi_gt_box_assignment)  # shape (positive_count, 56, 56, 1)
+    roi_masks = tf.gather(transposed_masks, roi_gt_box_assignment)
 
     # Compute mask targets
     boxes = positive_rois
@@ -988,7 +977,7 @@ def rpn_graph(feature_map, anchors_per_location, anchor_stride):
 
     Returns:
         rpn_logits: [batch, H, W, 2] Anchor classifier logits (before softmax)
-        rpn_probs: [batch, H, W, 2] Anchor classifier probabilities.
+        rpn_probs: [batch, W, W, 2] Anchor classifier probabilities.
         rpn_bbox: [batch, H, W, (dy, dx, log(dh), log(dw))] Deltas to be
                   applied to anchors.
     """
@@ -1181,23 +1170,69 @@ def arbitrary_size_pooling(feature_map):
     return b2
 
 
-def global_parsing_encoder(feature_map):
+def conv_gru_unit(temporal_features, initial_state=None):
+    input_tensor = KL.Lambda(lambda x: tf.stack(x, axis=1))(temporal_features)
+    from models.convolutional_recurrent import ConvGRU2D
+    x = ConvGRU2D(filters=256, kernel_size=(3, 3), name="gru_recurrent_unit",
+                  padding='same', return_sequences=False)(input_tensor, initial_state=initial_state)
+    return x
+
+
+def conv_gru_unit_seq(temporal_features, initial_state=None):
+    input_tensor = KL.Lambda(lambda x: tf.stack(x, axis=1))(temporal_features)
+    from models.convolutional_recurrent import ConvGRU2D
+    x = ConvGRU2D(filters=256, kernel_size=(3, 3), name="gru_recurrent_seq_unit",
+                  padding='same', return_sequences=True)(input_tensor, initial_state=initial_state)
+    return x
+
+
+def average_after_element_add(inputs):
+    if not isinstance(inputs, list):
+        inputs = [inputs]
+    l = len(inputs)
+    res = inputs[0]
+    for i in range(1, l):
+        res = res + inputs[i]
+    res = res / l
+
+    return res
+
+
+def resfpn(feature_stages, output_shape, base_name="resfpn"):
+    res = []
+    oh, ow = output_shape
+    for i, x in enumerate(feature_stages):
+        xh, xw = x.shape[1], x.shape[2]
+        x = KL.Conv2D(256, (1, 1), strides=(xh // oh, xw // ow),
+                      name="conv_" + base_name + "_" + str(i + 1), use_bias=False)(x)
+        x = BatchNorm(axis=-1, name="bn_" + base_name + "_" + str(i + 1))(x)
+        x = KL.Activation('relu')(x)
+        res.append(x)
+    # init_feature_map = KL.Lambda(lambda x: average_after_element_add(x))(res)
+    # x = conv_gru_unit(res, initial_state=init_feature_map)
+    x = KL.Add(name="resfpn_add")(res)
+    return x
+
+
+def global_parsing_encoder(feature_maps):
+    feature_map = resfpn(feature_maps, output_shape=(32, 32))
+    print("feature_maps", feature_map)
     x1 = KL.Conv2D(256, (1, 1), padding='same',
                    name='mrcnn_global_parsing_encoder_c1')(feature_map)
     # x1 = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn1')(x1)
     x1 = KL.Activation('relu')(x1)
 
-    x2 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(6, 6),
+    x2 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(3, 3),
                    name='mrcnn_global_parsing_encoder_c2')(feature_map)
     # x2 = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn2')(x2)
     x2 = KL.Activation('relu')(x2)
 
-    x3 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(12, 12),
+    x3 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(5, 5),
                    name='mrcnn_global_parsing_encoder_c3')(feature_map)
     # x3 = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn3')(x3)
     x3 = KL.Activation('relu')(x3)
 
-    x4 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(18, 18),
+    x4 = KL.Conv2D(256, (3, 3), padding='same', dilation_rate=(7, 7),
                    name='mrcnn_global_parsing_encoder_c4')(feature_map)
     # x4 = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn4')(x4)
     x4 = KL.Activation('relu')(x4)
@@ -1216,6 +1251,8 @@ def global_parsing_encoder(feature_map):
     # x = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn')(x)
     x = KL.Activation('relu')(x)
 
+    x = cbam_block(x)
+
     return x
 
 
@@ -1223,6 +1260,7 @@ def global_parsing_decoder(feature_map, low_feature_map):
     # navie upsample from 1/16(32) to 1/4(128), fit the low_feature_map
     top = KL.Lambda(lambda x: tf.image.resize_bilinear(
         x[0], tf.shape(x[1])[1:3], align_corners=True))([feature_map, low_feature_map])
+
     # low dim of low_feature_map by 1*1 conv
     low = KL.Conv2D(48, (1, 1), padding='same',
                     name='mrcnn_global_parsing_decoder_conv1')(low_feature_map)
@@ -1236,6 +1274,7 @@ def global_parsing_decoder(feature_map, low_feature_map):
     x = KL.Conv2D(256, (3, 3), padding='same',
                   name='mrcnn_global_parsing_decoder_conv3')(x)
     x = KL.Activation('relu')(x)
+    x = cbam_block(x)
     return x
 
 
@@ -1250,6 +1289,7 @@ def global_parsing_graph(feature_map, num_classes):
                    name='mrcnn_global_parsing_c3')(feature_map)
 
     x = KL.Add()([x1, x2, x3])
+    x = squeeze_excite_block(x)
     return x
 
 
@@ -1393,10 +1433,10 @@ def mrcnn_bbox_loss_graph(target_bbox, target_class_ids, pred_bbox):
 def mrcnn_mask_loss_graph(target_masks, target_class_ids, pred_masks):
     """Mask binary cross-entropy loss for the masks head.
 
-    target_masks: [batch, num_rois, height=28, width=28].
+    target_masks: [batch, num_rois, height, width].
         A float32 tensor of values 0 or 1. Uses zero padding to fill array.
     target_class_ids: [batch, num_rois]. Integer class IDs. Zero padded.
-    pred_masks: [batch, proposals, height, width, num_classes] float32 tensor
+    pred_masks: [batch, proposals=128, height=28, width=28, num_classes] float32 tensor
                 with values from 0 to 1.
     """
     # Reshape for simplicity. Merge first two dimensions into one.
@@ -1432,65 +1472,31 @@ def mrcnn_mask_loss_graph(target_masks, target_class_ids, pred_masks):
 
 def mrcnn_global_parsing_loss_graph(num_classes, gt_parsing_map, predict_parsing_map):
     """
-    num_classes: for part parsing is 20= 1 + 19 (background + classes)
-    gt_parsing_map: [batch, resize_height=512, resize_width=512] of uint8
-    predict_parsing_map: [batch, net_height=128, net_width=128, num_classes=20]
+    gt_parsing_map: [batch, image_height, image_width] of uint8
+    predict_parsing_map: [batch, height, width, parsing_class_num]
     """
-    gt_shape = tf.shape(gt_parsing_map)  # the value is [batch, 512, 512]
-    predict_parsing_map = tf.image.resize_bilinear(predict_parsing_map, gt_shape[1:3])  # shape [batch, 512, 512, 20]
+    gt_shape = tf.shape(gt_parsing_map)
+    predict_parsing_map = tf.image.resize_bilinear(predict_parsing_map, gt_shape[1:3])
 
-    pred_shape = tf.shape(predict_parsing_map)  # the value is [batch, 512, 512, 20]
+    pred_shape = tf.shape(predict_parsing_map)
 
-    raw_gt = tf.expand_dims(gt_parsing_map, -1)  # shape [batch, 512, 512, 1]
+    raw_gt = tf.expand_dims(gt_parsing_map, -1)
     # raw_gt = tf.image.resize_nearest_neighbor(raw_gt, pred_shape[1:3])
-    raw_gt = tf.reshape(raw_gt, [-1, ])  # shape [batch*512*512*1, ]
+    raw_gt = tf.reshape(raw_gt, [-1, ])
     raw_gt = tf.cast(raw_gt, tf.int32)
 
-    raw_prediction = tf.reshape(predict_parsing_map, [-1, pred_shape[-1]])  # shape [batch*512*512, 20]
+    raw_prediction = tf.reshape(predict_parsing_map, [-1, pred_shape[-1]])
 
     # Predictions: ignoring all predictions with labels greater or equal than n_classes
-    indices = tf.squeeze(tf.where(tf.less_equal(raw_gt, num_classes - 1)), 1)  # shape [K=(batch*512*512 - ignore_num),]
+    indices = tf.squeeze(tf.where(tf.less_equal(raw_gt, num_classes - 1)), 1)
     gt = tf.gather(raw_gt, indices)  # shape = (K,) K 表示找到的符合tf.less_equal(raw_gt, num_classes - 1)的个数
-    prediction = tf.gather(raw_prediction, indices)  # shape = （K, parsing_class_num=20)
-    # gt: shape [K,], the value is [0,19], 0 is bg, other represent the part lable,
-    # prediction: shape[K, parsing_class_num=20],
+    prediction = tf.gather(raw_prediction, indices)  # shape = （K, parsing_class_num)
+
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
         labels=gt, logits=prediction)  # (parsing_class_num, )
     loss = tf.reduce_mean(loss)  # scalar
     # loss = tf.reshape(loss, [1, 1])
     return K.cast(loss, dtype="float32")
-
-
-def mrcnn_global_parsing_miou_loss_graph(num_classes, gt_parsing_map, predict_parsing_map):
-    """mask iou loss
-    num_classes: for part parsing is 20= 1 + 19 (background + classes)
-    gt_parsing_map: [batch, resize_height=512, resize_width=512] of uint8
-    predict_parsing_map: [batch, net_height=128, net_width=128, num_classes]
-    """
-    gt_shape = tf.shape(gt_parsing_map)  # the value is [batch, 512, 512]
-    predict_parsing_map = tf.image.resize_bilinear(predict_parsing_map, gt_shape[1:3])  # shape [batch, 512, 512, 20]
-
-    raw_gt = []
-    for class_id in range(num_classes):  # person part label
-        raw_gt.append(
-            tf.where(tf.equal(gt_parsing_map, class_id), tf.ones_like(gt_parsing_map),
-                     tf.zeros_like(gt_parsing_map)))
-    raw_gt = tf.stack(raw_gt, axis=-1)  # shape [batch, resize_height=512, resize_width=512, num_classes=20]
-
-    predict_parsing_map = tf.sigmoid(predict_parsing_map)
-    THR = [0.5, 0.6, 0.7, 0.8]
-    mious = []
-    for t in THR:
-        predict_parsing_map_t = tf.where(tf.greater_equal(predict_parsing_map, t),
-                                       tf.ones_like(predict_parsing_map, dtype=raw_gt.dtype),
-                                       tf.zeros_like(predict_parsing_map, dtype=raw_gt.dtype))
-        intersection = tf.cast(tf.equal(raw_gt, predict_parsing_map_t), tf.int32)  # shape [batch, 512, 512, 20]
-        intersection_sum = tf.reduce_sum(intersection, axis=[0, 1, 2])  # shape [num_classes, ]
-        union = gt_shape[0] * gt_shape[1] * gt_shape[2]
-        miou = 1 - intersection_sum / union  # shape [num_classes, ]
-        mious.append(tf.reduce_mean(miou) / 10)
-    mious = tf.reduce_mean(mious)
-    return K.cast(mious, dtype="float32")
 
 
 def post_processing_graph(parts, input_image):
@@ -1580,7 +1586,7 @@ def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
     # RPN Match: 1 = positive anchor, -1 = negative anchor, 0 = neutral
     rpn_match = np.zeros([anchors.shape[0]], dtype=np.int32)
     # RPN bounding boxes: [max anchors per image, (dy, dx, log(dh), log(dw))]
-    rpn_bbox = np.zeros((config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4))  # shape(256, 4)
+    rpn_bbox = np.zeros((config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4))
 
     # Compute overlaps [num_anchors, num_gt_boxes]
     overlaps = util.compute_overlaps(anchors, gt_boxes)
@@ -1595,7 +1601,7 @@ def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
     #
     # 1. Set negative anchors first. They get overwritten below if a GT box is
     # matched to them. Skip boxes in crowd areas.
-    anchor_iou_argmax = np.argmax(overlaps, axis=1)  # shape : (245760,)
+    anchor_iou_argmax = np.argmax(overlaps, axis=1)
     anchor_iou_max = overlaps[np.arange(overlaps.shape[0]), anchor_iou_argmax]
     rpn_match[(anchor_iou_max < 0.3)] = -1
     # 2. Set an anchor for each GT box (regardless of IoU value).
@@ -1624,7 +1630,7 @@ def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
 
     # For positive anchors, compute shift and scale needed to transform them
     # to match the corresponding GT boxes.
-    ids = np.where(rpn_match == 1)[0]  # For example: ids shape: (41,)
+    ids = np.where(rpn_match == 1)[0]
     ix = 0  # index into rpn_bbox
     # TODO: use box_refinment() rather than duplicating the code here
     for i, a in zip(ids, anchors[ids]):
@@ -1643,7 +1649,7 @@ def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
         a_center_y = a[0] + 0.5 * a_h
         a_center_x = a[1] + 0.5 * a_w
 
-        # Compute the bbox refinement that the RPN should predict.  rpn_bbox shape: (256, 4)
+        # Compute the bbox refinement that the RPN should predict.
         rpn_bbox[ix] = [
             (gt_center_y - a_center_y) / a_h,
             (gt_center_x - a_center_x) / a_w,
@@ -1651,7 +1657,7 @@ def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
             np.log(gt_w / a_w),
         ]
         # Normalize
-        rpn_bbox[ix] /= config.RPN_BBOX_STD_DEV  # config.RPN_BBOX_STD_DEV ndarray [0.1 0.1 0.2 0.2]
+        rpn_bbox[ix] /= config.RPN_BBOX_STD_DEV
         ix += 1
 
     return rpn_match, rpn_bbox
@@ -1702,12 +1708,13 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
 
     # Anchors
     # [anchor_count, (y1, x1, y2, x2)]
+    t0 = time()
     anchors = util.generate_anchors(config.RPN_ANCHOR_SCALES,
                                     config.RPN_ANCHOR_RATIOS,
                                     config.BACKBONE_SHAPES[0],
                                     config.BACKBONE_STRIDES[0],
                                     config.RPN_ANCHOR_STRIDE)
-
+    print("generate_anchors", time() - t0, "s")  # 16ms
     # Keras requires a generator to run indefinately.
     while True:
         try:
@@ -1868,6 +1875,7 @@ class PARSING_RCNN():
                             "to avoid fractions when downscaling and upscaling.")
 
         # Inputs
+        t0 = time()
         input_image = KL.Input(
             shape=config.IMAGE_SHAPE.tolist(), name="input_image")
         input_image_meta = KL.Input(shape=[None], name="input_image_meta")
@@ -1905,17 +1913,25 @@ class PARSING_RCNN():
             input_gt_part = KL.Input(
                 shape=[config.IMAGE_SHAPE[0], config.IMAGE_SHAPE[1]],
                 name="input_gt_part", dtype=tf.uint8)
-
+        t1 = time()
+        print("input", t1 - t0, "s")
         # Build the shared convolutional layers.
         # Bottom-up Layers
         # Returns a list of the last layers of each stage, 5 in total.
         # Don't create the thead (stage 5), so we pick the 4th item in the list.
-        c1, c5 = deeplab_resnet(input_image, 'resnet50')
-        coarse_feature = global_parsing_encoder(c5)
+        c1, c2, c3, c4, c5 = deeplab_resnet(input_image, 'resnet50')
+        t2 = time()
+        print("deeplab_resnet", t2 - t1, "s")
+        coarse_feature = global_parsing_encoder([c3, c4, c5])
+        t3 = time()
+        print("global_parsing_encoder", t3 - t2, "s")
         fine_feature = global_parsing_decoder(coarse_feature, c1)
+        t4 = time()
+        print("global_parsing_decoder", t4 - t3, "s")
         # global parsing branch
         global_parsing_map = global_parsing_graph(fine_feature, config.NUM_PART_CLASS)
-
+        t4 = time()
+        print("global_parsing_graph", t4 - t3, "s")
         rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
                                     name='mrcnn_share_rpn_conv1')(fine_feature)
         rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
@@ -1925,7 +1941,8 @@ class PARSING_RCNN():
                                       name='mrcnn_share_recog_conv1')(fine_feature)
         mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
                                       name='mrcnn_share_recog_conv2')(mrcnn_feature_map)
-
+        t5 = time()
+        print("mrcnn_share_rpn and mrcnn_share_recog", t5 - t4, "s")
         # Generate Anchors
         self.anchors = util.generate_anchors(config.RPN_ANCHOR_SCALES,
                                              config.RPN_ANCHOR_RATIOS,
@@ -1933,10 +1950,14 @@ class PARSING_RCNN():
                                              config.BACKBONE_STRIDES[0],
                                              config.RPN_ANCHOR_STRIDE)
 
+        t6 = time()
+        print("build generate_anchors", t6 - t5, "s")
         # RPN Model
         rpn_class_logits, rpn_class, rpn_bbox = rpn_graph(rpn_feature_map,
                                                           len(config.RPN_ANCHOR_RATIOS) * len(config.RPN_ANCHOR_SCALES),
                                                           config.RPN_ANCHOR_STRIDE)
+        t7 = time()
+        print("rpn_graph", t7 - t6, "s")
 
         # Generate proposals
         # Proposals are [batch, N, (y1, x1, y2, x2)] in normalized coordinates
@@ -1951,13 +1972,15 @@ class PARSING_RCNN():
                                  name="ROI",
                                  anchors=self.anchors,
                                  config=config)([rpn_class, rpn_bbox])
-
+        t8 = time()
+        print("ProposalLayer", t8 - t7, "s")
         if mode == "training":
             # Class ID mask to mark class IDs supported by the dataset the image
             # came from.
             _, _, _, active_class_ids = KL.Lambda(lambda x: parse_image_meta_graph(x),
                                                   mask=[None, None, None, None])(input_image_meta)
-
+            t9 = time()
+            print("train parse_image_meta_graph", t9 - t8, "s")
             target_rois = rpn_rois
 
             # Generate detection targets
@@ -1967,29 +1990,29 @@ class PARSING_RCNN():
             rois, target_class_ids, target_bbox, target_mask = \
                 DetectionTargetLayer(config, name="proposal_targets")([
                     target_rois, input_gt_class_ids, gt_boxes, input_gt_masks])
-
+            t10 = time()
+            print("train DetectionTargetLayer", t10 - t9, "s")
             # Network Heads
             # TODO: verify that this handles zero padded ROIs
             mrcnn_class_logits, mrcnn_class, mrcnn_bbox = \
                 fpn_classifier_graph(rois, mrcnn_feature_map, config.IMAGE_SHAPE,
                                      config.POOL_SIZE, config.NUM_CLASSES)
-
+            t11 = time()
+            print("train fpn_classifier_graph", t11 - t10, "s")
             mrcnn_mask = build_fpn_mask_graph(rois, mrcnn_feature_map,
                                               config.IMAGE_SHAPE,
                                               config.MASK_POOL_SIZE,
                                               config.NUM_CLASSES)
-
+            t12 = time()
+            print("train build_fpn_mask_graph", t12 - t11, "s")
             # TODO: clean up (use tf.identify if necessary)
             output_rois = KL.Lambda(lambda x: x * 1, name="output_rois")(rois)
 
-            # global part loss
             global_parsing_loss = KL.Lambda(lambda x: mrcnn_global_parsing_loss_graph(config.NUM_PART_CLASS, *x),
                                             name="mrcnn_global_parsing_loss")(
                 [input_gt_part, global_parsing_map])
-            global_parsing_miou_loss = KL.Lambda(
-                lambda x: mrcnn_global_parsing_miou_loss_graph(config.NUM_PART_CLASS, *x),
-                name="mrcnn_global_parsing_miou_loss")(
-                [input_gt_part, global_parsing_map])
+            t13 = time()
+            print("train mrcnn_global_parsing_loss_graph", t13 - t12, "s")
             # Losses
             rpn_class_loss = KL.Lambda(lambda x: rpn_class_loss_graph(*x), name="rpn_class_loss")(
                 [input_rpn_match, rpn_class_logits])
@@ -2001,7 +2024,8 @@ class PARSING_RCNN():
                 [target_bbox, target_class_ids, mrcnn_bbox])
             mask_loss = KL.Lambda(lambda x: mrcnn_mask_loss_graph(*x), name="mrcnn_mask_loss")(
                 [target_mask, target_class_ids, mrcnn_mask])
-
+            t14 = time()
+            print("train loss", t14 - t13, "s")
             # Model
             inputs = [input_image, input_image_meta,
                       input_rpn_match, input_rpn_bbox, input_gt_class_ids, input_gt_boxes, input_gt_masks,
@@ -2012,20 +2036,25 @@ class PARSING_RCNN():
                        mrcnn_class_logits, mrcnn_class, mrcnn_bbox, mrcnn_mask,
                        rpn_rois, output_rois,
                        rpn_class_loss, rpn_bbox_loss, class_loss, bbox_loss, mask_loss,
-                       global_parsing_loss, global_parsing_miou_loss]
+                       global_parsing_loss]
             model = KM.Model(inputs, outputs, name='parsing_rcnn')
+            t15 = time()
+            print("train Model", t15 - t14, "s")
         else:
             # Network Heads
             # Proposal classifier and BBox regressor heads
+            t16 = time()
             mrcnn_class_logits, mrcnn_class, mrcnn_bbox = \
                 fpn_classifier_graph(rpn_rois, mrcnn_feature_map, config.IMAGE_SHAPE,
                                      config.POOL_SIZE, config.NUM_CLASSES)
-
+            t17 = time()
+            print("Inference fpn_classifier_graph", t17 - t16, "s")
             # Detections
             # output is [batch, num_detections, (y1, x1, y2, x2, class_id, score)] in image coordinates
             detections = DetectionLayer(config, name="mrcnn_detection")(
                 [rpn_rois, mrcnn_class, mrcnn_bbox, input_image_meta])
-
+            t18 = time()
+            print("Inference DetectionLayer", t18 - t17, "s")
             # Convert boxes to normalized coordinates
             # TODO: let DetectionLayer return normalized coordinates to avoid
             #       unnecessary conversions
@@ -2038,26 +2067,29 @@ class PARSING_RCNN():
                                               config.IMAGE_SHAPE,
                                               config.MASK_POOL_SIZE,
                                               config.NUM_CLASSES)
-
+            t19 = time()
+            print("Inference build_fpn_mask_graph", t19 - t18, "s")
             # global parsing branch
             global_parsing_prob = KL.Lambda(lambda x: post_processing_graph(*x))([global_parsing_map, input_image])
-
+            t20 = time()
+            print("Inference post_processing_graph", t20 - t19, "s")
             model = KM.Model([input_image, input_image_meta],
                              [detections, mrcnn_class, mrcnn_bbox,
                               mrcnn_mask, rpn_rois, rpn_class, rpn_bbox, global_parsing_prob],
                              name='parsing_rcnn')
-
+            t21 = time()
+            print("Inference Model", t21 - t20, "s")
         # Add multi-GPU support.
         if config.GPU_COUNT > 1:
             from utils.parallel_model import ParallelModel
             model = ParallelModel(model, config.GPU_COUNT)
         import platform
         sys = platform.system()
-        # if sys == "Windows":
-        #     if self.mode == "training":
-        #         plot_model(model, "parsing_rcnn_training.jpg")
-        #     else:
-        #         plot_model(model, "parsing_rcnn_inference.png")
+        if sys == "Windows":
+            if self.mode == "training":
+                plot_model(model, "parsing_rcnn_training.jpg")
+            else:
+                plot_model(model, "parsing_rcnn_inference.png")
         return model
 
     def find_last(self):
@@ -2121,7 +2153,8 @@ class PARSING_RCNN():
         print("load model", filepath)
 
         if by_name:
-            s.load_weights_from_hdf5_group_by_name(f, layers)
+            # s.load_weights_from_hdf5_group_by_name(f, layers, skip_mismatch=True)
+            s.load_weights_from_hdf5_group_by_name(f, layers,)
         else:
             s.load_weights_from_hdf5_group(f, layers)
         if hasattr(f, 'close'):
@@ -2143,7 +2176,7 @@ class PARSING_RCNN():
         self.keras_model._per_input_losses = {}
         loss_names = ["rpn_class_loss", "rpn_bbox_loss",
                       "mrcnn_class_loss", "mrcnn_bbox_loss", "mrcnn_mask_loss",
-                      "mrcnn_global_parsing_loss", "mrcnn_global_parsing_miou_loss"]
+                      "mrcnn_global_parsing_loss"]
         for name in loss_names:
             layer = self.keras_model.get_layer(name)
             if layer.output in self.keras_model.losses:
@@ -2422,19 +2455,19 @@ class PARSING_RCNN():
         """Reformats the detections of one image from the format of the neural
         network output to a format suitable for use in the rest of the
         application.
-
-        detections: [N, (y1, x1, y2, x2, class_id, score)]
-        mrcnn_mask: [N, height, width, num_classes]
-        mrcnn_global_parsing: [resized_height, resized_width, num_classes]
-        image_shape: [height, width, depth] Original size of the image before resizing
-        window: [y1, x1, y2, x2] Box in the image where the real image is
-                excluding the padding.
+        Args:
+            detections: [N, (y1, x1, y2, x2, class_id, score)]
+            mrcnn_mask: [N, height=28, width=28, num_classes=2]
+            mrcnn_global_parsing: [resized_height=512, resized_width=512, num_part_classes=20]
+            image_shape: [height=720, width=1080, depth=3] Original size of the image before resizing
+            window: [y1=112, x1=0, y2=400, x2=512] Box in the image where the real image is
+                    excluding the padding.
 
         Returns:
-        boxes: [N, (y1, x1, y2, x2)] Bounding boxes in pixels
-        class_ids: [N] Integer class IDs for each bounding box
-        scores: [N] Float probability scores of the class_id
-        masks: [height, width, num_instances] Instance masks
+            boxes: [N, (y1, x1, y2, x2)] Bounding boxes in pixels
+            class_ids: [N] Integer class IDs for each bounding box
+            scores: [N] Float probability scores of the class_id
+            masks: [height, width, num_instances] Instance masks
         """
         # How many detections do we have?
         # Detections array is padded with zeros. Find the first class_id == 0.
@@ -2442,10 +2475,10 @@ class PARSING_RCNN():
         N = zero_ix[0] if zero_ix.shape[0] > 0 else detections.shape[0]
 
         # Extract boxes, class_ids, scores, and class-specific masks
-        boxes = detections[:N, :4]
-        class_ids = detections[:N, 4].astype(np.int32)
-        scores = detections[:N, 5]
-        masks = mrcnn_mask[np.arange(N), :, :, class_ids]
+        boxes = detections[:N, :4]  # shape (N, 4)
+        class_ids = detections[:N, 4].astype(np.int32)  # shape (N,)
+        scores = detections[:N, 5]  # shape (N,)
+        masks = mrcnn_mask[np.arange(N), :, :, class_ids]  # shape (N, height, width)
 
         # Compute scale and shift to translate coordinates to image domain.
         h_scale = image_shape[0] / (window[2] - window[0])
@@ -2477,16 +2510,18 @@ class PARSING_RCNN():
             full_masks.append(full_mask)
         full_masks = np.stack(full_masks, axis=-1) \
             if full_masks else np.empty((0,) + masks.shape[1:3])
-
         global_parsing = mrcnn_global_parsing[window[0]:window[2], window[1]:window[3], :]
-        global_parsing = skimage.transform.resize(global_parsing, (image_shape[0], image_shape[1]), mode="constant")
+        # global_parsing = skimage.transform.resize(global_parsing, (image_shape[0], image_shape[1]), mode="constant")
+        global_parsing = cv2.resize(global_parsing, (image_shape[1], image_shape[0]), interpolation=cv2.INTER_LINEAR)
+        print("unmold_detections global_parsing", np.min(global_parsing), np.max(global_parsing))
+        # global_parsing = cv2.resize(global_parsing, (image_shape[1], image_shape[0]), interpolation=cv2.INTER_CUBIC)
 
         return boxes, class_ids, scores, full_masks, global_parsing
 
     def detect(self, images, verbose=0):
         """Runs the detection pipeline.
 
-        images: List of images, potentially of different sizes.
+        images: List of images, potentially of different sizes.every image shape is [H, W, 3],3 represent rgb
 
         Returns a list of dicts, one dict per image. The dict contains:
         rois: [N, (y1, x1, y2, x2)] detection bounding boxes
@@ -2508,15 +2543,27 @@ class PARSING_RCNN():
             log("molded_images", molded_images)
             log("image_metas", image_metas)
         # Run object detection
+        t1 = time()
+        # detections (1, 100, 6) float32 0-441     , mrcnn_class (1, 1000, 2) float32 0-1
+        # mrcnn_bbox (1, 1000, 2, 4) -3.17 ～ 2.47 ，mrcnn_mask (1, 100, 28, 28, 2) 0-1
+        # roi (1, 1000, 4) 0-1                     ，rpn_class (1, 245760, 2) 0-1
+        # rpn_bbox (1, 245760, 4) -4,73 ～ 18.27   ，mrcnn_global_parsing_prob (1, 512, 512, 20) 0-1
+        # detections: [B, N, (y1, x1, y2, x2, class_id, score)]
+        # mrcnn_mask: [B, N, height, width, num_classes]
+        # mrcnn_global_parsing: [B, resized_height, resized_width, num_classes]
         detections, mrcnn_class, mrcnn_bbox, mrcnn_mask, \
         rois, rpn_class, rpn_bbox, mrcnn_global_parsing_prob = \
             self.keras_model.predict([molded_images, image_metas], verbose=0)
+        t2 = time()
+        print("mrcnn_global_parsing_prob", np.min(mrcnn_global_parsing_prob), np.max(mrcnn_global_parsing_prob))
+        # print("Run object detection", t2 - t1, "s")
         # Process detections
         results = []
         for i, image in enumerate(images):
             final_rois, final_class_ids, final_scores, final_masks, final_globals = \
                 self.unmold_detections(detections[i], mrcnn_mask[i], mrcnn_global_parsing_prob[i],
                                        image.shape, windows[i])
+            # print("results", np.min(final_masks), np.max(final_masks), np.min(final_globals), np.max(final_globals))
             results.append({
                 "rois": final_rois,
                 "class_ids": final_class_ids,
@@ -2524,6 +2571,7 @@ class PARSING_RCNN():
                 "masks": final_masks,
                 "global_parsing": final_globals
             })
+        # print("Process detections", time.time() - t1, "s")
         return results
 
 
