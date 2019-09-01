@@ -34,9 +34,9 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Download this file and place in the root of your
 # project (See README file for details)
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190821a/checkpoints" + "/" + \
-                      "parsing_rcnn_vip_singleframe_20190821a_epoch009_loss0.942_valloss0.919.h5"
-RES_DIR = "./vis/val_vip_singleframe_20190821a_epoch009"
+MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190830b/checkpoints" + "/" + \
+                      "parsing_rcnn_vip_singleframe_20190830b_epoch016_loss0.574_valloss0.618.h5"
+RES_DIR = "./vis/val_vip_singleframe_20190830b_epoch016"
 # RES_DIR = "./vis/debug"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
@@ -136,9 +136,9 @@ def worker(images, infer_config):
         cv2.imwrite(os.path.join(color_floder, "color", "vis_global_%s.png" % image_id), vis_global_image)
         # vis_inst_image = cv2.addWeighted(masked_image, 1, color_map, 0.4, 0)
         # cv2.imwrite(os.path.join(color_floder, "color", "vis_ins_%s.png" % image_id), vis_inst_image)
-        print("    (2)write_inst_part_result(A and B total time):", time() - t4, "s")
-        print("  2, visualize results total time:", time() - t3, "s")
-        print("  3, test and visualize one image:", time() - t1, "s")
+        print("    (2)write_inst_part_result:", time.time() - t4, "s")
+        print("  2, visualize results total time:", time.time() - t3, "s")
+        print("  3, test and visualize one image:", time.time() - t1, "s")
     print("total", time.time() - t0, "s")
     session.close()
 

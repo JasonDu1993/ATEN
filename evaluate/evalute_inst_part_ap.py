@@ -4,7 +4,7 @@ from PIL import Image
 import numpy as np
 import multiprocessing
 
-PREDICT_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190520a_epoch038/vp_results'
+PREDICT_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190830a_epoch022/vp_results'
 # PREDICT_DIR = r'D:\workspaces\ATEN\vis\viptiny_test\vp_results'
 INST_PART_GT_DIR = '/home/sk49/workspace/dataset/VIP/Instance_ids'
 # INST_PART_GT_DIR = r'D:\dataset\VIP_tiny\Instance_ids'

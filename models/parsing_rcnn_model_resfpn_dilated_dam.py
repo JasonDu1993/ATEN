@@ -19,7 +19,7 @@ from time import time
 from keras.utils.vis_utils import plot_model
 from utils import util
 from models.se_block import squeeze_excite_block
-from models.spatial_channel_attention_module import cbam_block
+from models.cbam_and_sa import cbam_block
 from models.DAModule import DAModule
 
 assert LooseVersion(tf.__version__) >= LooseVersion("1.3")
