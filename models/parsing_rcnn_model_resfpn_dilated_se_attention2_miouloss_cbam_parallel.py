@@ -1251,7 +1251,8 @@ def global_parsing_encoder(feature_maps):
     # x = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn')(x)
     x = KL.Activation('relu')(x)
 
-    x = cbam_block(x)
+    # x = cbam_block(x)
+    x = cbam_block_parallel(x)
 
     return x
 
@@ -1274,7 +1275,8 @@ def global_parsing_decoder(feature_map, low_feature_map):
     x = KL.Conv2D(256, (3, 3), padding='same',
                   name='mrcnn_global_parsing_decoder_conv3')(x)
     x = KL.Activation('relu')(x)
-    x = cbam_block(x)
+    # x = cbam_block(x)
+    x = cbam_block_parallel(x)
     return x
 
 
