@@ -19,7 +19,7 @@ from time import time
 from keras.utils.vis_utils import plot_model
 from utils import util
 from models.se_block import squeeze_excite_block
-from models.cbam_and_sa import cbam_block, cbam_block_parallel
+from models.cbam_and_sa import cbam_block, cbam_block_parallel, cbam_block_parallel2
 
 assert LooseVersion(tf.__version__) >= LooseVersion("1.3")
 assert LooseVersion(keras.__version__) >= LooseVersion('2.0.8')
@@ -1252,7 +1252,7 @@ def global_parsing_encoder(feature_maps):
     x = KL.Activation('relu')(x)
 
     # x = cbam_block(x)
-    x = cbam_block_parallel(x)
+    x = cbam_block_parallel2(x)
 
     return x
 
@@ -1276,7 +1276,7 @@ def global_parsing_decoder(feature_map, low_feature_map):
                   name='mrcnn_global_parsing_decoder_conv3')(x)
     x = KL.Activation('relu')(x)
     # x = cbam_block(x)
-    x = cbam_block_parallel(x)
+    x = cbam_block_parallel2(x)
     return x
 
 

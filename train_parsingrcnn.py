@@ -12,12 +12,12 @@ session = tf.Session(config=config)
 
 from configs.vip import ParsingRCNNModelConfig
 from configs.vip import VIPDataset
-from models.parsing_rcnn_model_resfpn_dilated_se_attention2_miouloss_cbam_parallel import PARSING_RCNN
+from models.parsing_rcnn_model_resfpn_dilated_se_attention2_miouloss_cbam_parallel2 import PARSING_RCNN
 # from models.parsing_rcnn_model_dilated import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "vip_singleframe_20190901a"
+    NAME = "vip_singleframe_20190903a"
     # NAME = "vip_singleframe_test"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
@@ -49,6 +49,10 @@ DEFAULT_DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
 
 
 if __name__ == '__main__':
+    """command:
+    nohup python3 train_parsingrcnn.py >> outs/train_vip_video_20190903a.out &
+    tail -f outs/train_vip_video_20190903a.out
+    """
     import argparse
 
     t0 = time()
