@@ -34,11 +34,11 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Download this file and place in the root of your
 # project (See README file for details)
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190830b/checkpoints" + "/" + \
-                      "parsing_rcnn_vip_singleframe_20190830b_epoch016_loss0.574_valloss0.618.h5"
-RES_DIR = "./vis/val_vip_singleframe_20190830b_epoch016"
+MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190901a/checkpoints" + "/" + \
+                      "parsing_rcnn_vip_singleframe_20190901a_epoch019_loss1.084_valloss1.550.h5"
+RES_DIR = "./vis/val_vip_singleframe_20190901a_epoch019"
 # RES_DIR = "./vis/debug"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 # Directory of images to run detection on
 IMAGE_DIR = DATASET_DIR + "/Images"
@@ -79,7 +79,7 @@ def worker(images, infer_config):
     config.gpu_options.per_process_gpu_memory_fraction = 0.2
     session = tf.Session(config=config)
     # from models.parsing_rcnn_model_resfpn_dilated_se import PARSING_RCNN
-    from models.parsing_rcnn_model_miouloss import PARSING_RCNN
+    from models.parsing_rcnn_model_resfpn_dilated_se_attention2_miouloss_cbam_parallel import PARSING_RCNN
     if infer_config is None:
         infer_config = InferenceConfig()
     model = PARSING_RCNN(mode="inference", config=infer_config, model_dir=MODEL_DIR)

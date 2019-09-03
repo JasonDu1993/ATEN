@@ -75,6 +75,21 @@ def cbam_block_parallel(cbam_feature, attn_type="channel_attention", ratio=8):
     final_feature = add([cbam_feature, cbam_feature_channel, cbam_feature_spatial])
     return final_feature
 
+def cbam_block_parallel2(cbam_feature, attn_type="se", ratio=8):
+    """Contains the implementation of Convolutional Block Attention Module(CBAM) block.
+    As described in https://arxiv.org/abs/1807.06521.
+    """
+    assert attn_type in ["se", "channel_attention"]
+    if attn_type == "se":
+        cbam_feature_channel = se_block(cbam_feature, ratio)
+    elif attn_type == "channel_attention":
+        cbam_feature_channel = channel_attention(cbam_feature, ratio)
+    else:
+        cbam_feature_channel = channel_attention(cbam_feature, ratio)
+    cbam_feature_spatial = spatial_attention(cbam_feature)
+    attn_map = multiply([cbam_feature_channel, cbam_feature_spatial])
+    final_feature = add([cbam_feature, attn_map])
+    return final_feature
 
 def channel_attention(input_feature, ratio=8):
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
