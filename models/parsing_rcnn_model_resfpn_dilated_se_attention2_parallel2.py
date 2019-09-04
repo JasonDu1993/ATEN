@@ -19,7 +19,7 @@ from time import time
 from keras.utils.vis_utils import plot_model
 from utils import util
 from models.se_block import squeeze_excite_block
-from models.cbam_and_sa import cbam_block
+from models.cbam_and_sa import cbam_block, cbam_block_parallel2
 
 assert LooseVersion(tf.__version__) >= LooseVersion("1.3")
 assert LooseVersion(keras.__version__) >= LooseVersion('2.0.8')
@@ -1251,7 +1251,7 @@ def global_parsing_encoder(feature_maps):
     # x = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn')(x)
     x = KL.Activation('relu')(x)
 
-    x = cbam_block(x)
+    x = cbam_block_parallel2(x)
 
     return x
 
@@ -1274,7 +1274,7 @@ def global_parsing_decoder(feature_map, low_feature_map):
     x = KL.Conv2D(256, (3, 3), padding='same',
                   name='mrcnn_global_parsing_decoder_conv3')(x)
     x = KL.Activation('relu')(x)
-    x = cbam_block(x)
+    x = cbam_block_parallel2(x)
     return x
 
 
@@ -2153,8 +2153,8 @@ class PARSING_RCNN():
         print("load model", filepath)
 
         if by_name:
-            # s.load_weights_from_hdf5_group_by_name(f, layers, skip_mismatch=True)
-            s.load_weights_from_hdf5_group_by_name(f, layers,)
+            s.load_weights_from_hdf5_group_by_name(f, layers, skip_mismatch=True)
+            # s.load_weights_from_hdf5_group_by_name(f, layers,)
         else:
             s.load_weights_from_hdf5_group(f, layers)
         if hasattr(f, 'close'):

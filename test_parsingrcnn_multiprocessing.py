@@ -79,7 +79,7 @@ def worker(images, infer_config):
     config.gpu_options.per_process_gpu_memory_fraction = 0.2
     session = tf.Session(config=config)
     # from models.parsing_rcnn_model_resfpn_dilated_se import PARSING_RCNN
-    from models.parsing_rcnn_model_resfpn_dilated_se_attention2_miouloss_cbam_parallel import PARSING_RCNN
+    from models.parsing_rcnn_model_resfpn_dilated_se_attention2_miouloss_cbam_parallel2 import PARSING_RCNN
     if infer_config is None:
         infer_config = InferenceConfig()
     model = PARSING_RCNN(mode="inference", config=infer_config, model_dir=MODEL_DIR)
