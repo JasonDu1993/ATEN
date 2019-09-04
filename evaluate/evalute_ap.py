@@ -1,10 +1,15 @@
 import os
 import cv2
 import numpy as np
+import time
 
-PREDICT_DIR = './sample_result'
+"""
+Human_ids:存储实例注解inst_anno，图片大小和原始帧大小一致，里面存储为灰度值，
+min:0， max:person_num uint8，0表示背景，其他数值表示每个人体
+"""
+PREDICT_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190821a_epoch012/vp_results'
 
-GT_DIR = '/your/path/to/VIP/Human_ids'
+GT_DIR = '/home/sk49/workspace/dataset/VIP/Human_ids'
 BBOX_IOU_THRE = [float(x) / 100.0 for x in list(range(50, 100, 5))]
 MASK_IOU_THRE = [float(x) / 100.0 for x in list(range(50, 100, 5))]
 
@@ -154,7 +159,8 @@ def compute_mask_ap(image_list, iou_threshold):
 
     for image_id in image_list:
         gt_mask = cv2.imread(os.path.join(GT_DIR, image_id[0], '%s.png' % image_id[1]), 0)
-        pre_mask = cv2.imread(os.path.join(PREDICT_DIR, image_id[0], 'gray', 'inst_%s.png' % image_id[1]), 0)
+        pre_mask = cv2.imread(os.path.join(PREDICT_DIR, image_id[0], 'instance_segmentation', '%s.png' % image_id[1]),
+                              0)
 
         gt_mask, n_gt_inst = convert2evalformat(gt_mask)
         pre_mask, n_pre_inst = convert2evalformat(pre_mask)
@@ -165,7 +171,7 @@ def compute_mask_ap(image_list, iou_threshold):
         if n_pre_inst == 0:
             continue
 
-        rfp = open(os.path.join(PREDICT_DIR, image_id[0], 'gray', 'scores_%s.txt' % image_id[1]), 'r')
+        rfp = open(os.path.join(PREDICT_DIR, image_id[0], 'instance_segmentation', '%s.txt' % image_id[1]), 'r')
         items = [x.strip().split() for x in rfp.readlines()]
         rfp.close()
         tmp_scores = [x[0] for x in items]
@@ -429,15 +435,13 @@ def convert2evalformat(inst_id_map):
 
 if __name__ == '__main__':
     print("result of", PREDICT_DIR)
-
+    t0 = time.time()
     image_list = []
     for vid in os.listdir(PREDICT_DIR):
-        for img in os.listdir(os.path.join(PREDICT_DIR, vid, 'gray')):
-            j = img.find('_')
-            if img[:j] == 'inst':
-                image_list.append([vid, img[j + 1:-4]])
-
-
-                #    compute_bbox_ap(image_list, BBOX_IOU_THRE)
+        dir_vid = os.path.join(PREDICT_DIR, vid, 'instance_segmentation')
+        for img in os.listdir(dir_vid):
+            if img.endswith(".png"):
+                image_list.append([vid, img[:-4]])
 
     compute_mask_ap(image_list, MASK_IOU_THRE)
+    print("total time", time.time() - t0, "s")

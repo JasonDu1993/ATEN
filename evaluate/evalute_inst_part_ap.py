@@ -4,7 +4,7 @@ from PIL import Image
 import numpy as np
 import multiprocessing
 
-PREDICT_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190901a_epoch019/vp_results'
+PREDICT_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190903a_epoch028/vp_results'
 # PREDICT_DIR = r'D:\workspaces\ATEN\vis\viptiny_test\vp_results'
 INST_PART_GT_DIR = '/home/sk49/workspace/dataset/VIP/Instance_ids'
 # INST_PART_GT_DIR = r'D:\dataset\VIP_tiny\Instance_ids'
@@ -279,6 +279,30 @@ if __name__ == '__main__':
     """command
     1: nohup python3 -u evaluate/evalute_inst_part_ap.py >> outs/eval_20190520a_epoch038.txt &
     2: tail -f outs/eval_20190520a_epoch038.txt
+Instance_ids:存储人和身体部位组合之后的结果，每个人的每个身体部位使用的不同的标签表示，该文件夹内主要用于评估evalute_inst_part_ap.py
+    身体部位标签如下所示：
+    (1, "hat")(2, "hair")(3, "gloves")(4, "sun-glasses")(5, "upper-clothes")(6, "dress")(7, "coat")(8, "socks")(9, "pants")(10, "torso-skin")
+    (11, "scarf")(12, "skirt")(13, "face")(14, "left-arm")(15, "right-arm")(16, "left-leg")(17, "right-leg")(18, "left-shoe")(19, "right-shoe")
+    
+    图片和文件第一列中存储的是每个人每个身体部位的不同标签值
+    
+    对于txt文件中的三列：[注]预测是编号是连续的，和下面编号方式不一样
+        第一列即为每个人每个身体部位的标签，由于身体部位有19个，0表示背景，从1开始编号，
+            因此，第一个每个身体部位编号范围为1-19，第二个人编号范围为21-39，20是第二个人的背景，以此类推，第n个人编号范围为从20*n+1到20*n+19
+        第二列为身体部位的标签，
+        第三列为每个人的标签第一列即为每个人每个身体部位的标签，
+    --videos45
+        000000000001.png,000000000026.png,000000000051.png,......,000000000226.png  
+        000000000001.txt,000000000026.txt,000000000051.txt,......,000000000226.txt  
+            txt文件内容如下所示
+            2 2 1
+            5 5 1    #  5%20 == 5表示第一个人身体部位标签5
+            14 14 1
+            21 1 2   # 21%20 == 1，即表示第2个人的身体部位标签1
+            22 2 2   # 22%20 == 2，即表示第2个人的身体部位标签2
+    --videos86
+        000000000001.png,000000000026.png,000000000051.png,......,000000000401.png
+        000000000001.txt,000000000026.txt,000000000051.txt,......,000000000401.txt
     """
     print("result of", PREDICT_DIR)
     t0 = time.time()

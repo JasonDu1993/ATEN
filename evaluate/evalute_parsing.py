@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from PIL import Image
+import time
 
 n_cl = 20
 CLASSES = ['background', 'hat', 'hair', 'sun-glasses', 'upper-clothes', 'dress',
@@ -8,14 +9,17 @@ CLASSES = ['background', 'hat', 'hair', 'sun-glasses', 'upper-clothes', 'dress',
            'face', 'right-arm', 'left-arm', 'right-leg', 'left-leg', 'right-shoe', 'left-shoe']
 # GT_DIR = '/your/path/to/VIP/Category_ids'
 # PRE_DIR = '/your/path/to/results'
-
+"""
+Category_ids:存储人体解析身体部位的注解part_anno，其中每个部位一个数字表示，
+此次不区分不同的人，即每个人的部位数字是一样的
+"""
 GT_DIR = '/home/sk49/workspace/dataset/VIP/Category_ids'
 # PRE_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe'
 # PRE_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20181229a_epoch041'
-PRE_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20181229ma_epoch084_submit'
+PRE_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190821a_epoch012/vp_results'
 
-evalute_result_path = "/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20181229ma_epoch084_submit/" \
-                      "20181229ma_epoch084_evalute_parsing.txt"
+evalute_result_path = "/home/sk49/workspace/zhoudu/ATEN/outs" + "/" + \
+                      "eval_20190821a_epoch012_parsing.txt"
 
 f = open(evalute_result_path, "w")
 res = ""
@@ -60,7 +64,7 @@ def init_path():
     global res
     res += "video name:" + str(len(file_names)) + "\n"
     res += "result of" + image_dir + "\n"
-    print("video name:", len(file_names), file_names)
+    # print("video name:", len(file_names), file_names)
     print("result of", image_dir)
 
     image_paths = []
@@ -152,4 +156,6 @@ def show_result(hist):
 
 
 if __name__ == '__main__':
+    t0 = time.time()
     main()
+    print("total time", time.time() - t0, "s")
