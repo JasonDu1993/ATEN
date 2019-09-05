@@ -16,10 +16,10 @@ Category_ids:存储人体解析身体部位的注解part_anno，其中每个部�
 GT_DIR = '/home/sk49/workspace/dataset/VIP/Category_ids'
 # PRE_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe'
 # PRE_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20181229a_epoch041'
-PRE_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190821a_epoch012/vp_results'
+PRE_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190904a_epoch016/vp_results'
 
 evalute_result_path = "/home/sk49/workspace/zhoudu/ATEN/outs" + "/" + \
-                      "eval_20190821a_epoch012_parsing.txt"
+                      "eval_20190904a_epoch016_parsing.txt"
 
 f = open(evalute_result_path, "w")
 res = ""
