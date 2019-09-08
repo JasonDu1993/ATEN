@@ -2156,7 +2156,7 @@ class PARSING_RCNN():
         print("load model", filepath)
 
         if by_name:
-            s.load_weights_from_hdf5_group_by_name(f, layers)
+            s.load_weights_from_hdf5_group_by_name(f, layers, skip_mismatch=True)
         else:
             s.load_weights_from_hdf5_group(f, layers)
         if hasattr(f, 'close'):
