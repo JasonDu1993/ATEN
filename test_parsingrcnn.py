@@ -17,8 +17,8 @@ import matplotlib
 matplotlib.use('Agg')
 from configs.vip import ParsingRCNNModelConfig
 
-# from models.parsing_rcnn_model import PARSING_RCNN
-from models.parsing_rcnn_model_miouloss import PARSING_RCNN
+from models.parsing_rcnn_model import PARSING_RCNN
+# from models.parsing_rcnn_model_miouloss import PARSING_RCNN
 from utils import visualize
 from time import time
 
@@ -37,8 +37,8 @@ DATASET_DIR = "D:\dataset\VIP_tiny"
 # MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190408a/checkpoints/" \
 #              "parsing_rcnn_vip_singleframe_20190408a_epoch073_loss0.401_valloss0.391.h5"
 # MODEL_PATH = "./outputs/vip_singleframe_20181229ma/checkpoints/parsing_rcnn_vip_singleframe_20181229ma_epoch086.h5"
-MODEL_PATH = "./outputs/vip_singleframe_test/checkpoints/parsing_rcnn_vip_singleframe_test_epoch001_loss0.585_valloss0.497.h5"
-# MODEL_PATH = "./checkpoints/parsing_rcnn.h5"
+# MODEL_PATH = "./outputs/vip_singleframe_test/checkpoints/parsing_rcnn_vip_singleframe_test_epoch001_loss0.585_valloss0.497.h5"
+MODEL_PATH = "./checkpoints/parsing_rcnn.h5"
 # Directory of images to run detection on
 IMAGE_DIR = DATASET_DIR + "/Images"
 IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"

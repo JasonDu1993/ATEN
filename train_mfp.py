@@ -12,13 +12,15 @@ session = tf.Session(config=config)
 
 from configs.vip import ParsingRCNNModelConfig
 from configs.vip import VIPDataset
-from models.parsing_rcnn_model import PARSING_RCNN
+from models.mfp_model import MFP
+
+
 # from models.parsing_rcnn_model_dilated import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    # NAME = "vip_singleframe_20190908d"
-    NAME = "vip_singleframe_test"
+    NAME = "vip_singleframe_20190905b"
+    # NAME = "vip_singleframe_test"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
     # IMAGES_PER_GPU = 1
@@ -82,8 +84,7 @@ if __name__ == '__main__':
     config.display()
 
     # Create model
-    model = PARSING_RCNN(mode="training", config=config,
-                         model_dir=args.logs)
+    model = MFP(mode="training", config=config, model_dir=args.logs)
 
     # Select weights file to load
     if args.model.lower() == "last":
