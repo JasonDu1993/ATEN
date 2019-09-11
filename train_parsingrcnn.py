@@ -5,20 +5,20 @@ from time import time
 sys.path.insert(0, os.getcwd())
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 
 from configs.vip import ParsingRCNNModelConfig
 from configs.vip import VIPDataset
-from models.parsing_rcnn_model import PARSING_RCNN
+from models.parsing_rcnn_model_pyramid_roialign import PARSING_RCNN
 # from models.parsing_rcnn_model_dilated import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    # NAME = "vip_singleframe_20190908d"
-    NAME = "vip_singleframe_test"
+    NAME = "vip_singleframe_20190911a"
+    # NAME = "vip_singleframe_test"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
     # IMAGES_PER_GPU = 1

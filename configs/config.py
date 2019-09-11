@@ -55,6 +55,9 @@ class Config(object):
     # Number of classification classes (including background)
     NUM_CLASSES = 1  # Override in sub-classes
 
+    # Size of the top-down layers used to build the feature pyramid
+    TOP_DOWN_PYRAMID_SIZE = 256
+
     # Length of square anchor side in pixels
     RPN_ANCHOR_SCALES = (32, 64, 128, 256, 512)
 

@@ -254,7 +254,7 @@ def deeplab_resnet(img_input, architecture):
     x = atrous_identity_block(x, 3, [512, 512, 2048], stage=5, block='b', atrous_rate=(2, 2), use_bias=False)
     C5 = x = atrous_identity_block(x, 3, [512, 512, 2048], stage=5, block='c', atrous_rate=(2, 2), use_bias=False)
 
-    return [C1, C5]
+    return [C1, C2, C3, C4, C5]
 
 
 ############################################################
@@ -514,11 +514,11 @@ class PyramidROIAlign(KE.Layer):
         self.image_shape = tuple(image_shape)
 
     def call(self, inputs):
-        # Crop boxes [batch, num_boxes, (y1, x1, y2, x2)] in normalized coords
+        # Crop boxes [batch, num_boxes=128, (y1, x1, y2, x2)] in normalized coords
         boxes = inputs[0]
 
         # Feature Maps. List of feature maps from different level of the
-        # feature pyramid. Each is [batch, height, width, channels]
+        # feature pyramid. Each is [batch, f_height, f_width, f_channels=256]
         feature_maps = inputs[1:]
 
         # Assign each ROI to a level in the pyramid based on the ROI area.
@@ -532,18 +532,18 @@ class PyramidROIAlign(KE.Layer):
             self.image_shape[0] * self.image_shape[1], tf.float32)
         roi_level = log2_graph(tf.sqrt(h * w) / (224.0 / tf.sqrt(image_area)))
         roi_level = tf.minimum(5, tf.maximum(
-            2, 4 + tf.cast(tf.round(roi_level), tf.int32)))
-        roi_level = tf.squeeze(roi_level, 2)
+            2, 4 + tf.cast(tf.round(roi_level), tf.int32)))  # shape [batch, num_boxes=128, 1]
+        roi_level = tf.squeeze(roi_level, 2)  # shape [batch, num_boxes=128]
 
         # Loop through levels and apply ROI pooling to each. P2 to P5.
         pooled = []
         box_to_level = []
         for i, level in enumerate(range(2, 6)):
-            ix = tf.where(tf.equal(roi_level, level))
-            level_boxes = tf.gather_nd(boxes, ix)
+            ix = tf.where(tf.equal(roi_level, level))  # shape [num_boxes_level, 2]
+            level_boxes = tf.gather_nd(boxes, ix)  # shape [num_boxes_level, (y1, x1, y2, x2)] in normalized to 1
 
             # Box indicies for crop_and_resize.
-            box_indices = tf.cast(ix[:, 0], tf.int32)
+            box_indices = tf.cast(ix[:, 0], tf.int32)   # shape [num_boxes_level, ]
 
             # Keep track of which box is mapped to which level
             box_to_level.append(ix)
@@ -552,31 +552,45 @@ class PyramidROIAlign(KE.Layer):
             level_boxes = tf.stop_gradient(level_boxes)
             box_indices = tf.stop_gradient(box_indices)
 
-            # Crop and Resize
-            pooled = roi_align_graph(
-                feature_maps[i], level_boxes, box_indices, self.pool_shape)
+            # # Crop and Resize in ATEN
+            # pooled = roi_align_graph(
+            #     feature_maps[i], level_boxes, box_indices, self.pool_shape)
+
+            # Crop and Resize in MASK RCNN
+            # From Mask R-CNN paper: "We sample four regular locations, so
+            # that we can evaluate either max or average pooling. In fact,
+            # interpolating only a single value at each bin center (without
+            # pooling) is nearly as effective."
+            #
+            # Here we use the simplified approach of a single value per bin,
+            # which is how it's done in tf.crop_and_resize()
+            # Result: [batch * num_boxes, pool_height, pool_width, channels]
+            pooled.append(tf.image.crop_and_resize(
+                feature_maps[i], level_boxes, box_indices, self.pool_shape,
+                method="bilinear"))
 
         # Pack pooled features into one tensor
-        pooled = tf.concat(pooled, axis=0)
+        pooled = tf.concat(pooled, axis=0)  # shape [batch * num_boxes, pool_height=7, pool_width=7, 256]
 
         # Pack box_to_level mapping into one array and add another
         # column representing the order of pooled boxes
-        box_to_level = tf.concat(box_to_level, axis=0)
-        box_range = tf.expand_dims(tf.range(tf.shape(box_to_level)[0]), 1)
+        box_to_level = tf.concat(box_to_level, axis=0)  # shape [batch * num_boxes, 2]
+        box_range = tf.expand_dims(tf.range(tf.shape(box_to_level)[0]), 1)  # shape [batch * num_boxes, 1]
         box_to_level = tf.concat([tf.cast(box_to_level, tf.int32), box_range],
-                                 axis=1)
+                                 axis=1)  # shape [batch * num_boxes, 3]
 
         # Rearrange pooled features to match the order of the original boxes
         # Sort box_to_level by batch then box index
         # TF doesn't have a way to sort by two columns, so merge them and sort.
-        sorting_tensor = box_to_level[:, 0] * 100000 + box_to_level[:, 1]
+        sorting_tensor = box_to_level[:, 0] * 100000 + box_to_level[:, 1]  # shape [batch * num_boxes,]
         ix = tf.nn.top_k(sorting_tensor, k=tf.shape(
-            box_to_level)[0]).indices[::-1]
-        ix = tf.gather(box_to_level[:, 2], ix)
-        pooled = tf.gather(pooled, ix)
+            box_to_level)[0]).indices[::-1]  # shape [batch * num_boxes,]
+        ix = tf.gather(box_to_level[:, 2], ix)  # shape [batch * num_boxes,]
+        pooled = tf.gather(pooled, ix)  # shape [batch * num_boxes, pool_height=7, pool_width=7, 256]
 
         # Re-add the batch dimension
-        pooled = tf.expand_dims(pooled, 0)
+        shape = tf.concat([tf.shape(boxes)[:2], tf.shape(pooled)[1:]], axis=0)
+        pooled = tf.reshape(pooled, shape)  # shape [batch, num_boxes, pool_height=7, pool_width=7, 256]
         return pooled
 
     def compute_output_shape(self, input_shape):
@@ -1055,7 +1069,7 @@ def fpn_classifier_graph(rois, feature_map,
 
     rois: [batch, num_rois(default TRAIN_ROIS_PER_IMAGE=128, inference 1000),
         (y1, x1, y2, x2)] Proposal boxes in normalized coordinates to 1.
-    feature_maps: [batch, f_height=128, f_width=128, f_chanel=256]
+    feature_maps: list, [batch, f_height=128, f_width=128, f_chanel=256]
     image_shape: [height=512, width=512, depth=3]
     pool_size: The width of the square feature map generated from ROI Pooling. for example 7 in vip
     num_classes: number of classes, which determines the depth of the results. for example 2 in vip
@@ -1068,8 +1082,10 @@ def fpn_classifier_graph(rois, feature_map,
     """
     # ROI Pooling
     # Shape: [batch, num_boxes=128, pool_height, pool_width, channels]
-    x = ROIAlign([pool_size, pool_size], image_shape,
-                 name="roi_align_classifier")([rois, feature_map])  # shape [1, batch * num_boxes, 7, 7, 256]
+    # x = ROIAlign([pool_size, pool_size], image_shape,
+    #              name="roi_align_classifier")([rois, feature_map])  # shape [1, batch * num_boxes, 7, 7, 256]
+    x = PyramidROIAlign([pool_size, pool_size], image_shape,
+                        name="roi_align_classifier")([rois] + feature_map)  # shape [batch, num_boxes=128, 7, 7, 256]
 
     # Two 1024 FC layers (implemented with Conv2D for consistency)
     x = KL.TimeDistributed(KL.Conv2D(1024, (pool_size, pool_size), padding="valid"),
@@ -1105,7 +1121,7 @@ def build_fpn_mask_graph(rois, feature_map,
 
     rois: [batch, num_boxes, (y1, x1, y2, x2)] Proposal boxes in normalized
           coordinates.num_boxes training 128, inference 100
-    feature_maps: 
+    feature_maps: list
     image_shape: [height, width, depth]
     pool_size: The width of the square feature map generated from ROI Pooling.
     num_classes: number of classes, which determines the depth of the results
@@ -1114,8 +1130,10 @@ def build_fpn_mask_graph(rois, feature_map,
     """
     # ROI Pooling
     # Shape: [batch_size, num_boxes=TRAIN_ROIS_PER_IMAGE=128, pool_height, pool_width, channels]
-    x = ROIAlign([pool_size, pool_size], image_shape,
-                 name="roi_align_mask")([rois, feature_map])  # shape [1, batch * num_boxes, 14, 14, 256]
+    # x = ROIAlign([pool_size, pool_size], image_shape,
+    #              name="roi_align_mask")([rois, feature_map])  # shape [1, batch * num_boxes, 14, 14, 256]
+    x = PyramidROIAlign([pool_size, pool_size], image_shape,
+                        name="roi_align_mask")([rois] + feature_map)  # shape [batch, num_boxes, 14, 14, 256]
 
     # Conv layers
     x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"),
@@ -1878,9 +1896,28 @@ class PARSING_RCNN():
         # Bottom-up Layers
         # Returns a list of the last layers of each stage, 5 in total.
         # Don't create the thead (stage 5), so we pick the 4th item in the list.
-        c1, c5 = deeplab_resnet(input_image, 'resnet50')
-        coarse_feature = global_parsing_encoder(c5)
-        fine_feature = global_parsing_decoder(coarse_feature, c1)
+        C1, C2, C3, C4, C5 = deeplab_resnet(input_image, 'resnet50')
+        # Top-down Layers
+        # TODO: add assert to varify feature map sizes match what's in config
+        P5 = KL.Conv2D(config.TOP_DOWN_PYRAMID_SIZE, (1, 1), name='fpn_c5p5')(C5)
+        P4 = KL.Add(name="fpn_p4add")([P5, KL.Conv2D(config.TOP_DOWN_PYRAMID_SIZE, (1, 1), name='fpn_c4p4')(C4)])
+        P3 = KL.Add(name="fpn_p3add")([
+            KL.UpSampling2D(size=(2, 2), name="fpn_p4upsampled")(P4),
+            KL.Conv2D(config.TOP_DOWN_PYRAMID_SIZE, (1, 1), name='fpn_c3p3')(C3)])
+        P2 = KL.Add(name="fpn_p2add")([
+            KL.UpSampling2D(size=(2, 2), name="fpn_p3upsampled")(P3),
+            KL.Conv2D(config.TOP_DOWN_PYRAMID_SIZE, (1, 1), name='fpn_c2p2')(C2)])
+        # Attach 3x3 conv to all P layers to get the final feature maps.
+        P2 = KL.Conv2D(config.TOP_DOWN_PYRAMID_SIZE, (3, 3), padding="SAME", name="fpn_p2")(P2)
+        P3 = KL.Conv2D(config.TOP_DOWN_PYRAMID_SIZE, (3, 3), padding="SAME", name="fpn_p3")(P3)
+        P4 = KL.Conv2D(config.TOP_DOWN_PYRAMID_SIZE, (3, 3), padding="SAME", name="fpn_p4")(P4)
+        P5 = KL.Conv2D(config.TOP_DOWN_PYRAMID_SIZE, (3, 3), padding="SAME", name="fpn_p5")(P5)
+        # P6 is used for the 5th anchor scale in RPN. Generated by
+        # subsampling from P5 with stride of 2.
+        # P6 = KL.MaxPooling2D(pool_size=(1, 1), strides=2, name="fpn_p6")(P5)
+
+        coarse_feature = global_parsing_encoder(C5)
+        fine_feature = global_parsing_decoder(coarse_feature, C1)
         # global parsing branch
         global_parsing_map = global_parsing_graph(fine_feature, config.NUM_PART_CLASS)
 
@@ -1889,11 +1926,11 @@ class PARSING_RCNN():
         rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
                                     name='mrcnn_share_rpn_conv2')(rpn_feature_map)  # shape [batch, 128, 128, 256]
 
-        mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
-                                      name='mrcnn_share_recog_conv1')(fine_feature)
-        mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
-                                      name='mrcnn_share_recog_conv2')(mrcnn_feature_map)  # shape [batch, 128, 128, 256]
-
+        # mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
+        #                               name='mrcnn_share_recog_conv1')(P2)
+        # mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
+        #                               name='mrcnn_share_recog_conv2')(mrcnn_feature_map)  # shape [batch, 128, 128, 256]
+        mrcnn_feature_map = [P2, P3, P4, P5]
         # Generate Anchors
         self.anchors = util.generate_anchors(config.RPN_ANCHOR_SCALES,
                                              config.RPN_ANCHOR_RATIOS,
