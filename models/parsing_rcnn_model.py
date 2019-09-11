@@ -1094,7 +1094,7 @@ def fpn_classifier_graph(rois, feature_map,
                            name='mrcnn_bbox_pascal_fc')(shared)  # shape [batch, num_boxes=128, num_classes * 4]
     # Reshape to [batch, boxes, num_classes, (dy, dx, log(dh), log(dw))]
     s = K.int_shape(x)
-    mrcnn_bbox = KL.Reshape((s[1], num_classes, 4), name="mrcnn_bbox")(x)
+    mrcnn_bbox = KL.Reshape((s[1], num_classes, 4), name="mrcnn_bbox")(x)  # [batch, num_boxes=128, num_classes, 4]
 
     return mrcnn_class_logits, mrcnn_probs, mrcnn_bbox
 
@@ -1887,12 +1887,12 @@ class PARSING_RCNN():
         rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
                                     name='mrcnn_share_rpn_conv1')(fine_feature)
         rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
-                                    name='mrcnn_share_rpn_conv2')(rpn_feature_map)
+                                    name='mrcnn_share_rpn_conv2')(rpn_feature_map)  # shape [batch, 128, 128, 256]
 
         mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
                                       name='mrcnn_share_recog_conv1')(fine_feature)
         mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
-                                      name='mrcnn_share_recog_conv2')(mrcnn_feature_map)
+                                      name='mrcnn_share_recog_conv2')(mrcnn_feature_map)  # shape [batch, 128, 128, 256]
 
         # Generate Anchors
         self.anchors = util.generate_anchors(config.RPN_ANCHOR_SCALES,
