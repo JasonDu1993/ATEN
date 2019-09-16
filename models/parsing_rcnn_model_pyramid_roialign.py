@@ -1131,7 +1131,7 @@ def build_fpn_mask_graph(rois, feature_map,
     # ROI Pooling
     # Shape: [batch_size, num_boxes=TRAIN_ROIS_PER_IMAGE=128, pool_height, pool_width, channels]
     x = ROIAlign([pool_size, pool_size], image_shape,
-                 name="roi_align_mask")([rois, feature_map[-1]])  # shape [1, batch * num_boxes, 14, 14, 256]
+                 name="roi_align_mask")([rois, feature_map[0]])  # shape [1, batch * num_boxes, 14, 14, 256]
     # x = PyramidROIAlign([pool_size, pool_size], image_shape,
     #                     name="roi_align_mask")([rois] + feature_map)  # shape [batch, num_boxes, 14, 14, 256]
     print(K.ndim(x), x)

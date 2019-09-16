@@ -5,7 +5,7 @@ from time import time
 sys.path.insert(0, os.getcwd())
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
@@ -17,7 +17,7 @@ from models.parsing_rcnn_model_pyramid_roialign import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "vip_singleframe_20190916a"
+    NAME = "vip_singleframe_20190916b"
     # NAME = "vip_singleframe_test"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
