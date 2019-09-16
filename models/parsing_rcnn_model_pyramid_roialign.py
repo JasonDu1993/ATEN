@@ -1086,7 +1086,7 @@ def fpn_classifier_graph(rois, feature_map,
     #              name="roi_align_classifier")([rois, feature_map])  # shape [1, batch * num_boxes, 7, 7, 256]
     x = PyramidROIAlign([pool_size, pool_size], image_shape,
                         name="roi_align_classifier")([rois] + feature_map)  # shape [batch, num_boxes=128, 7, 7, 256]
-
+    # print(K.ndim(x), x)
     # Two 1024 FC layers (implemented with Conv2D for consistency)
     x = KL.TimeDistributed(KL.Conv2D(1024, (pool_size, pool_size), padding="valid"),
                            name="mrcnn_class_conv1")(x)  # [batch, num_boxes=128, 1, 1, 1024]
@@ -1130,11 +1130,11 @@ def build_fpn_mask_graph(rois, feature_map,
     """
     # ROI Pooling
     # Shape: [batch_size, num_boxes=TRAIN_ROIS_PER_IMAGE=128, pool_height, pool_width, channels]
-    # x = ROIAlign([pool_size, pool_size], image_shape,
-    #              name="roi_align_mask")([rois, feature_map])  # shape [1, batch * num_boxes, 14, 14, 256]
-    x = PyramidROIAlign([pool_size, pool_size], image_shape,
-                        name="roi_align_mask")([rois] + feature_map)  # shape [batch, num_boxes, 14, 14, 256]
-
+    x = ROIAlign([pool_size, pool_size], image_shape,
+                 name="roi_align_mask")([rois, feature_map[-1]])  # shape [1, batch * num_boxes, 14, 14, 256]
+    # x = PyramidROIAlign([pool_size, pool_size], image_shape,
+    #                     name="roi_align_mask")([rois] + feature_map)  # shape [batch, num_boxes, 14, 14, 256]
+    print(K.ndim(x), x)
     # Conv layers
     x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"),
                            name="mrcnn_mask_conv1")(x)  # shape [batch, num_boxes=128, 14, 14, 256]
@@ -1926,10 +1926,10 @@ class PARSING_RCNN():
         rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
                                     name='mrcnn_share_rpn_conv2')(rpn_feature_map)  # shape [batch, 128, 128, 256]
 
-        # mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
-        #                               name='mrcnn_share_recog_conv1')(P2)
-        # mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
-        #                               name='mrcnn_share_recog_conv2')(mrcnn_feature_map)  # shape [batch, 128, 128, 256]
+        class_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
+                                      name='mrcnn_share_recog_conv1')(P2)
+        class_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
+                                      name='mrcnn_share_recog_conv2')(class_feature_map)  # shape [batch, 128, 128, 256]
         mrcnn_feature_map = [P2, P3, P4, P5]
         # Generate Anchors
         self.anchors = util.generate_anchors(config.RPN_ANCHOR_SCALES,

@@ -17,7 +17,7 @@ from models.parsing_rcnn_model_pyramid_roialign import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "vip_singleframe_20190911a"
+    NAME = "vip_singleframe_20190916a"
     # NAME = "vip_singleframe_test"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
