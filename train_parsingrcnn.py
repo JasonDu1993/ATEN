@@ -12,12 +12,12 @@ session = tf.Session(config=config)
 
 from configs.vip import ParsingRCNNModelConfig
 from configs.vip import VIPDataset
-from models.parsing_rcnn_model_pyramid_roialign import PARSING_RCNN
+from models.parsing_rcnn_model_pyramid_roialign_separt import PARSING_RCNN
 # from models.parsing_rcnn_model_dilated import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "vip_singleframe_20190916b"
+    NAME = "vip_singleframe_20190918a"
     # NAME = "vip_singleframe_test"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
