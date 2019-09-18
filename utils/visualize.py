@@ -579,13 +579,13 @@ def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, m
                 mean_parsing_prob = np.mean(tmp_parsing_prob)
 
                 inst_part_prob_map[counter] = mean_parsing_prob * human_seg_sco
-                print("tt1", time() - tt1, "s")
+                # print("tt1", time() - tt1, "s")
         tt2 = time()
-        print("tt", tt2 - tt0, "s")
+        # print("tt", tt2 - tt0, "s")
         if cur_counter < counter:
             for i in range(cur_counter, counter):
                 wfp.write('%d %f\n' % (k, inst_part_prob_map[i + 1]))  # k is part label
-        print("write", time() - tt2, "s")
+        # print("write", time() - tt2, "s")
     wfp.close()
     img_instance_parsing_path = os.path.join(floder, "%s.png" % image_id)
     if not os.path.exists(img_instance_parsing_path):

@@ -4,7 +4,7 @@ from PIL import Image
 import numpy as np
 import multiprocessing
 
-PREDICT_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190904a_epoch016/vp_results'
+PREDICT_DIR = "/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190908c_epoch019/vp_results"
 # PREDICT_DIR = r'D:\workspaces\ATEN\vis\viptiny_test\vp_results'
 INST_PART_GT_DIR = '/home/sk49/workspace/dataset/VIP/Instance_ids'
 # INST_PART_GT_DIR = r'D:\dataset\VIP_tiny\Instance_ids'
@@ -306,7 +306,7 @@ Instance_ids:存储人和身体部位组合之后的结果，每个人的每个�
     """
     print("result of", PREDICT_DIR)
     t0 = time.time()
-    pool = multiprocessing.Pool(processes=5)
+    pool = multiprocessing.Pool(processes=8)
     image_list = []  # list, the value is also a list, len 2, [videoid, imageid]
     for vid in os.listdir(PREDICT_DIR):
         for img in os.listdir(os.path.join(PREDICT_DIR, vid, 'instance_parsing')):
@@ -325,7 +325,7 @@ Instance_ids:存储人和身体部位组合之后的结果，每个人的每个�
     pool.close()
     pool.join()
     for r in sorted(res):
-        print("r", r)
+        # print("r", r)
         AP[r, :] = res[r].get()
     print("-----------------AP-----------------")
     print(AP)
