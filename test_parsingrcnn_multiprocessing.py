@@ -34,9 +34,9 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Download this file and place in the root of your
 # project (See README file for details)
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190916a/checkpoints" + "/" + \
-                      "parsing_rcnn_vip_singleframe_20190916a_epoch023_loss0.912_valloss1.042.h5"
-RES_DIR = "./vis/val_vip_singleframe_20190916a_epoch023"
+MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190916b/checkpoints" + "/" + \
+                      "parsing_rcnn_vip_singleframe_20190916b_epoch028_loss0.890_valloss1.000.h5"
+RES_DIR = "./vis/val_vip_singleframe_20190916b_epoch028"
 # RES_DIR = "./vis/debug"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
