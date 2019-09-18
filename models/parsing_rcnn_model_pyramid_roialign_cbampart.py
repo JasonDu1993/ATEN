@@ -1269,6 +1269,7 @@ def global_parsing_graph(feature_map, num_classes):
                    name='mrcnn_global_parsing_c3')(feature_map)
 
     x = KL.Add()([x1, x2, x3])
+    x = cbam_block(x)
     return x
 
 
