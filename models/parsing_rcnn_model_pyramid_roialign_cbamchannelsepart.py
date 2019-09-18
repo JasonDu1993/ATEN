@@ -544,7 +544,7 @@ class PyramidROIAlign(KE.Layer):
             level_boxes = tf.gather_nd(boxes, ix)  # shape [num_boxes_level, (y1, x1, y2, x2)] in normalized to 1
 
             # Box indicies for crop_and_resize.
-            box_indices = tf.cast(ix[:, 0], tf.int32)   # shape [num_boxes_level, ]
+            box_indices = tf.cast(ix[:, 0], tf.int32)  # shape [num_boxes_level, ]
 
             # Keep track of which box is mapped to which level
             box_to_level.append(ix)
@@ -1269,6 +1269,7 @@ def global_parsing_graph(feature_map, num_classes):
                    name='mrcnn_global_parsing_c3')(feature_map)
 
     x = KL.Add()([x1, x2, x3])
+    x = cbam_block(x, attn_type="se")
     return x
 
 
