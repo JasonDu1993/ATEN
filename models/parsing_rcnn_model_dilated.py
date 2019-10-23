@@ -2029,9 +2029,9 @@ class PARSING_RCNN():
             t21 = time()
             print("Inference Model", t21 - t20, "s")
         # Add multi-GPU support.
-        if config.GPU_COUNT > 1:
-            from utils.parallel_model import ParallelModel
-            model = ParallelModel(model, config.GPU_COUNT)
+        # if config.GPU_COUNT > 1:
+        #     from utils.parallel_model import ParallelModel
+        #     model = ParallelModel(model, config.GPU_COUNT)
         import platform
         sys = platform.system()
         # if sys == "Windows":
@@ -2478,8 +2478,8 @@ class PARSING_RCNN():
         masks: [H, W, N] instance binary masks
         """
         assert self.mode == "inference", "Create model in inference mode."
-        assert len(
-            images) == self.config.BATCH_SIZE, "len(images) must be equal to BATCH_SIZE"
+        assert len(images) == self.config.BATCH_SIZE, "len(images)={} must be equal to BATCH_SIZE={}".format(
+            len(images), self.config.BATCH_SIZE)
 
         if verbose:
             log("Processing {} images".format(len(images)))

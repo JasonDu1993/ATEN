@@ -34,18 +34,19 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Download this file and place in the root of your
 # project (See README file for details)
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190918c/checkpoints" + "/" + \
-                      "parsing_rcnn_vip_singleframe_20190918c_epoch020_loss0.913_valloss1.016.h5"
-RES_DIR = "./vis/val_vip_singleframe_20190918c_epoch020"
+MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190408a/checkpoints" + "/" + \
+             "parsing_rcnn_vip_singleframe_20190408a_epoch073_loss0.401_valloss0.391.h5"
+RES_DIR = "./vis/origin_val_vip_singleframe_20190408a_epoch073"
 # RES_DIR = "./vis/debug"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+gpus = ["0", "1", "2", "3"]
 
 # Directory of images to run detection on
-IMAGE_DIR = DATASET_DIR + "/Images"
-IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
+# IMAGE_DIR = DATASET_DIR + "/Images"
+# IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
 
-# IMAGE_DIR = DATASET_DIR + "/videos/train_videos_frames"
-# IMAGE_LIST = DATASET_DIR + "/lists/train_all_frames_id_part3.txt"
+IMAGE_DIR = DATASET_DIR + "/videos/val_videos_frames"
+IMAGE_LIST = DATASET_DIR + "/lists/val_all_frames_id.txt"
 
 
 flag = False
@@ -61,11 +62,12 @@ class InferenceConfig(ParsingRCNNModelConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     GPU_COUNT = 1
-    PROCESS_COUNT = 3
+    PROCESS_COUNT = 2
     IMAGES_PER_GPU = 1
+    BATCH_SIZE = 1
 
 
-def worker(images, infer_config):
+def worker(images, infer_config, gpu_id):
     """
     Args:
         images : 输入数据，为图片的id信息，for example: video106/000000000001
@@ -73,13 +75,14 @@ def worker(images, infer_config):
     """
     # gpu数量
     t0 = time.time()
+    os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
     import keras.backend as K
     config = tf.ConfigProto()
     # config.gpu_options.allow_growth = True
-    config.gpu_options.per_process_gpu_memory_fraction = 0.2
+    config.gpu_options.per_process_gpu_memory_fraction = 0.4
     session = tf.Session(config=config)
     # from models.parsing_rcnn_model_resfpn_dilated_se import PARSING_RCNN
-    from models.parsing_rcnn_model_pyramid_roialign_cbamchannelsepart import PARSING_RCNN
+    from models.parsing_rcnn_model_dilated import PARSING_RCNN
     if infer_config is None:
         infer_config = InferenceConfig()
     model = PARSING_RCNN(mode="inference", config=infer_config, model_dir=MODEL_DIR)
@@ -152,29 +155,30 @@ def multiprocess_main():
         images_list = f.readlines()
         image_num = len(images_list)
         print("test image num:", image_num)
-        image_split = math.ceil(image_num / num_workers)
+        image_split = math.ceil(image_num / (num_workers * len(gpus)))
         # 所有进程
         procs = []
         # 队列缓存
 
         # 对于每个进程
-        for i in range(num_workers):
-            # 数据分块
-            start = i * image_split
-            end = min(start + image_split, image_num)
-            split_data = images_list[start:end]
-            # 各个进程开始
-            proc = Process(target=worker, args=(split_data, infer_config))
-            print('process:%d, start:%d, end:%d' % (i, start, end))
-            proc.start()
-            procs.append(proc)
-            # # 数据量，将queue中数据取出
-            # for i in range(image_num):
-            #     ret = main_queue.get()
-            #     # 将ret写入file_out
-            #     print('{}'.format(ret), file=file_out)
-            #     # 进度条更新
-            #     pbar.update(1)
+        for i, gpu_id in enumerate(gpus):
+            for j in range(num_workers):
+                # 数据分块
+                start = (i * num_workers + j) * image_split
+                end = min(start + image_split, image_num)
+                split_data = images_list[start:end]
+                # 各个进程开始
+                proc = Process(target=worker, args=(split_data, infer_config, gpu_id))
+                print('process:%d, start:%d, end:%d' % (i, start, end))
+                proc.start()
+                procs.append(proc)
+                # # 数据量，将queue中数据取出
+                # for i in range(image_num):
+                #     ret = main_queue.get()
+                #     # 将ret写入file_out
+                #     print('{}'.format(ret), file=file_out)
+                #     # 进度条更新
+                #     pbar.update(1)
 
     for p in procs:
         p.join()

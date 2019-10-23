@@ -1964,7 +1964,8 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
             # 7. pre_images(input_pre_images): pre frame image input
             #    pre_masks(input_pre_masks): pre frame mask input
             #    pre_parts(input_pre_parts): pre frame part input
-            pre_images, pre_masks, pre_parts, scale = dataset.load_pre_image_datas(image_id, pre_image_names, config)
+            pre_images, pre_masks, pre_parts, scale = dataset.load_pre_image_datas(image_id, pre_image_names, config,
+                                                                                   pre_image_dir)
             pre_boxes = dataset.load_pre_image_boxes(image_id, pre_image_names, scale)
             # Skip images that have no instances. This can happen in cases
             # where we train on a subset of classes and the image doesn't

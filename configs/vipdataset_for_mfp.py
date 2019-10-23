@@ -9,8 +9,7 @@ import cv2
 import numpy as np
 import skimage.io
 import skimage.transform
-from utils import util
-from utils.util import Dataset
+from utils.util import Dataset, resize_image, resize_mask, resize_part_mfp
 from configs.config import Config
 
 
@@ -177,6 +176,10 @@ class VIPDatasetForMFP(Dataset):
 
         # Path
         image_dir = os.path.join(dataset_dir, 'Images')
+        if subset == "train":
+            self.pre_image_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_train_vip_singleframe_20190408a_epoch073"
+        elif subset == "val":
+            self.pre_image_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190408a_epoch073"
         # Add images
         # Generate random specifications of images (i.e. color and
         # list of shapes sizes and locations). This is more compact than
@@ -255,9 +258,9 @@ class VIPDatasetForMFP(Dataset):
         pre_parts = []
         for pre_video_name, pre_image_id in pre_image_names:
             pre_image_path = os.path.join(image_dir, "adjacent_frames", pre_video_name, image_id, pre_image_id + ".jpg")
-            pre_mask_path = os.path.join(image_dir, "vp_results", pre_video_name, "instance_segmentation",
+            pre_mask_path = os.path.join(self.pre_image_dir, "vp_results", pre_video_name, "instance_segmentation",
                                          pre_image_id + ".png")
-            pre_part_path = os.path.join(image_dir, "vp_results", pre_video_name, "global_parsing",
+            pre_part_path = os.path.join(self.pre_image_dir, "vp_results", pre_video_name, "global_parsing",
                                          pre_image_id + ".png")
             pre_image = cv2.imread(pre_image_path)  # shape [h=720, w=1080, 3(bgr)]
             pre_mask = cv2.imread(pre_mask_path, flags=cv2.IMREAD_GRAYSCALE)  # shape [h=720, w=1080]
@@ -268,10 +271,10 @@ class VIPDatasetForMFP(Dataset):
             for i in range(1, config.NUM_PART_CLASS):
                 pre_part[pre_part_tmp == i] = 1
             # print("pre_part generate cost:", time.time() - t0, "s")
-            pre_image, window, scale, padding = util.resize_image(pre_image, max_dim=config.IMAGE_MAX_DIM,
+            pre_image, window, scale, padding = resize_image(pre_image, max_dim=config.IMAGE_MAX_DIM,
                                                                   padding=config.IMAGE_PADDING, isopencv=True)
-            pre_mask = util.resize_mask(pre_mask, scale, padding, isopencv=True)[:, :, np.newaxis]  # shape [512, 512,1]
-            pre_part = util.resize_part_mfp(pre_part, scale, padding, isopencv=True)  # [512,512,20]
+            pre_mask = resize_mask(pre_mask, scale, padding, isopencv=True)[:, :, np.newaxis]  # shape [512, 512,1]
+            pre_part = resize_part_mfp(pre_part, scale, padding, isopencv=True)  # [512,512,20]
             pre_images.append(pre_image)
             pre_masks.append(pre_mask)
             pre_parts.append(pre_part)
