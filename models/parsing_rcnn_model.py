@@ -2069,22 +2069,24 @@ class PARSING_RCNN():
             raise Exception("Image size must be dividable by 2 at least 4 times "
                             "to avoid fractions when downscaling and upscaling.")
 
-        # Inputs
+        # 1, Inputs
         input_image = KL.Input(
             shape=config.IMAGE_SHAPE.tolist(), name="input_image")
+        # 2, meta data, shape [10=1+3+4+2], meta include image_id(1), image_shape(3), window(4), active_class_ids(2),
+        # detail in func compose_image_meta
         input_image_meta = KL.Input(shape=[None], name="input_image_meta")
         if mode == "training":
-            # RPN GT
+            # 3, RPN GT
             input_rpn_match = KL.Input(
                 shape=[None, 1], name="input_rpn_match", dtype=tf.int32)
             input_rpn_bbox = KL.Input(
                 shape=[None, 4], name="input_rpn_bbox", dtype=tf.float32)
 
             # Detection GT (class IDs, bounding boxes, and masks)
-            # 1. GT Class IDs (zero padded)
+            # 4. GT Class IDs (zero padded)
             input_gt_class_ids = KL.Input(
                 shape=[None], name="input_gt_class_ids", dtype=tf.int32)
-            # 2. GT Boxes in pixels (zero padded)
+            # 5. GT Boxes in pixels (zero padded)
             # [batch, MAX_GT_INSTANCES, (y1, x1, y2, x2)] in image coordinates
             input_gt_boxes = KL.Input(
                 shape=[None, 4], name="input_gt_boxes", dtype=tf.float32)
@@ -2092,7 +2094,7 @@ class PARSING_RCNN():
             h, w = K.shape(input_image)[1], K.shape(input_image)[2]
             image_scale = K.cast(K.stack([h, w, h, w], axis=0), tf.float32)
             gt_boxes = KL.Lambda(lambda x: x / image_scale)(input_gt_boxes)  # the coordinate is normalized to 1
-            # 3. GT Masks (zero padded)
+            # 6. GT Masks (zero padded)
             # [batch, height, width, MAX_GT_INSTANCES]
             if config.USE_MINI_MASK:
                 input_gt_masks = KL.Input(
@@ -2103,7 +2105,7 @@ class PARSING_RCNN():
                 input_gt_masks = KL.Input(
                     shape=[config.IMAGE_SHAPE[0], config.IMAGE_SHAPE[1], None],
                     name="input_gt_masks", dtype=bool)
-            # 4. GT Part
+            # 7. GT Part
             input_gt_part = KL.Input(
                 shape=[config.IMAGE_SHAPE[0], config.IMAGE_SHAPE[1]],
                 name="input_gt_part", dtype=tf.uint8)

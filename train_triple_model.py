@@ -13,7 +13,7 @@ session = tf.Session(config=config)
 import numpy as np
 
 from configs.vip import VideoModelConfig
-from configs.vipdataset_triple_model import VIPDatasetForTripleModel
+from configs.vipdataset_for_mfp import VIPDatasetForTripleModel
 # from models import aten_triplemodel_dilated as modellib
 from models import aten_triplemodel_dilated_se as modellib
 

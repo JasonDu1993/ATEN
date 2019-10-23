@@ -97,7 +97,7 @@ if __name__ == '__main__':
     # common load weight 
     print("Loading weights ", model_path)
     t0 = time()
-    # model.load_weights(model_path, by_name=True)
+    model.load_weights(model_path, by_name=True)
     print("Loaded weights ", time() - t0, "s")
     # Training dataset. Use the training set and 35K from the
     # validation set, as as in the Mask RCNN paper.

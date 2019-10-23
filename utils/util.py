@@ -228,7 +228,7 @@ class Dataset(object):
     def __init__(self, class_map=None):
         self._image_ids = []  # [   0    1    2 ... 2442 2443 2444]
         self.image_info = []
-        # self.image_info(list),the value is dict, whick like
+        # self.image_info(list),the value is dict, which like
         # {'id': 'videos245/000000001051', 'source': 'VIP',
         # 'path': '/home/sk49/workspace/dataset/VIP/Images/videos245/000000001051.jpg',
         # 'front_frame_list': '/home/sk49/workspace/dataset/VIP/front_frame_list/videos245/000000001051.txt',
@@ -265,7 +265,7 @@ class Dataset(object):
         # {'source': 'VIP', 'id': 17, 'name': 'right-leg'},
         # {'source': 'VIP', 'id': 18, 'name': 'left-shoe'},
         # {'source': 'VIP', 'id': 19, 'name': 'right-shoe'}]
-        self.source_class_ids = {} # {'': [0], 'VIP': [0, 1]}
+        self.source_class_ids = {}  # {'': [0], 'VIP': [0, 1]}
 
     def add_class(self, source, class_id, class_name):
         assert "." not in source, "Source name cannot contain a dot"
@@ -399,7 +399,7 @@ class Dataset(object):
         return mask, class_ids
 
 
-def resize_image(image, min_dim=None, max_dim=None, padding=False):
+def resize_image(image, min_dim=None, max_dim=None, padding=False, isopencv=False):
     """
     Resizes an image keeping the aspect ratio.
 
@@ -434,8 +434,11 @@ def resize_image(image, min_dim=None, max_dim=None, padding=False):
             scale = max_dim / image_max
     # [TODO] 修改为opencv的resizeResize image and mask
     if scale != 1:
-        image = scipy.misc.imresize(
-            image, (round(h * scale), round(w * scale)))
+        if isopencv:
+            image = cv2.resize(image, (round(w * scale), round(h * scale)))
+        else:
+            image = scipy.misc.imresize(
+                image, (round(h * scale), round(w * scale)))
     # Need padding?
     if padding:
         # Get new height and width
@@ -450,7 +453,7 @@ def resize_image(image, min_dim=None, max_dim=None, padding=False):
     return image, window, scale, padding
 
 
-def resize_mask(mask, scale, padding):
+def resize_mask(mask, scale, padding, isopencv=False):
     """Resizes a mask using the given scale and padding.
     Typically, you get the scale and padding from resize_image() to
     ensure both, the image and the mask, are resized consistently.
@@ -460,19 +463,16 @@ def resize_mask(mask, scale, padding):
             [(top, bottom), (left, right), (0, 0)]
     """
     h, w = mask.shape[:2]
-    mask = scipy.ndimage.zoom(mask, zoom=[scale, scale, 1], order=0)  # 上采样、最近邻插法
+    if isopencv:
+        mask = cv2.resize(mask, (round(w * scale), round(h * scale)))
+        padding = padding[:2]
+    else:
+        mask = scipy.ndimage.zoom(mask, zoom=[scale, scale, 1], order=0)  # 上采样、最近邻插法
     mask = np.pad(mask, padding, mode='constant', constant_values=0)  #
     return mask
 
 
-"""
-resize part
-edited by Qixian Zhou
-
-"""
-
-
-def resize_part(part, scale, padding):
+def resize_part(part, scale, padding, isopencv=False):
     """Resizes a part using the given scale and padding.
     Typically, you get the scale and padding from resize_image() to
     ensure both, the image and the part, are resized consistently.
@@ -482,7 +482,29 @@ def resize_part(part, scale, padding):
             [(top, bottom), (left, right)]
     """
     h, w = part.shape
-    part = scipy.ndimage.zoom(part, zoom=[scale, scale], order=0)
+    if isopencv:
+        part = cv2.resize(part, (round(w * scale), round(h * scale)))
+    else:
+        part = scipy.ndimage.zoom(part, zoom=[scale, scale], order=0)
+    # padding with ignored label
+    part = np.pad(part, padding, mode='constant', constant_values=255)
+    return part
+
+
+def resize_part_mfp(part, scale, padding, isopencv=False):
+    """Resizes a part using the given scale and padding.
+    Typically, you get the scale and padding from resize_image() to
+    ensure both, the image and the part, are resized consistently.
+
+    scale: part scaling factor
+    padding: Padding ignore label(255) to add to the part in the form
+            [(top, bottom), (left, right)]
+    """
+    h, w, c = part.shape
+    if isopencv:
+        part = cv2.resize(part, (round(w * scale), round(h * scale)))
+    else:
+        part = scipy.ndimage.zoom(part, zoom=[scale, scale], order=0)
     # padding with ignored label
     part = np.pad(part, padding, mode='constant', constant_values=255)
     return part

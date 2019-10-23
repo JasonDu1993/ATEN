@@ -101,7 +101,7 @@ class ConvRecurrent2D(Recurrent):
         self.strides = conv_utils.normalize_tuple(strides, 2, 'strides')
         self.padding = conv_utils.normalize_padding(padding)
         import keras
-        if keras.__version__ > "2.1.3":
+        if keras.__version__ > "2.2.0":
             from keras.backend import normalize_data_format
             # self.data_format = K.normalize_data_format(data_format)
             self.data_format = normalize_data_format(data_format)
