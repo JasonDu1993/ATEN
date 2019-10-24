@@ -231,7 +231,7 @@ def get_color_map(n=256):
     return color_map
 
 
-def write_part_result(res_dir, color_dir, height, width, image_id, global_parsing_prob):
+def write_part_result(res_dir, color_dir, height, width, image_id, global_parsing_prob, iscolor=True):
     """save the human parsing results (instance independent) in "vp_results/videoid/global_parsing/imageid.png"
     and save visualization results in "color_results/videoid/color/global_imageid.png"
 
@@ -245,27 +245,28 @@ def write_part_result(res_dir, color_dir, height, width, image_id, global_parsin
             except background, 0 represent background
         global_parsing_map: shape [height, width, 3], which is used for visualized, 3 represent rgb,
     """
-    if not os.path.exists(os.path.join(color_dir, 'color')):
-        os.makedirs(os.path.join(color_dir, 'color'))
+    if iscolor:
+        if not os.path.exists(os.path.join(color_dir, 'color')):
+            os.makedirs(os.path.join(color_dir, 'color'))
     if not os.path.exists(os.path.join(res_dir, 'global_parsing')):
         os.makedirs(os.path.join(res_dir, 'global_parsing'))
     c_map = np.array(random_colors_opencv(20))
     global_parsing = np.argmax(global_parsing_prob, axis=-1)  # shape [height, width],
-
+    img_global_path = os.path.join(res_dir, "global_parsing", "%s.png" % image_id)
+    if not os.path.exists(img_global_path):
+        cv2.imwrite(img_global_path, global_parsing)
+        # for getting global_parsing_max_prob and global_parsing_map
     global_parsing_max_prob = np.max(global_parsing_prob, axis=-1)  # shape [height, width]
     forground_map = (global_parsing > 0)
     global_parsing_max_prob = np.multiply(global_parsing_max_prob, forground_map)
-
     global_parsing_map = np.zeros((height, width, 3), dtype=np.uint8)
+    if iscolor:
+        coo = np.where(global_parsing > 0)  # tuple, len 2, coo[0] axis=0 index, coo[1] axis=1 index
+        global_parsing_map[coo[0], coo[1], :] = c_map[global_parsing[coo[0], coo[1]]]
+        color_global_path = os.path.join(color_dir, "color", "global_%s.png" % image_id)
+        if not os.path.exists(color_global_path):
+            cv2.imwrite(color_global_path, global_parsing_map)
 
-    coo = np.where(global_parsing > 0)  # tuple, len 2, coo[0] axis=0 index, coo[1] axis=1 index
-    global_parsing_map[coo[0], coo[1], :] = c_map[global_parsing[coo[0], coo[1]]]
-    img_global_path = os.path.join(res_dir, "global_parsing", "%s.png" % image_id)
-    color_global_path = os.path.join(color_dir, "color", "global_%s.png" % image_id)
-    if not os.path.exists(img_global_path):
-        cv2.imwrite(img_global_path, global_parsing)
-    if not os.path.exists(color_global_path):
-        cv2.imwrite(color_global_path, global_parsing_map)
     return global_parsing, global_parsing_max_prob, global_parsing_map
 
 
@@ -421,7 +422,8 @@ def write_inst_result_v2(res_dir, color_dir, height, width, image_id, boxes, mas
     return gray_map, scores_boxes, color_map
 
 
-def write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes, masks, scores, nms_like_thre=0.7):
+def write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes, masks, scores, nms_like_thre=0.7,
+                              iscolor=True):
     """
     (1) save the instance segmentation results in "vp_results/videoid/instance_segmentation/imageid.png"
     (2) save the detected person prob and bounding box(y1, x1, y2, x2) in vp_results/videoid/instance_segmentation/
@@ -439,8 +441,9 @@ def write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes
         scores_boxes: [num_instance, (score, y1, x1, y2, x2)]
         color_map: [height, width, 3], the inst result will save in "color_results/videoid/color/inst_imageid.png"
     """
-    if not os.path.exists(os.path.join(color_dir, 'color')):
-        os.makedirs(os.path.join(color_dir, 'color'))
+    if iscolor:
+        if not os.path.exists(os.path.join(color_dir, 'color')):
+            os.makedirs(os.path.join(color_dir, 'color'))
     if not os.path.exists(os.path.join(res_dir, 'instance_segmentation')):
         os.makedirs(os.path.join(res_dir, 'instance_segmentation'))
     N = boxes.shape[0]
@@ -477,22 +480,24 @@ def write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes
         scores_boxes.append([score, box[0], box[1], box[2], box[3]])
         wfp.write('%f %d %d %d %d\n' % (score, box[0], box[1], box[2], box[3]))
         gray_map[mask > 0] = inst_count
-        color_map[coo[0], coo[1], :] = c_map[inst_count]
+        if iscolor:
+            color_map[coo[0], coo[1], :] = c_map[inst_count]
         inst_count += 1
     # print("for", time() - t3)
     wfp.close()
     img_instance_segmentation_path = os.path.join(res_dir, "instance_segmentation", "%s.png" % image_id)
     if not os.path.exists(img_instance_segmentation_path):
         cv2.imwrite(img_instance_segmentation_path, gray_map)
-    color_instance_segmentation_path = os.path.join(color_dir, "color", "inst_%s.png" % image_id)
-    if not os.path.exists(color_instance_segmentation_path):
-        cv2.imwrite(color_instance_segmentation_path, color_map)
+    if iscolor:
+        color_instance_segmentation_path = os.path.join(color_dir, "color", "inst_%s.png" % image_id)
+        if not os.path.exists(color_instance_segmentation_path):
+            cv2.imwrite(color_instance_segmentation_path, color_map)
 
     return gray_map, scores_boxes, color_map
 
 
 def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, masks, scores, global_parsing_prob,
-                           nms_like_thre=0.7, class_num=20, is_combine_inst_part=True):
+                           nms_like_thre=0.7, class_num=20, is_combine_inst_part=True, iscolor=True):
     """
         A. write_part_result function:
             (1)the human global parsing results (instance independent) in "vp_results/videoid/global_parsing/imageid.png"
@@ -530,8 +535,8 @@ def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, m
     #   except background, 0 represent background
     # global_parsing_map: shape [height, width, 3], which is used for visualized, 3 represent rgb,
     global_parsing, global_parsing_max_prob, global_parsing_map = write_part_result(res_dir, color_dir, height, width,
-                                                                                    image_id,
-                                                                                    global_parsing_prob)
+                                                                                    image_id, global_parsing_prob,
+                                                                                    iscolor=iscolor)
     t1 = time()
     print("        A. write_part_result:", t1 - t0)
     # inst_map, inst_scores, color_map = write_inst_result(res_dir, color_dir, height, width, image_id, boxes, masks,
@@ -542,7 +547,7 @@ def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, m
     # inst_scores(scores_boxes): [num_instance, (score, y1, x1, y2, x2)]
     # color_map: [height, width, 3], the inst result will save in "color_results/videoid/color/inst_imageid.png"
     inst_map, inst_scores, color_map = write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes,
-                                                                 masks, scores, nms_like_thre)
+                                                                 masks, scores, nms_like_thre, iscolor=iscolor)
     t2 = time()
     print("        B. write_inst_result:", t2 - t1)
     # C. combine inst and part, need `global_parsing`, `global_parsing_max_prob`, `inst_map`, `inst_scores`
