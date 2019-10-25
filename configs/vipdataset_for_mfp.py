@@ -33,8 +33,8 @@ class ParsingRCNNModelConfig(Config):
 
     # Use small images for faster training. Set the limits of the small side
     # the large side, and that determines the image shape.
-    IMAGE_MIN_DIM = 450  # 450, 256
-    IMAGE_MAX_DIM = 512  # 512, 416
+    IMAGE_MIN_DIM = 256  # 450, 256
+    IMAGE_MAX_DIM = 416  # 512, 416
 
     # If True, pad images with zeros such that they're (max_dim by max_dim)
     IMAGE_PADDING = True  # currently, the False option is not supported
@@ -151,7 +151,10 @@ class VIPDatasetForMFP(Dataset):
             "name": class_name,
         })
 
-    def load_vip(self, dataset_dir, subset):
+    def get_subset(self):
+        return self.subset
+
+    def load_vip(self, dataset_dir, subset, pre_image_dir):
         # Add classes
         self.add_class("VIP", 1, "person")  # self.class_info.append
         self.add_parsing_class("VIP", 1, "hat")  # self.parsing_class_info.append
@@ -176,10 +179,8 @@ class VIPDatasetForMFP(Dataset):
 
         # Path
         image_dir = os.path.join(dataset_dir, 'Images')
-        if subset == "train":
-            self.pre_image_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_train_vip_singleframe_20190408a_epoch073"
-        elif subset == "val":
-            self.pre_image_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190408a_epoch073"
+        self.pre_image_dir = pre_image_dir
+        self.subset = subset
         # Add images
         # Generate random specifications of images (i.e. color and
         # list of shapes sizes and locations). This is more compact than
@@ -272,7 +273,7 @@ class VIPDatasetForMFP(Dataset):
                 pre_part[pre_part_tmp == i] = 1
             # print("pre_part generate cost:", time.time() - t0, "s")
             pre_image, window, scale, padding = resize_image(pre_image, max_dim=config.IMAGE_MAX_DIM,
-                                                                  padding=config.IMAGE_PADDING, isopencv=True)
+                                                             padding=config.IMAGE_PADDING, isopencv=True)
             pre_mask = resize_mask(pre_mask, scale, padding, isopencv=True)[:, :, np.newaxis]  # shape [512, 512,1]
             pre_part = resize_part_mfp(pre_part, scale, padding, isopencv=True)  # [512,512,20]
             pre_images.append(pre_image)
@@ -297,7 +298,7 @@ class VIPDatasetForMFP(Dataset):
         image_dir = image_dir[:image_dir.rfind('Image')]
         pre_boxes = []
         for pre_video_name, pre_image_id in pre_image_names:
-            boxes_path = os.path.join(image_dir, "vp_results", pre_video_name, "instance_segmentation",
+            boxes_path = os.path.join(self.pre_image_dir, "vp_results", pre_video_name, "instance_segmentation",
                                       pre_image_id + ".txt")
             with open(boxes_path, "r") as f:
                 for line in f.readlines():

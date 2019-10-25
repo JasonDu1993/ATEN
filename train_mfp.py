@@ -19,15 +19,15 @@ from models.mfp_model import MFP
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    # NAME = "vip_singleframe_20190905b"
-    NAME = "mfp_debug"
+    NAME = "mfp_20191025a"
+    # NAME = "mfp_debug"
     GPU_COUNT = 1
-    # IMAGES_PER_GPU = 4
     IMAGES_PER_GPU = 1
-    STEPS_PER_EPOCH = 2000
-    # STEPS_PER_EPOCH = 2
-    VALIDATION_STEPS = 100
-    # VALIDATION_STEPS = 1
+    # IMAGES_PER_GPU = 1
+    # STEPS_PER_EPOCH = 2000
+    STEPS_PER_EPOCH = 2
+    # VALIDATION_STEPS = 100
+    VALIDATION_STEPS = 1
     SAVE_MODEL_PERIOD = 1
 
     PRE_MULTI_FRAMES = 3
@@ -47,8 +47,14 @@ PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
 DEFAULT_LOGS_DIR = "./outputs"
+# linux
 DEFAULT_DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+pre_image_train_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_train_vip_singleframe_20190408a_epoch073"
+pre_image_val_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_20190408a_epoch073"
+# win
 # DEFAULT_DATASET_DIR = "D:\dataset\VIP_tiny"
+# pre_image_train_dir = "D:\dataset\VIP_tiny"
+# pre_image_val_dir = "D:\dataset\VIP_tiny"
 
 ############################################################
 #  Training
@@ -107,18 +113,18 @@ if __name__ == '__main__':
     # Training dataset. Use the training set and 35K from the
     # validation set, as as in the Mask RCNN paper.
     dataset_train = VIPDatasetForMFP()
-    dataset_train.load_vip(args.dataset, "train")
+    dataset_train.load_vip(args.dataset, "train", pre_image_train_dir)
     dataset_train.prepare()
     # dataset_train = VIPDatasetForMFP()
-    # dataset_train.load_vip(args.dataset, "traintiny")
+    # dataset_train.load_vip(args.dataset, "traintiny", pre_image_train_dir)
     # dataset_train.prepare()
 
     # Validation dataset
     dataset_val = VIPDatasetForMFP()
-    dataset_val.load_vip(args.dataset, "val")
+    dataset_val.load_vip(args.dataset, "val", pre_image_val_dir)
     dataset_val.prepare()
     # dataset_val = VIPDatasetForMFP()
-    # dataset_val.load_vip(args.dataset, "traintiny")
+    # dataset_val.load_vip(args.dataset, "traintiny", pre_image_val_dir)
     # dataset_val.prepare()
 
     # *** This training schedule is an example. Update to your needs ***
