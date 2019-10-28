@@ -19,7 +19,7 @@ from models.mfp_model import MFP
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "mfp_20191028a"
+    NAME = "mfp_20191028b"
     # NAME = "mfp_debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 1
@@ -29,7 +29,8 @@ class trainConfig(ParsingRCNNModelConfig):
     VALIDATION_STEPS = 100
     # VALIDATION_STEPS = 1
     SAVE_MODEL_PERIOD = 1
-
+    IMAGE_MIN_DIM = 256  # 450, 256
+    IMAGE_MAX_DIM = 384  # 512, 416， 384（16*24）
     PRE_MULTI_FRAMES = 3
     RECURRENT_UNIT = "gru"
     assert RECURRENT_UNIT in ["gru", "lstm"]
