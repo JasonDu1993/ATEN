@@ -1818,7 +1818,7 @@ def generate_random_rois(image_shape, count, gt_class_ids, gt_boxes):
         image_shape: [Height, Width, Depth]
         count: Number of ROIs to generate
         gt_class_ids: [N] Integer ground truth class IDs
-        gt_boxes: list, [N, (y1, x1, y2, x2)] Ground truth boxes in pixels.
+        gt_boxes: list, [N, (y1, x1, y2, x2)] Ground truth boxes in pixels. Needed N > 0
     Returns:
         rois: [count, (y1, x1, y2, x2)] ROI boxes in pixels.
     """
@@ -1971,7 +1971,8 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
             # have any of the classes we care about.
             if not np.any(gt_class_ids > 0):
                 continue
-
+            if len(pre_boxes) == 0:
+                continue
             # RPN Targets
             # rpn_match, rpn_bbox = build_rpn_targets(image.shape, anchors,
             #                                         gt_class_ids, gt_boxes, config)
@@ -2088,8 +2089,8 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
             raise
         except:
             # Log it and skip the image
-            logging.exception("Error processing image {} in {}".format(
-                dataset.image_info[image_id], dataset.get_subset()))
+            logging.exception("Error processing image {} in {}, pre_image_names={}".format(
+                dataset.image_info[image_id], dataset.get_subset(), pre_image_names))
             error_count += 1
             # if error_count > 5:
             #     raise
