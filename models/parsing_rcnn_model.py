@@ -867,7 +867,7 @@ def refine_detections(rois, probs, deltas, window, config):
     detections.
 
     Inputs:
-        rois: [N, (y1, x1, y2, x2)] in normalized coordinates
+        rois: [N=1000(inference), (y1, x1, y2, x2)] in normalized coordinates
         probs: [N, num_classes]. Class probabilities.
         deltas: [N, num_classes, (dy, dx, log(dh), log(dw))]. Class-specific
                 bounding box deltas.
@@ -877,11 +877,11 @@ def refine_detections(rois, probs, deltas, window, config):
     Returns detections shaped: [N, (y1, x1, y2, x2, class_id, score)]
     """
     # Class IDs per ROI
-    class_ids = np.argmax(probs, axis=1)
+    class_ids = np.argmax(probs, axis=1)  # shape [N, ]
     # Class probability of the top class of each ROI
-    class_scores = probs[np.arange(class_ids.shape[0]), class_ids]
+    class_scores = probs[np.arange(class_ids.shape[0]), class_ids]  # shape [N, ]
     # Class-specific bounding box deltas
-    deltas_specific = deltas[np.arange(deltas.shape[0]), class_ids]
+    deltas_specific = deltas[np.arange(deltas.shape[0]), class_ids]  # shape [N, (dy, dx, log(dh), log(dw))]
     # Apply bounding box deltas
     # Shape: [boxes, (y1, x1, y2, x2)] in normalized coordinates
     refined_rois = util.apply_box_deltas(

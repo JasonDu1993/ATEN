@@ -2091,8 +2091,8 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
             logging.exception("Error processing image {} in {}".format(
                 dataset.image_info[image_id], dataset.get_subset()))
             error_count += 1
-            if error_count > 5:
-                raise
+            # if error_count > 5:
+            #     raise
 
 
 class MFP(object):

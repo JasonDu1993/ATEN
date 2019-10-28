@@ -257,6 +257,7 @@ class VIPDatasetForMFP(Dataset):
         pre_images = []
         pre_masks = []
         pre_parts = []
+        scale = 1
         for pre_video_name, pre_image_id in pre_image_names:
             pre_image_path = os.path.join(image_dir, "adjacent_frames", pre_video_name, image_id, pre_image_id + ".jpg")
             pre_mask_path = os.path.join(self.pre_image_dir, "vp_results", pre_video_name, "instance_segmentation",

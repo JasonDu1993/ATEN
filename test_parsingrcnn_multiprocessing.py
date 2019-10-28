@@ -36,14 +36,14 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
 # MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190408a/checkpoints" + "/" + \
 #              "parsing_rcnn_vip_singleframe_20190408a_epoch073_loss0.401_valloss0.391.h5"
-RES_DIR = "./vis/origin_train_vip_singleframe_parsing_rcnn"
+RES_DIR = "./vis/origin_val_vip_singleframe_parsing_rcnn"
 gpus = ["0", "1", "2", "3"]
 
 # Directory of images to run detection on
 # IMAGE_DIR = DATASET_DIR + "/Images"
 # IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
-IMAGE_DIR = DATASET_DIR + "/videos/train_videos_frames"
-IMAGE_LIST = DATASET_DIR + "/lists/train_all_frames_id.txt"
+IMAGE_DIR = DATASET_DIR + "/videos/val_videos_frames"
+IMAGE_LIST = DATASET_DIR + "/lists/val_all_frames_id.txt"
 
 # DATASET_DIR = "D:\dataset\VIP_tiny"
 MODEL_PATH = "./checkpoints/parsing_rcnn.h5"
