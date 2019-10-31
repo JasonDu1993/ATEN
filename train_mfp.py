@@ -15,11 +15,8 @@ from configs.vipdataset_for_mfp import VIPDatasetForMFP
 from models.mfp_model import MFP
 
 
-# from models.parsing_rcnn_model_dilated import PARSING_RCNN
-
-
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "mfp_20191028b"
+    NAME = "mfp_20191031a"
     # NAME = "mfp_debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 1
@@ -41,9 +38,9 @@ class trainConfig(ParsingRCNNModelConfig):
 ROOT_DIR = os.getcwd()
 
 # Path to trained weights file
-PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
-# PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190326a/checkpoints/" \
-#                       "parsing_rcnn_vip_singleframe_20190326a_epoch038_loss0.491_valloss0.550.h5"
+# PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
+PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191028b/checkpoints" + "/" + \
+                      "parsing_rcnn_mfp_20191028b_epoch003_loss1.366_valloss1.006.h5"
 
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
@@ -71,6 +68,7 @@ if __name__ == '__main__':
     """
     import argparse
     from time import strftime
+
     print("training at:", strftime("%Y_%m%d_%H%M%S"))
     t0 = time()
     # Parse command line arguments
