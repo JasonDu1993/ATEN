@@ -14,7 +14,7 @@ from tqdm import tqdm
 import skimage.io
 import matplotlib
 
-from configs.vip import ParsingRCNNModelConfig
+from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
 # from models.parsing_rcnn_model import PARSING_RCNN
 from utils import visualize
 
@@ -33,24 +33,24 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Path to trained weights file
 # Download this file and place in the root of your
 # project (See README file for details)
-DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+# DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
 # MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190408a/checkpoints" + "/" + \
 #              "parsing_rcnn_vip_singleframe_20190408a_epoch073_loss0.401_valloss0.391.h5"
-RES_DIR = "./vis/origin_val_vip_singleframe_parsing_rcnn"
-gpus = ["0", "1", "2", "3"]
+# RES_DIR = "./vis/origin_val_vip_singleframe_parsing_rcnn"
+# gpus = ["0", "1", "2", "3"]
 
 # Directory of images to run detection on
 # IMAGE_DIR = DATASET_DIR + "/Images"
 # IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
-IMAGE_DIR = DATASET_DIR + "/videos/val_videos_frames"
-IMAGE_LIST = DATASET_DIR + "/lists/val_all_frames_id.txt"
+# IMAGE_DIR = DATASET_DIR + "/videos/val_videos_frames"
+# IMAGE_LIST = DATASET_DIR + "/lists/val_all_frames_id.txt"
 
-# DATASET_DIR = "D:\dataset\VIP_tiny"
-MODEL_PATH = "./checkpoints/parsing_rcnn.h5"
-# RES_DIR = "./vis/debug"
-# gpus = ["0"]
-# IMAGE_DIR = DATASET_DIR + "/Images"
-# IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
+DATASET_DIR = "D:\dataset\VIP_tiny"
+MODEL_PATH = "./checkpoints/parsing_rcnn_mfp_20191025a_epoch003_loss7.044_valloss4.044.h5.h5"
+RES_DIR = "./vis/mfp_debuf"
+gpus = ["0"]
+IMAGE_DIR = DATASET_DIR + "/Images"
+IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
 
 flag = False
 if not os.path.exists(RES_DIR):
@@ -64,12 +64,20 @@ if not os.path.exists(RES_DIR):
 class InferenceConfig(ParsingRCNNModelConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
-    PROCESS_NAME = "parsing_rcnn"  # for process name
+    PROCESS_NAME = "mfp_20191025a_epoch003"
     GPU_COUNT = 1
     PROCESS_COUNT = 2
     IMAGES_PER_GPU = 1
     BATCH_SIZE = 1
     ISCOLOR = False
+
+    IMAGE_MIN_DIM = 256  # 450, 256
+    IMAGE_MAX_DIM = 384  # 512, 416， 384（16*24）
+    PRE_MULTI_FRAMES = 3
+    RECURRENT_UNIT = "gru"
+    assert RECURRENT_UNIT in ["gru", "lstm"]
+    RECURRENT_FILTER = 64
+
 
 
 def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
@@ -94,11 +102,12 @@ def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
     # config.gpu_options.allow_growth = True
     config.gpu_options.per_process_gpu_memory_fraction = 0.4
     session = tf.Session(config=config)
-    # from models.parsing_rcnn_model_resfpn_dilated_se import PARSING_RCNN
+    # The below line need to correct every test time
+    from models.mfp_model import MFP
     from models.parsing_rcnn_model import PARSING_RCNN
     if infer_config is None:
         infer_config = InferenceConfig()
-    model = PARSING_RCNN(mode="inference", config=infer_config, model_dir=MODEL_DIR)
+    model = MFP(mode="inference", config=infer_config, model_dir=MODEL_DIR)
     # Load weights trained on MS-COCO
     s0 = time.time()
     model.load_weights(MODEL_PATH, by_name=True)
@@ -118,8 +127,19 @@ def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
         color_floder = os.path.join(RES_DIR, "color_results", vid)
 
         print("line", c, line, "pid:", os.getpid())
-        image = skimage.io.imread(os.path.join(IMAGE_DIR, vid, image_id) + '.jpg')
-        # image = cv2.imread(os.path.join(IMAGE_DIR, vid, image_id) + '.jpg')
+        image = cv2.imread(os.path.join(IMAGE_DIR, vid, image_id) + '.jpg')
+        if image_id.endswith("000000000001"):
+            results = model.detect([image])
+        input_pre_images = []
+        input_pre_masks = []
+        input_pre_parts = []
+        for i in range(config.PRE_MULTI_FRAMES):
+            # pre image
+            input_pre_images.append()
+            # pre mask
+            input_pre_masks.append()
+            # pre part
+            input_pre_parts.append()
         # Run detection
         # results = model.detect([image[:, :, ::-1]])
         t2 = time.time()

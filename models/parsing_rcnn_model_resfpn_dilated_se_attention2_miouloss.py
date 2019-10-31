@@ -2595,12 +2595,12 @@ class PARSING_RCNN():
         # Process detections
         results = []
         for i, image in enumerate(images):
-            final_rois, final_class_ids, final_scores, final_masks, final_globals = \
+            final_boxes, final_class_ids, final_scores, final_masks, final_globals = \
                 self.unmold_detections(detections[i], mrcnn_mask[i], mrcnn_global_parsing_prob[i],
                                        image.shape, windows[i])
             # print("results", np.min(final_masks), np.max(final_masks), np.min(final_globals), np.max(final_globals))
             results.append({
-                "rois": final_rois,
+                "boxes": final_boxes,
                 "class_ids": final_class_ids,
                 "scores": final_scores,
                 "masks": final_masks,

@@ -1811,16 +1811,15 @@ def build_detection_targets(rpn_rois, gt_class_ids, gt_boxes, gt_masks, gt_parts
     return rois, roi_gt_class_ids, bboxes, masks, gt_parts
 
 
-def generate_random_rois(image_shape, count, gt_class_ids, gt_boxes):
+def generate_random_rois(image_shape, count, gt_boxes):
     """Generates ROI proposals similar to what a region proposal network
     would generate.
     Args:
         image_shape: [Height, Width, Depth]
         count: Number of ROIs to generate
-        gt_class_ids: [N] Integer ground truth class IDs
         gt_boxes: list, [N, (y1, x1, y2, x2)] Ground truth boxes in pixels. Needed N > 0
     Returns:
-        rois: [count, (y1, x1, y2, x2)] ROI boxes in pixels.
+        rois: ndarray, [count, (y1, x1, y2, x2)] ROI boxes in pixels.
     """
     # placeholder
     rois = np.zeros((count, 4), dtype=np.int32)
@@ -1981,8 +1980,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
             random_rois = 256
             # detection_targets = True
             if random_rois:
-                rpn_rois = generate_random_rois(
-                    image.shape, random_rois, gt_class_ids, pre_boxes)
+                rpn_rois = generate_random_rois(image.shape, random_rois, pre_boxes)
                 if detection_targets:
                     rois, mrcnn_class_ids, mrcnn_bbox, mrcnn_mask, mrcnn_part = \
                         build_detection_targets(rpn_rois, gt_class_ids, gt_boxes, gt_masks, gt_parts, config)
@@ -2309,13 +2307,14 @@ class MFP(object):
             # Network Heads
             # Proposal classifier and BBox regressor heads
             mrcnn_class_logits, mrcnn_class, mrcnn_bbox = \
-                fpn_classifier_graph(rpn_rois, mrcnn_feature_map, config.IMAGE_SHAPE,
+                fpn_classifier_graph(target_rois, mrcnn_feature_map, config.IMAGE_SHAPE,
                                      config.POOL_SIZE, config.NUM_CLASSES)
 
             # Detections
+            target_rois = KL.Lambda(lambda x: x * 1, name="output_rois")(target_rois)
             # output is [batch, num_detections(default 100), (y1, x1, y2, x2, class_id, score)] in image coordinates
             detections = DetectionLayer(config, name="mrcnn_detection")(
-                [rpn_rois, mrcnn_class, mrcnn_bbox, input_image_meta])
+                [target_rois, mrcnn_class, mrcnn_bbox, input_image_meta])
 
             # Convert boxes to normalized coordinates
             # TODO: let DetectionLayer return normalized coordinates to avoid
@@ -2333,10 +2332,9 @@ class MFP(object):
             # global parsing branch
             global_parsing_prob = KL.Lambda(lambda x: post_processing_graph(*x))([global_parsing_map, input_image])
 
-            model = KM.Model([input_image, input_image_meta],
-                             [detections, mrcnn_class, mrcnn_bbox,
-                              mrcnn_mask, rpn_rois, rpn_class, rpn_bbox, global_parsing_prob],
-                             name='parsing_rcnn')
+            model = KM.Model(
+                [input_image, input_image_meta] + input_pre_images + input_pre_masks + input_pre_parts + [input_rois],
+                [detections, mrcnn_class, mrcnn_bbox, mrcnn_mask, global_parsing_prob], name='parsing_rcnn')
 
         # Add multi-GPU support.
         if config.GPU_COUNT > 1:
@@ -2670,7 +2668,7 @@ class MFP(object):
                 layers.append(l)
         return layers
 
-    def mold_inputs(self, images):
+    def mold_inputs(self, images, isopencv=False):
         """Takes a list of images and modifies them to the format expected
         as an input to the neural network.
         Args:
@@ -2693,7 +2691,7 @@ class MFP(object):
                 image,
                 min_dim=self.config.IMAGE_MIN_DIM,
                 max_dim=self.config.IMAGE_MAX_DIM,
-                padding=self.config.IMAGE_PADDING)
+                padding=self.config.IMAGE_PADDING, isopencv=isopencv)
             molded_image = mold_image(molded_image, self.config)
             # Build image_meta
             image_meta = compose_image_meta(
@@ -2774,7 +2772,7 @@ class MFP(object):
 
         return boxes, class_ids, scores, full_masks, global_parsing
 
-    def detect(self, images, verbose=0):
+    def detect(self, images, pre_images, pre_masks, pre_parts, pre_boxes, verbose=0, isopencv=False):
         """Runs the detection pipeline.
         Args:
             images: List of images, potentially of different sizes.
@@ -2794,22 +2792,25 @@ class MFP(object):
             for image in images:
                 log("image", image)
         # Mold inputs to format expected by the neural network
-        molded_images, image_metas, windows = self.mold_inputs(images)
+        molded_images, image_metas, windows = self.mold_inputs(images, isopencv=isopencv)
+        random_rois = 256
+        rpn_rois = generate_random_rois(images[0].shape, random_rois, pre_boxes)
         if verbose:
             log("molded_images", molded_images)
             log("image_metas", image_metas)
         # Run object detection
-        detections, mrcnn_class, mrcnn_bbox, mrcnn_mask, \
-        rois, rpn_class, rpn_bbox, mrcnn_global_parsing_prob = \
-            self.keras_model.predict([molded_images, image_metas], verbose=0)
+        detections, mrcnn_class, mrcnn_bbox, mrcnn_mask, mrcnn_global_parsing_prob = \
+            self.keras_model.predict(
+                [molded_images, image_metas] + pre_images + pre_masks + pre_parts + [rpn_rois[np.newaxis, ...]],
+                verbose=0)
         # Process detections
         results = []
         for i, image in enumerate(images):
-            final_rois, final_class_ids, final_scores, final_masks, final_globals = \
+            final_boxes, final_class_ids, final_scores, final_masks, final_globals = \
                 self.unmold_detections(detections[i], mrcnn_mask[i], mrcnn_global_parsing_prob[i],
                                        image.shape, windows[i])
             results.append({
-                "rois": final_rois,
+                "boxes": final_boxes,
                 "class_ids": final_class_ids,
                 "scores": final_scores,
                 "masks": final_masks,

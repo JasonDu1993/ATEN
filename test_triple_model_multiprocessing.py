@@ -118,12 +118,12 @@ def worker(image_ids, dataset, infer_config):
         t3 = time.time()
         print("  (1), model test one image", t3 - t2, "s")
         # print("detect out ", r['class_ids'].shape[0], "person")
-        # visualize.vis_insts(cur_frame, video_floder, im_name, r['rois'], r['masks'], r['class_ids'], r['scores'])
-        masked_image = visualize.vis_insts_opencv(cur_frame[:, :, ::-1], color_floder, im_name, r['rois'], r['masks'],
+        # visualize.vis_insts(cur_frame, video_floder, im_name, r['boxes'], r['masks'], r['class_ids'], r['scores'])
+        masked_image = visualize.vis_insts_opencv(cur_frame[:, :, ::-1], color_floder, im_name, r['boxes'], r['masks'],
                                                   r['class_ids'], r['scores'])
         t4 = time.time()
         global_parsing_map, color_map = visualize.write_inst_part_result(video_floder, color_floder, cur_frame.shape[0],
-                                                                         cur_frame.shape[1], im_name, r['rois'],
+                                                                         cur_frame.shape[1], im_name, r['boxes'],
                                                                          r['masks'], r['scores'], r['global_parsing'])
         vis_global_image = cv2.addWeighted(masked_image, 1, global_parsing_map, 0.4, 0)
         cv2.imwrite(os.path.join(color_floder, "color", "vis_global_%012d.png" % int(image_id)), vis_global_image)
