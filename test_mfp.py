@@ -1,11 +1,11 @@
 import os
 import tensorflow as tf
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-# config = tf.ConfigProto()
-# # config.gpu_options.allow_growth = True
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
 # config.gpu_options.per_process_gpu_memory_fraction = 0.3
-# session = tf.Session(config=config)
+session = tf.Session(config=config)
 import sys
 import cv2
 
@@ -28,19 +28,20 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Path to trained weights file
 # Download this file and place in the root of your 
 # project (See README file for details)
-# DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-DATASET_DIR = "D:\dataset\VIP_tiny"
-# MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190408a/checkpoints/" \
-#              "parsing_rcnn_vip_singleframe_20190408a_epoch073_loss0.401_valloss0.391.h5"
-# MODEL_PATH = "./outputs/vip_singleframe_20181229ma/checkpoints/parsing_rcnn_vip_singleframe_20181229ma_epoch086.h5"
-MODEL_PATH = "outputs/mfp_20191028b/checkpoints/parsing_rcnn_mfp_20191028b_epoch003_loss1.366_valloss1.006.h5"
-# MODEL_PATH = "./checkpoints/parsing_rcnn_mfp_20191025a_epoch003_loss7.044_valloss4.044.h5"
-# Directory of images to run detection on
+DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191031a/checkpoints" + "/" + \
+             "parsing_rcnn_mfp_20191031a_epoch023_loss0.899_valloss0.571.h5"
 IMAGE_DIR = DATASET_DIR + "/Images"
-IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
-# IMAGE_LIST = DATASET_DIR + "/lists/trainval_id.txt"
-PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
-PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
+IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
+PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
+PRE_PREDICT_DATA_DIR = r"/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
+
+# DATASET_DIR = "D:\dataset\VIP_tiny"
+# MODEL_PATH = "outputs/mfp_20191028b/checkpoints/parsing_rcnn_mfp_20191028b_epoch003_loss1.366_valloss1.006.h5"
+# IMAGE_DIR = DATASET_DIR + "/Images"
+# IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
+# PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
+# PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
 
 # RES_DIR = "./vis/trainval_vip_singleframe_20190408a_epoch073000"
 # RES_DIR = "./vis/test_vip_singleframe_20190326a_epoch032_t"
