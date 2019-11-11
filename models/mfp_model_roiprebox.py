@@ -3,6 +3,7 @@ import logging
 import os
 import random
 import re
+import math
 # Requires TensorFlow 1.3+ and Keras 2.0.8+.
 from distutils.version import LooseVersion
 
@@ -1815,7 +1816,7 @@ def generate_random_rois(image_shape, count, gt_boxes):
     """Generates ROI proposals similar to what a region proposal network
     would generate.
     Args:
-        image_shape: [Height, Width, Depth]
+        image_shape: [resize_height=512, resize_width=512, Depth]
         count: Number of ROIs to generate
         gt_boxes: list, [N, (y1, x1, y2, x2)] Ground truth boxes in pixels. Needed N > 0
     Returns:
@@ -1884,7 +1885,93 @@ def generate_random_rois(image_shape, count, gt_boxes):
     return rois
 
 
-def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
+def generate_rois(image_shape, counts, gt_boxes):
+    """Generates ROI proposals similar to what a region proposal network
+    would generate.
+    Args:
+        image_shape: [resize_height=512, resize_width=512, Depth]
+        counts: Number of ROIs to generate
+        gt_boxes: list, [N, (y1, x1, y2, x2)] Ground truth boxes in pixels. Needed N > 0
+    Returns:
+        rois: ndarray, [count, (y1, x1, y2, x2)] ROI boxes in pixels.
+    """
+    # placeholder
+    rois = np.zeros((counts, 4), dtype=np.int32)
+    new_rois = []  # tmp
+    resize_height, resize_width, _ = image_shape
+    new_rois.extend(gt_boxes)
+    gt_boxes = np.array(gt_boxes)
+    N = gt_boxes.shape[0]
+    count = counts - N
+    # Generate random ROIs around GT boxes (90% of count)
+    rois_per_box = int(count / N)
+    for i in range(N):
+        gt_y1, gt_x1, gt_y2, gt_x2 = gt_boxes[i]
+        cx = (gt_x1 + gt_x2) // 2
+        cy = (gt_y1 + gt_y2) // 2
+        w = gt_x2 - gt_x1
+        h = gt_y2 - gt_y1
+        w_scale = [0.8, 1, 1.2]
+        h_scale = [0.8, 1, 1.2]
+        for hs in h_scale:
+            for ws in w_scale:
+                new_w = int(w * ws)
+                new_h = int(h * hs)
+                new_x1 = max(cx - new_w // 2, 0)
+                new_x2 = min(cx + new_w // 2, resize_width)
+                new_y1 = max(cy - new_h // 2, 0)
+                new_y2 = min(cy + new_h // 2, resize_height)
+                new_rois.append([new_y1, new_x1, new_y2, new_x2])
+        if rois_per_box > 9:
+            grid_num = math.ceil(math.sqrt((rois_per_box - 9) / (len(w_scale) * len(h_scale))))
+            if grid_num & 1 == 1:
+                grid_num += 1
+            grid_per_w = w // grid_num
+            grid_per_h = h // grid_num
+            for w_i in range(grid_num):
+                for h_j in range(grid_num):
+                    new_cx = gt_x1 + w_i * grid_per_w + grid_per_w // 2
+                    new_cy = gt_y1 + h_j * grid_per_h + grid_per_h // 2
+                    for hs in h_scale:
+                        for ws in w_scale:
+                            new_w = int(w * ws)
+                            new_h = int(h * hs)
+                            new_x1 = max(new_cx - new_w // 2, 0)
+                            new_x2 = min(new_cx + new_w // 2, resize_width)
+                            new_y1 = max(new_cy - new_h // 2, 0)
+                            new_y2 = min(new_cy + new_h // 2, resize_height)
+                            new_rois.append([new_y1, new_x1, new_y2, new_x2])
+    # Generate random ROIs anywhere in the image
+    remaining_count = counts - len(new_rois)
+    # To avoid generating boxes with zero area, we generate double what
+    # we need and filter out the extra. If we get fewer valid boxes
+    # than we need, we loop and try again.
+    if remaining_count > 0:
+        while True:
+            y1y2 = np.random.randint(0, image_shape[0], (remaining_count * 2, 2))
+            x1x2 = np.random.randint(0, image_shape[1], (remaining_count * 2, 2))
+            # Filter out zero area boxes
+            threshold = 1
+            y1y2 = y1y2[np.abs(y1y2[:, 0] - y1y2[:, 1]) >=
+                        threshold][:remaining_count]
+            x1x2 = x1x2[np.abs(x1x2[:, 0] - x1x2[:, 1]) >=
+                        threshold][:remaining_count]
+            if y1y2.shape[0] == remaining_count and x1x2.shape[0] == remaining_count:
+                break
+
+        # Sort on axis 1 to ensure x1 <= x2 and y1 <= y2 and then reshape
+        # into x1, y1, x2, y2 order
+        x1, x2 = np.split(np.sort(x1x2, axis=1), 2, axis=1)
+        y1, y2 = np.split(np.sort(y1y2, axis=1), 2, axis=1)
+        global_rois = np.hstack([y1, x1, y2, x2])
+        rois[:-remaining_count] = np.array(new_rois)
+        rois[-remaining_count:] = global_rois
+    else:
+        rois[:] = np.array(new_rois)[:counts]
+    return rois
+
+
+def data_generator(dataset, config, shuffle=True, augment=True, random_rois_num=0,
                    batch_size=1, detection_targets=False):
     """A generator that returns images and corresponding target class ids,
     bounding box deltas, and masks.videos45/000000000026
@@ -1894,7 +1981,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
     shuffle: If True, shuffles the samples before every epoch
     augment: If True, applies image augmentation to images (currently only
              horizontal flips are supported)
-    random_rois: If > 0 then generate proposals to be used to train the
+    random_rois_num: If > 0 then generate proposals to be used to train the
                  network classifier and mask heads. Useful if training
                  the Mask RCNN part without the RPN.
     batch_size: How many images to return in each call
@@ -1977,10 +2064,11 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
             #                                         gt_class_ids, gt_boxes, config)
 
             # Mask R-CNN Targets
-            random_rois = 256
+            # random_rois_num = 256
             # detection_targets = True
-            if random_rois:
-                rpn_rois = generate_random_rois(image.shape, random_rois, pre_boxes)
+            if random_rois_num:
+                # rpn_rois = generate_random_rois(image.shape, random_rois, pre_boxes)
+                rpn_rois = generate_rois(image.shape, random_rois_num, pre_boxes)
                 if detection_targets:
                     rois, mrcnn_class_ids, mrcnn_bbox, mrcnn_mask, mrcnn_part = \
                         build_detection_targets(rpn_rois, gt_class_ids, gt_boxes, gt_masks, gt_parts, config)
@@ -2014,7 +2102,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
                     batch_pre_masks.append(np.zeros((batch_size,) + pre_mask.shape, dtype=np.float32))
                 for pre_part in pre_parts:
                     batch_pre_parts.append(np.zeros((batch_size,) + pre_part.shape, dtype=np.float32))
-                if random_rois:
+                if random_rois_num:
                     batch_rpn_rois = np.zeros(
                         (batch_size, rpn_rois.shape[0], 4), dtype=rpn_rois.dtype)
                     if detection_targets:
@@ -2052,7 +2140,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
                 batch_pre_masks[i][b] = pre_mask
             for i, pre_part in enumerate(pre_parts):
                 batch_pre_parts[i][b] = pre_part
-            if random_rois:
+            if random_rois_num:
                 batch_rpn_rois[b] = rpn_rois
                 if detection_targets:
                     batch_rois[b] = rois
@@ -2069,7 +2157,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
                           batch_gt_parts] + batch_pre_images + batch_pre_masks + batch_pre_parts
                 outputs = []
 
-                if random_rois:
+                if random_rois_num:
                     inputs.extend([batch_rpn_rois])
                     if detection_targets:
                         inputs.extend([batch_rois])
@@ -2581,10 +2669,10 @@ class MFP(object):
         # Data generators
         print("get train generator")
         train_generator = data_generator(train_dataset, self.config, shuffle=True,
-                                         batch_size=self.config.BATCH_SIZE)
+                                         random_rois_num=self.config.RANDOM_ROIS_NUM, batch_size=self.config.BATCH_SIZE)
         print("get val generator")
         val_generator = data_generator(val_dataset, self.config, shuffle=True,
-                                       batch_size=self.config.BATCH_SIZE)
+                                       random_rois_num=self.config.RANDOM_ROIS_NUM, batch_size=self.config.BATCH_SIZE)
 
         # Callbacks
         callbacks = [

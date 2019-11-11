@@ -1815,7 +1815,7 @@ def generate_random_rois(image_shape, count, gt_boxes):
     """Generates ROI proposals similar to what a region proposal network
     would generate.
     Args:
-        image_shape: [Height, Width, Depth]
+        image_shape: [resize_height=512, resize_width=512, Depth]
         count: Number of ROIs to generate
         gt_boxes: list, [N, (y1, x1, y2, x2)] Ground truth boxes in pixels. Needed N > 0
     Returns:
@@ -1884,7 +1884,7 @@ def generate_random_rois(image_shape, count, gt_boxes):
     return rois
 
 
-def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
+def data_generator(dataset, config, shuffle=True, augment=True, random_rois_num=0,
                    batch_size=1, detection_targets=False):
     """A generator that returns images and corresponding target class ids,
     bounding box deltas, and masks.videos45/000000000026
@@ -1894,7 +1894,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
     shuffle: If True, shuffles the samples before every epoch
     augment: If True, applies image augmentation to images (currently only
              horizontal flips are supported)
-    random_rois: If > 0 then generate proposals to be used to train the
+    random_rois_num: If > 0 then generate proposals to be used to train the
                  network classifier and mask heads. Useful if training
                  the Mask RCNN part without the RPN.
     batch_size: How many images to return in each call
@@ -1977,10 +1977,10 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
             #                                         gt_class_ids, gt_boxes, config)
 
             # Mask R-CNN Targets
-            random_rois = 256
+            # random_rois_num = 256
             # detection_targets = True
-            if random_rois:
-                rpn_rois = generate_random_rois(image.shape, random_rois, pre_boxes)
+            if random_rois_num:
+                rpn_rois = generate_random_rois(image.shape, random_rois_num, pre_boxes)
                 if detection_targets:
                     rois, mrcnn_class_ids, mrcnn_bbox, mrcnn_mask, mrcnn_part = \
                         build_detection_targets(rpn_rois, gt_class_ids, gt_boxes, gt_masks, gt_parts, config)
@@ -2014,7 +2014,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
                     batch_pre_masks.append(np.zeros((batch_size,) + pre_mask.shape, dtype=np.float32))
                 for pre_part in pre_parts:
                     batch_pre_parts.append(np.zeros((batch_size,) + pre_part.shape, dtype=np.float32))
-                if random_rois:
+                if random_rois_num:
                     batch_rpn_rois = np.zeros(
                         (batch_size, rpn_rois.shape[0], 4), dtype=rpn_rois.dtype)
                     if detection_targets:
@@ -2052,7 +2052,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
                 batch_pre_masks[i][b] = pre_mask
             for i, pre_part in enumerate(pre_parts):
                 batch_pre_parts[i][b] = pre_part
-            if random_rois:
+            if random_rois_num:
                 batch_rpn_rois[b] = rpn_rois
                 if detection_targets:
                     batch_rois[b] = rois
@@ -2069,7 +2069,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
                           batch_gt_parts] + batch_pre_images + batch_pre_masks + batch_pre_parts
                 outputs = []
 
-                if random_rois:
+                if random_rois_num:
                     inputs.extend([batch_rpn_rois])
                     if detection_targets:
                         inputs.extend([batch_rois])
@@ -2581,10 +2581,10 @@ class MFP(object):
         # Data generators
         print("get train generator")
         train_generator = data_generator(train_dataset, self.config, shuffle=True,
-                                         batch_size=self.config.BATCH_SIZE)
+                                         random_rois_num=self.config.RANDOM_ROIS_NUM, batch_size=self.config.BATCH_SIZE)
         print("get val generator")
         val_generator = data_generator(val_dataset, self.config, shuffle=True,
-                                       batch_size=self.config.BATCH_SIZE)
+                                       random_rois_num=self.config.RANDOM_ROIS_NUM, batch_size=self.config.BATCH_SIZE)
 
         # Callbacks
         callbacks = [

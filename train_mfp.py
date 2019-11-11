@@ -5,18 +5,18 @@ from time import time
 sys.path.insert(0, os.getcwd())
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 
 from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
 from configs.vipdataset_for_mfp import VIPDatasetForMFP
-from models.mfp_model import MFP
+from models.mfp_model_roiprebox import MFP
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "mfp_20191031a"
+    NAME = "mfp_20191112a"
     # NAME = "mfp_debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 1
@@ -38,20 +38,21 @@ class trainConfig(ParsingRCNNModelConfig):
 ROOT_DIR = os.getcwd()
 
 # Path to trained weights file
-# PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
-PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191028b/checkpoints" + "/" + \
-                      "parsing_rcnn_mfp_20191028b_epoch003_loss1.366_valloss1.006.h5"
+
 
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
 DEFAULT_LOGS_DIR = "./outputs"
 # linux
+PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191028b/checkpoints" + "/" + \
+                      "parsing_rcnn_mfp_20191028b_epoch003_loss1.366_valloss1.006.h5"
 DEFAULT_DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-# pre_image_train_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_train_vip_singleframe_20190408a_epoch073"
-# pre_image_val_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_20190408a_epoch073"
 pre_image_train_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_train_vip_singleframe_parsing_rcnn"
 pre_image_val_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
+
+
 # win
+# PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
 # DEFAULT_DATASET_DIR = "D:\dataset\VIP_tiny"
 # pre_image_train_dir = "D:\dataset\VIP_tiny"
 # pre_image_val_dir = "D:\dataset\VIP_tiny"

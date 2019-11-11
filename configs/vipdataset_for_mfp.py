@@ -120,6 +120,7 @@ class ParsingRCNNModelConfig(Config):
     # the RPN. For example, to debug the classifier head without having to
     # train the RPN.
     USE_RPN_ROIS = False
+    RANDOM_ROIS_NUM = 256
 
     # parsing part class num
     NUM_PART_CLASS = 1 + 19  # background + classes
