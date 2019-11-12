@@ -12,22 +12,27 @@ session = tf.Session(config=config)
 
 from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
 from configs.vipdataset_for_mfp import VIPDatasetForMFP
-from models.mfp_model_roiprebox import MFP
+from models.mfp_model_roiprebox_tinyinput import MFP
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "mfp_20191112a"
+    NAME = "mfp_20191112b"
     # NAME = "mfp_debug"
     GPU_COUNT = 1
-    IMAGES_PER_GPU = 1
+    IMAGES_PER_GPU = 4
     # IMAGES_PER_GPU = 1
     STEPS_PER_EPOCH = 2000
     # STEPS_PER_EPOCH = 2
     VALIDATION_STEPS = 100
     # VALIDATION_STEPS = 1
     SAVE_MODEL_PERIOD = 1
-    IMAGE_MIN_DIM = 256  # 450, 256
-    IMAGE_MAX_DIM = 384  # 512, 416， 384（16*24）
+    # Use small images for faster training. Set the limits of the small side
+    # the large side, and that determines the image shape.
+    IMAGE_MIN_DIM = 450  # 450, 256
+    IMAGE_MAX_DIM = 512  # 512, 416， 384（16*24）
+    # use small pre image for training
+    PRE_IMAGE_SHAPE = [128, 128, 3]  # needed 128(PRE_IMAGE_SHAPE[0]) * 4 = 512(IMAGE_MAX_DIM)
+
     PRE_MULTI_FRAMES = 3
     RECURRENT_UNIT = "gru"
     assert RECURRENT_UNIT in ["gru", "lstm"]
@@ -44,8 +49,9 @@ ROOT_DIR = os.getcwd()
 # through the command line argument --logs
 DEFAULT_LOGS_DIR = "./outputs"
 # linux
-PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191028b/checkpoints" + "/" + \
-                      "parsing_rcnn_mfp_20191028b_epoch003_loss1.366_valloss1.006.h5"
+# PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191028b/checkpoints" + "/" + \
+#                       "parsing_rcnn_mfp_20191028b_epoch003_loss1.366_valloss1.006.h5"
+PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
 DEFAULT_DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
 pre_image_train_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_train_vip_singleframe_parsing_rcnn"
 pre_image_val_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"

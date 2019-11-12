@@ -2253,13 +2253,15 @@ class MFP(object):
         input_pre_parts = []
         for i in range(config.PRE_MULTI_FRAMES):
             # pre image
-            input_pre_images.append(KL.Input(shape=config.IMAGE_SHAPE.tolist(), name="input_pre_image_" + str(i)))
+            input_pre_images.append(KL.Input(shape=config.PRE_IMAGE_SHAPE, name="input_pre_image_" + str(i)))
             # pre mask
             input_pre_masks.append(
-                KL.Input(shape=[config.IMAGE_SHAPE[0], config.IMAGE_SHAPE[1], 1], name="input_pre_mask_" + str(i)))
+                KL.Input(shape=[config.PRE_IMAGE_SHAPE[0], config.PRE_IMAGE_SHAPE[1], 1],
+                         name="input_pre_mask_" + str(i)))
             # pre part
             input_pre_parts.append(
-                KL.Input(shape=[config.IMAGE_SHAPE[0], config.IMAGE_SHAPE[1], 20], name="input_pre_part_" + str(i)))
+                KL.Input(shape=[config.PRE_IMAGE_SHAPE[0], config.PRE_IMAGE_SHAPE[1], 20],
+                         name="input_pre_part_" + str(i)))
         # 8, rois from pre frames
         # Ignore predicted ROIs and use ROIs provided as an input.
         input_rois = KL.Input(shape=[config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4],
@@ -2280,7 +2282,7 @@ class MFP(object):
             feature_pre_parts = conv_lstm_unit(input_pre_parts, name="feature_pre_parts", initial_state=None)
         elif config.RECURRENT_UNIT == 'gru':
             # deal with pre images
-            feature_pre_images = conv3d_gru2d_unit(input_pre_images + [input_image], filter=config.RECURRENT_FILTER,
+            feature_pre_images = conv3d_gru2d_unit(input_pre_images, filter=config.RECURRENT_FILTER,
                                                    name="feature_pre_images")
             # deal with pre masks
             feature_pre_masks = conv3d_gru2d_unit(input_pre_masks, filter=config.RECURRENT_FILTER,
@@ -2290,9 +2292,9 @@ class MFP(object):
                                                   name="feature_pre_parts")
             feature_merge = conv3d_gru2d_unit([feature_pre_images, feature_pre_masks, feature_pre_parts],
                                               filter=config.RECURRENT_FILTER, name="merge")
-        C1, C2, C3, C4, C5 = deeplab_resnet(feature_merge, 'resnet50')
+        C1, C2, C3, C4, C5 = deeplab_resnet(input_image, 'resnet50')
         coarse_feature = global_parsing_encoder(C5)
-        fine_feature = global_parsing_decoder(coarse_feature, C1)
+        fine_feature = global_parsing_decoder(coarse_feature, feature_merge)
         # global parsing branch
         global_parsing_map = global_parsing_graph(fine_feature, config.NUM_PART_CLASS)
 

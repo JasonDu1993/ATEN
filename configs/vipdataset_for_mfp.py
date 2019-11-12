@@ -33,8 +33,11 @@ class ParsingRCNNModelConfig(Config):
 
     # Use small images for faster training. Set the limits of the small side
     # the large side, and that determines the image shape.
-    IMAGE_MIN_DIM = 256  # 450, 256
-    IMAGE_MAX_DIM = 416  # 512, 416
+    IMAGE_MIN_DIM = 450  # 450, 256
+    IMAGE_MAX_DIM = 512  # 512, 416
+
+    # use small pre image for training
+    PRE_IMAGE_SHAPE = [128, 128, 3]  # needed 128(PRE_IMAGE_SHAPE[0]) * 4 = 512(IMAGE_MAX_DIM)
 
     # If True, pad images with zeros such that they're (max_dim by max_dim)
     IMAGE_PADDING = True  # currently, the False option is not supported
@@ -281,7 +284,7 @@ class VIPDatasetForMFP(Dataset):
             for i in range(1, config.NUM_PART_CLASS):
                 pre_part[pre_part_tmp == i] = 1
             # print("pre_part generate cost:", time.time() - t0, "s")
-            pre_image, window, scale, padding = resize_image(pre_image, max_dim=config.IMAGE_MAX_DIM,
+            pre_image, window, scale, padding = resize_image(pre_image, max_dim=config.PRE_IMAGE_SHAPE[0],
                                                              padding=config.IMAGE_PADDING, isopencv=True)
             pre_mask = resize_mask(pre_mask, scale, padding, isopencv=True)[:, :, np.newaxis]  # shape [512, 512,1]
             pre_part = resize_part_mfp(pre_part, scale, padding, isopencv=True)  # [512,512,20]

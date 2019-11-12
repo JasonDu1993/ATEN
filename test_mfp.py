@@ -140,7 +140,7 @@ def load_pre_image_datas(image_name, pre_image_names, config):
         for i in range(1, config.NUM_PART_CLASS):
             pre_part[pre_part_tmp == i] = 1
         # print("pre_part generate cost:", time.time() - t0, "s")
-        pre_image, window, scale, padding = resize_image(pre_image, max_dim=config.IMAGE_MAX_DIM,
+        pre_image, window, scale, padding = resize_image(pre_image, max_dim=config.PRE_IMAGE_SHAPE[0],
                                                          padding=config.IMAGE_PADDING, isopencv=True)
         pre_mask = resize_mask(pre_mask, scale, padding, isopencv=True)[:, :, np.newaxis]  # shape [512, 512,1]
         pre_part = resize_part_mfp(pre_part, scale, padding, isopencv=True)  # [512,512,20]
