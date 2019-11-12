@@ -2032,8 +2032,6 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois_num=
 
             # Get GT bounding boxes and masks for image.
             image_id = image_ids[image_index]  # index for example 0, 1, 2 ..., image_ids is 0, 1, 2 ... shuffled
-            if dataset.image_info[image_index]["id"].endswith("000000000001"):
-                continue
             # 1. image(input_image): current frame input, shape (512, 512, 3)
             # 2. image_meta(meta_data): shape [10=1+3+4+2], meta include image_id(1), image_shape(3), window(4),
             #    active_class_ids(2), detail in func compose_image_meta

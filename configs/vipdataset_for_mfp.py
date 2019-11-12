@@ -223,7 +223,14 @@ class VIPDatasetForMFP(Dataset):
         image_info = self.image_info[image_index]  # image_index is index, for example 0, 1, 2 ...
         video_name, image_id = image_info["id"].split("/")  # image_id like 000000000001
         if image_id.endswith("000000000001"):
-            return []
+            with open(image_info['behind_frame_list'], 'r') as fp:
+                behind_frame_ids = [x.strip() for x in fp.readlines()]
+            pre_image_names = []
+            for i in range(key_num):
+                index_gap = i * (gap + 1)
+                pre_image_id = behind_frame_ids[index_gap]
+                pre_image_names.append([video_name, pre_image_id])
+            return pre_image_names[::-1]
         with open(image_info['front_frame_list'], 'r') as fp:
             front_frame_ids = [x.strip() for x in fp.readlines()]
 

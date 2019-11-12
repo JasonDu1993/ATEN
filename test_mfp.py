@@ -89,7 +89,12 @@ def load_pre_image_names(image_name, key_num=3, gap=1):
     video_name, image_id = image_name.strip().split("/")
     pre_image_names = []
     if image_id.endswith("000000000001"):
-        return pre_image_names
+        image_id_int = int(image_id) + 1
+        for i in range(key_num):
+            index_gap = i * (gap + 1)
+            pre_image_id = "%012d" % (image_id_int + index_gap)
+            pre_image_names.append([video_name, pre_image_id])
+        return pre_image_names[::-1]
     image_id_int = int(image_id) - 1
     for i in range(key_num):
         index_gap = i * (gap + 1)

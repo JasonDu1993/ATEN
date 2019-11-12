@@ -27,21 +27,22 @@ class InferenceConfig(vip.VideoModelConfig):
 
 
 config = InferenceConfig()
-DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+# DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+DATASET_DIR = "D:\dataset\VIP_tiny"
 
 # Root directory of the project
 ROOT_DIR = os.getcwd()
 MODEL_DIR = os.path.join(ROOT_DIR, "outputs_aten")
 # Directory of images to run detection on
-# MODEL_PATH = "./checkpoints/aten_p2l3.h5"
+MODEL_PATH = "./checkpoints/aten_p2l3.h5"
 # MODEL_PATH = "./outputs_aten/vip_video_20190103va/checkpoints/" \
 #              "aten_vip_video_20190103va_epoch200_loss1.441_valloss1.354.h5"
-MODEL_PATH = "./outputs_aten/vip_video_20190103vma/checkpoints/" \
-             "aten_vip_video_20190103vma_epoch200_loss3.426_valloss3.532.h5"
+# MODEL_PATH = "./outputs_aten/vip_video_20190103vma/checkpoints/" \
+#              "aten_vip_video_20190103vma_epoch200_loss3.426_valloss3.532.h5"
 IMAGE_DIR = DATASET_DIR + "/Images"
 FRONT_FRAME_LIST_DIR = DATASET_DIR + "/front_frame_list"
 BEHIND_FRAME_LIST_DIR = DATASET_DIR + "/behind_frame_list"
-mode = "val"
+mode = "traintiny"
 # RES_DIR = "./vis_aten/test_vip_video_20190103va_epoch169"
 RES_DIR = "./vis_aten/" + mode + "_vip_video_20190103vma_epoch200"
 # RES_DIR = "./vis_aten/val_vip_video"

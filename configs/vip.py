@@ -302,6 +302,7 @@ class VIPDataset(Dataset):
         # print(most_left_ind, frame_ind, most_right_ind)
         new_key_left = max(most_left_ind, frame_ind - int(key_range // 2))
         new_key_right = min(most_right_ind, frame_ind + (key_range - 1 - int(key_range // 2)))
+        # 重新随机挑选该帧旁边的几帧作为新的关键帧，list中值为len为2的list，第一个为帧号，第二个为1、0（表示当前帧号）
         sel_pool = []
         for i in range(new_key_left, new_key_right + 1):
             if i != frame_ind:
