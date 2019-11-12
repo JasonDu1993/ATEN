@@ -14,7 +14,7 @@ import numpy as np
 
 from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
 from utils.util import resize_image, resize_mask, resize_part_mfp
-from models.mfp_model import MFP
+from models.mfp_model_roiprebox import MFP
 from utils import visualize
 from time import time
 
@@ -37,7 +37,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # PRE_PREDICT_DATA_DIR = r"/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
 
 DATASET_DIR = "D:\dataset\VIP_tiny"
-MODEL_PATH = "outputs/mfp_20191028b/checkpoints/parsing_rcnn_mfp_20191028b_epoch003_loss1.366_valloss1.006.h5"
+MODEL_PATH = "outputs/mfp_20191112a/checkpoints/parsing_rcnn_mfp_20191112a_epoch006_loss0.852_valloss1.367.h5"
 IMAGE_DIR = DATASET_DIR + "/Images"
 IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
 PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
@@ -45,7 +45,7 @@ PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
 
 # RES_DIR = "./vis/trainval_vip_singleframe_20190408a_epoch073000"
 # RES_DIR = "./vis/test_vip_singleframe_20190326a_epoch032_t"
-RES_DIR = "./vis_mfp/debug"
+RES_DIR = "./vis_mfp/traintiny_vip_mfp_20191112a"
 flag = False
 if not os.path.exists(RES_DIR):
     os.makedirs(RES_DIR)
