@@ -16,7 +16,7 @@ from models.mfp_model_roiprebox_tinyinput import MFP
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "mfp_20191112c"
+    NAME = "mfp_20191113a"
     # NAME = "mfp_debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4

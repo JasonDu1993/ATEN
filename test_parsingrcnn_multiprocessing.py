@@ -90,10 +90,10 @@ def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
     images_set = images_set - tested_images_set
     f_tested = open(tested_path, "a")
     import keras.backend as K
-    config = tf.ConfigProto()
+    tf_config = tf.ConfigProto()
     # config.gpu_options.allow_growth = True
-    config.gpu_options.per_process_gpu_memory_fraction = 0.4
-    session = tf.Session(config=config)
+    tf_config.gpu_options.per_process_gpu_memory_fraction = 0.4
+    session = tf.Session(config=tf_config)
     # from models.parsing_rcnn_model_resfpn_dilated_se import PARSING_RCNN
     from models.parsing_rcnn_model import PARSING_RCNN
     if infer_config is None:

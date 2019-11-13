@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-# @Time    : 2019/5/7 15:00
+# @Time    : 2019/11/13 10:36
 # @Author  : Jason
 # @Email   : 1358681631@qq.com
-# @File    : test_parsingrcnn_multiprocessing.py
+# @File    : test_mfp_multiprocessing.py
 # @Software: PyCharm
 import os
 import sys
@@ -15,8 +15,8 @@ import skimage.io
 import matplotlib
 
 from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
-# from models.parsing_rcnn_model import PARSING_RCNN
 from utils import visualize
+from utils.util_load_mfp_data import get_scale, load_pre_image_names, load_pre_image_datas, load_pre_image_boxes
 
 import tensorflow as tf
 
@@ -33,24 +33,30 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Path to trained weights file
 # Download this file and place in the root of your
 # project (See README file for details)
+
+# linux
 # DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
 # MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190408a/checkpoints" + "/" + \
 #              "parsing_rcnn_vip_singleframe_20190408a_epoch073_loss0.401_valloss0.391.h5"
 # RES_DIR = "./vis/origin_val_vip_singleframe_parsing_rcnn"
 # gpus = ["0", "1", "2", "3"]
-
-# Directory of images to run detection on
 # IMAGE_DIR = DATASET_DIR + "/Images"
 # IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
+# PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
+# PRE_PREDICT_DATA_DIR = r"/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
+# test all val image in VIP dataset
 # IMAGE_DIR = DATASET_DIR + "/videos/val_videos_frames"
 # IMAGE_LIST = DATASET_DIR + "/lists/val_all_frames_id.txt"
 
+# win
 DATASET_DIR = "D:\dataset\VIP_tiny"
-MODEL_PATH = "./checkpoints/parsing_rcnn_mfp_20191025a_epoch003_loss7.044_valloss4.044.h5.h5"
-RES_DIR = "./vis/mfp_debuf"
+MODEL_PATH = "outputs/mfp_20191112b/checkpoints/parsing_rcnn_mfp_20191112b_epoch015_loss0.497_valloss0.506.h5"
+RES_DIR = "./vis_mfp/mfp_debug"
 gpus = ["0"]
 IMAGE_DIR = DATASET_DIR + "/Images"
 IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
+PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
+PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
 
 flag = False
 if not os.path.exists(RES_DIR):
@@ -58,26 +64,30 @@ if not os.path.exists(RES_DIR):
     flag = True
 
 
-# else:
-#     print(RES_DIR, "测试文件已存在，请检查是否需要修改预测文件名")
-
 class InferenceConfig(ParsingRCNNModelConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     PROCESS_NAME = "mfp_20191025a_epoch003"
-    GPU_COUNT = 1
-    PROCESS_COUNT = 2
+    GPU_COUNT = 1  # only 1
+    PROCESS_COUNT = 1
     IMAGES_PER_GPU = 1
     BATCH_SIZE = 1
-    ISCOLOR = False
+    # whether save the predicted visualized image
+    ISCOLOR = True
+    # open image tool
+    ISOPENCV = True
 
-    IMAGE_MIN_DIM = 256  # 450, 256
-    IMAGE_MAX_DIM = 384  # 512, 416， 384（16*24）
+    # Use small images for faster training. Set the limits of the small side
+    # the large side, and that determines the image shape.
+    IMAGE_MIN_DIM = 450  # 450, 256
+    IMAGE_MAX_DIM = 512  # 512, 416， 384（16*24）
+    # use small pre image for training
+    PRE_IMAGE_SHAPE = [128, 128, 3]  # needed 128(PRE_IMAGE_SHAPE[0]) * 4 = 512(IMAGE_MAX_DIM)
+
     PRE_MULTI_FRAMES = 3
     RECURRENT_UNIT = "gru"
     assert RECURRENT_UNIT in ["gru", "lstm"]
     RECURRENT_FILTER = 64
-
 
 
 def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
@@ -97,14 +107,12 @@ def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
     l = len(images_set)
     images_set = images_set - tested_images_set
     f_tested = open(tested_path, "a")
-    import keras.backend as K
-    config = tf.ConfigProto()
+    tf_config = tf.ConfigProto()
     # config.gpu_options.allow_growth = True
-    config.gpu_options.per_process_gpu_memory_fraction = 0.4
-    session = tf.Session(config=config)
+    tf_config.gpu_options.per_process_gpu_memory_fraction = 0.4
+    session = tf.Session(config=tf_config)
     # The below line need to correct every test time
-    from models.mfp_model import MFP
-    from models.parsing_rcnn_model import PARSING_RCNN
+    from models.mfp_model_roiprebox_tinyinput import MFP
     if infer_config is None:
         infer_config = InferenceConfig()
     model = MFP(mode="inference", config=infer_config, model_dir=MODEL_DIR)
@@ -128,22 +136,16 @@ def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
 
         print("line", c, line, "pid:", os.getpid())
         image = cv2.imread(os.path.join(IMAGE_DIR, vid, image_id) + '.jpg')
-        if image_id.endswith("000000000001"):
-            results = model.detect([image])
-        input_pre_images = []
-        input_pre_masks = []
-        input_pre_parts = []
-        for i in range(config.PRE_MULTI_FRAMES):
-            # pre image
-            input_pre_images.append()
-            # pre mask
-            input_pre_masks.append()
-            # pre part
-            input_pre_parts.append()
+        scale = get_scale(image.shape, infer_config)
+        pre_image_names = load_pre_image_names(line, key_num=infer_config.PRE_MULTI_FRAMES)
+        if len(pre_image_names) == 0:
+            continue
+        pre_images, pre_masks, pre_parts = load_pre_image_datas(line, pre_image_names, infer_config,
+                                                                       PRE_IMAGE_DIR, PRE_PREDICT_DATA_DIR)
+        pre_boxes = load_pre_image_boxes(pre_image_names, scale, PRE_PREDICT_DATA_DIR)
         # Run detection
-        # results = model.detect([image[:, :, ::-1]])
         t2 = time.time()
-        results = model.detect([image])
+        results = model.detect([image], pre_images, pre_masks, pre_parts, pre_boxes, isopencv=infer_config.ISOPENCV)
         t3 = time.time()
         print("  1, model test one image:", t3 - t2, "s")
         # Visualize results
@@ -202,7 +204,8 @@ def multiprocess_main():
                 split_data = images_list[start:end]
                 # 各个进程开始
                 tested_path = os.path.join(RES_DIR,
-                                           "tested_" + infer_config.PROCESS_NAME + "_gpu" + str(i) + "_proc" + str(j) + ".txt")
+                                           "tested_" + infer_config.PROCESS_NAME + "_gpu" + str(i) + "_proc" + str(
+                                               j) + ".txt")
                 proc = Process(target=worker,
                                args=(split_data, infer_config, gpu_id, tested_images_set, tested_path))
                 proc.start()

@@ -1556,7 +1556,7 @@ def load_image_gt(dataset, config, image_id, augment=False,
 
     # Image meta data
     image_meta = compose_image_meta(image_id, shape, window, active_class_ids)
-    return image, image_meta, class_ids, bbox, mask, part
+    return image, image_meta, class_ids, bbox, mask, part, scale
 
 
 def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
@@ -2041,14 +2041,14 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois_num=
             # 5. gt_masks(input_cur_mask): GT Masks (zero padded), [batch, height(default 56), width, MAX_GT_INSTANCES]
             # 6. gt_parts(input_cur_part):GT Part [resize_height(IMAGE_MAX_DIM=512), resize_width(IMAGE_MAX_DIM=512)]
             #    the value is 0-19, 0 is bg, 1-19 is the person part label
-            image, image_meta, gt_class_ids, gt_boxes, gt_masks, gt_parts = \
+            image, image_meta, gt_class_ids, gt_boxes, gt_masks, gt_parts, scale = \
                 load_image_gt(dataset, config, image_id, augment=augment,
                               use_mini_mask=config.USE_MINI_MASK)
             pre_image_names = dataset.load_pre_image_names(image_id)
             # 7. pre_images(input_pre_images): pre frame image input
             #    pre_masks(input_pre_masks): pre frame mask input
             #    pre_parts(input_pre_parts): pre frame part input
-            pre_images, pre_masks, pre_parts, scale = dataset.load_pre_image_datas(image_id, pre_image_names, config, )
+            pre_images, pre_masks, pre_parts,= dataset.load_pre_image_datas(image_id, pre_image_names, config, )
             pre_boxes = dataset.load_pre_image_boxes(image_id, pre_image_names, scale)
             # Skip images that have no instances. This can happen in cases
             # where we train on a subset of classes and the image doesn't

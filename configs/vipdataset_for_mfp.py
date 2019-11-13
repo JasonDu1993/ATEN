@@ -127,6 +127,11 @@ class ParsingRCNNModelConfig(Config):
 
     # parsing part class num
     NUM_PART_CLASS = 1 + 19  # background + classes
+    # whether save the predicted visualized image
+    ISCOLOR = True
+    # open image tool
+    ISOPENCV = False
+
 
 
 class VideoModelConfig(ParsingRCNNModelConfig):
@@ -258,7 +263,6 @@ class VIPDatasetForMFP(Dataset):
                 which value include 0 ~ num_person, 0 is bg, 1 ~ num_person is the person label
             pre_parts: list, the value is numpy.ndarray, shape [resize_height, resize_width, num_class=20],
                 which value include 0 ~ 19, 0 is bg, 1 ~ 19 is the person part label
-            scale:
 
         """
         image_info = self.image_info[image_index]  # image_index is index, for example 0, 1, 2 ...
@@ -268,7 +272,6 @@ class VIPDatasetForMFP(Dataset):
         pre_images = []
         pre_masks = []
         pre_parts = []
-        scale = 1
         for pre_video_name, pre_image_id in pre_image_names:
             pre_image_path = os.path.join(image_dir, "adjacent_frames", pre_video_name, image_id, pre_image_id + ".jpg")
             pre_mask_path = os.path.join(self.pre_image_dir, "vp_results", pre_video_name, "instance_segmentation",
@@ -291,7 +294,7 @@ class VIPDatasetForMFP(Dataset):
             pre_images.append(pre_image)
             pre_masks.append(pre_mask)
             pre_parts.append(pre_part)
-        return pre_images, pre_masks, pre_parts, scale
+        return pre_images, pre_masks, pre_parts
 
     def load_pre_image_boxes(self, image_index, pre_image_names, scale):
         """

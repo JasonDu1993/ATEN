@@ -13,9 +13,9 @@ sys.path.insert(0, os.getcwd())
 import numpy as np
 
 from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
-from utils.util import resize_image, resize_mask, resize_part_mfp
-from models.mfp_model_roiprebox import MFP
+from models.mfp_model_roiprebox_tinyinput import MFP
 from utils import visualize
+from utils.util_load_mfp_data import get_scale, load_pre_image_names, load_pre_image_datas, load_pre_image_boxes
 from time import time
 
 t0 = time()
@@ -37,15 +37,14 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # PRE_PREDICT_DATA_DIR = r"/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
 
 DATASET_DIR = "D:\dataset\VIP_tiny"
-MODEL_PATH = "outputs/mfp_20191112a/checkpoints/parsing_rcnn_mfp_20191112a_epoch006_loss0.852_valloss1.367.h5"
+MODEL_PATH = "outputs/mfp_20191112b/checkpoints/parsing_rcnn_mfp_20191112b_epoch015_loss0.497_valloss0.506.h5"
 IMAGE_DIR = DATASET_DIR + "/Images"
 IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
 PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
 PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
 
-# RES_DIR = "./vis/trainval_vip_singleframe_20190408a_epoch073000"
-# RES_DIR = "./vis/test_vip_singleframe_20190326a_epoch032_t"
-RES_DIR = "./vis_mfp/traintiny_vip_mfp_20191112a"
+RES_DIR = "./vis_mfp/debug"
+# RES_DIR = "./vis_mfp/traintiny_vip_mfp_20191112a"
 flag = False
 if not os.path.exists(RES_DIR):
     os.makedirs(RES_DIR)
@@ -62,114 +61,22 @@ class InferenceConfig(ParsingRCNNModelConfig):
     IMAGES_PER_GPU = 1
 
     BATCH_SIZE = 1
+    # whether save the predicted visualized image
     ISCOLOR = True
+    # open image tool
     ISOPENCV = True
 
-    IMAGE_MIN_DIM = 256  # 450, 256
-    IMAGE_MAX_DIM = 384  # 512, 416， 384（16*24）
+    # Use small images for faster training. Set the limits of the small side
+    # the large side, and that determines the image shape.
+    IMAGE_MIN_DIM = 450  # 450, 256
+    IMAGE_MAX_DIM = 512  # 512, 416， 384（16*24）
+    # use small pre image for training
+    PRE_IMAGE_SHAPE = [128, 128, 3]  # needed 128(PRE_IMAGE_SHAPE[0]) * 4 = 512(IMAGE_MAX_DIM)
+
     PRE_MULTI_FRAMES = 3
     RECURRENT_UNIT = "gru"
     assert RECURRENT_UNIT in ["gru", "lstm"]
     RECURRENT_FILTER = 64
-
-
-def load_pre_image_names(image_name, key_num=3, gap=1):
-    """
-
-    Args:
-        image_name: image_name includes video_name/image_id, for example videos45/000000000176
-        key_num: int, default is 3
-        gap: int, default is 1
-
-    Returns:
-        pre_image_names: list, the value is list, len=2, which represent video_name, pre_image_id
-
-    """
-    assert key_num * (gap + 1) < 10, "key_num(%d) * (gap(%d) + 1) >= 10" % (key_num, gap)
-    video_name, image_id = image_name.strip().split("/")
-    pre_image_names = []
-    if image_id.endswith("000000000001"):
-        image_id_int = int(image_id) + 1
-        for i in range(key_num):
-            index_gap = i * (gap + 1)
-            pre_image_id = "%012d" % (image_id_int + index_gap)
-            pre_image_names.append([video_name, pre_image_id])
-        return pre_image_names[::-1]
-    image_id_int = int(image_id) - 1
-    for i in range(key_num):
-        index_gap = i * (gap + 1)
-        pre_image_id = "%012d" % (image_id_int - index_gap)
-        pre_image_names.append([video_name, pre_image_id])
-    return pre_image_names
-
-
-def load_pre_image_datas(image_name, pre_image_names, config):
-    """
-
-    Args:
-        image_name: image_name includes video_name/image_id, for example videos45/000000000176
-        pre_image_names: list, the value is list, len=2, which represent video_name, pre_image_id
-        config: The model config object
-
-    Returns:
-        pre_images: list, the value is numpy.ndarray, shape [resize_height=512, resize_width=512, 3(BGR)]
-        pre_masks: list, the value is numpy.ndarray, shape [resize_height, resize_width, 1],
-            which value include 0 ~ num_person, 0 is bg, 1 ~ num_person is the person label
-        pre_parts: list, the value is numpy.ndarray, shape [resize_height, resize_width, num_class=20],
-            which value include 0 ~ 19, 0 is bg, 1 ~ 19 is the person part label
-        scale:
-
-    """
-    video_name, image_id = image_name.strip().split("/")
-    pre_images = []
-    pre_masks = []
-    pre_parts = []
-    scale = 1
-    for pre_video_name, pre_image_id in pre_image_names:
-        pre_image_path = os.path.join(PRE_IMAGE_DIR, "adjacent_frames", pre_video_name, image_id, pre_image_id + ".jpg")
-        pre_mask_path = os.path.join(PRE_PREDICT_DATA_DIR, "vp_results", pre_video_name, "instance_segmentation",
-                                     pre_image_id + ".png")
-        pre_part_path = os.path.join(PRE_PREDICT_DATA_DIR, "vp_results", pre_video_name, "global_parsing",
-                                     pre_image_id + ".png")
-        pre_image = cv2.imread(pre_image_path)  # shape [h=720, w=1080, 3(bgr)]
-        pre_mask = cv2.imread(pre_mask_path, flags=cv2.IMREAD_GRAYSCALE)  # shape [h=720, w=1080]
-        pre_part_tmp = cv2.imread(pre_part_path, flags=cv2.IMREAD_GRAYSCALE)  # shape [h=720, w=1080]
-        pre_part = np.zeros(pre_part_tmp.shape + (config.NUM_PART_CLASS,))
-        import time
-        t0 = time.time()
-        for i in range(1, config.NUM_PART_CLASS):
-            pre_part[pre_part_tmp == i] = 1
-        # print("pre_part generate cost:", time.time() - t0, "s")
-        pre_image, window, scale, padding = resize_image(pre_image, max_dim=config.PRE_IMAGE_SHAPE[0],
-                                                         padding=config.IMAGE_PADDING, isopencv=True)
-        pre_mask = resize_mask(pre_mask, scale, padding, isopencv=True)[:, :, np.newaxis]  # shape [512, 512,1]
-        pre_part = resize_part_mfp(pre_part, scale, padding, isopencv=True)  # [512,512,20]
-        pre_images.append(pre_image[np.newaxis, ...])
-        pre_masks.append(pre_mask[np.newaxis, ...])
-        pre_parts.append(pre_part[np.newaxis, ...])
-    return pre_images, pre_masks, pre_parts, scale
-
-
-def load_pre_image_boxes(pre_image_names, scale):
-    """
-
-    Args:
-        pre_image_names: list, the value is list, len=2, which represent video_name, pre_image_id
-        scale: The scale factor used to resize the image
-
-    Returns:
-        pre_boxes: list, the value is list, len is 4, which represent y1, x1, y2, x2.
-
-    """
-    pre_boxes = []
-    for pre_video_name, pre_image_id in pre_image_names:
-        boxes_path = os.path.join(PRE_PREDICT_DATA_DIR, "vp_results", pre_video_name, "instance_segmentation",
-                                  pre_image_id + ".txt")
-        with open(boxes_path, "r") as f:
-            for line in f.readlines():
-                y1, x1, y2, x2 = list(map(int, line.strip().split(" ")[1:]))
-                pre_boxes.append([round(y1 * scale), round(x1 * scale), round(y2 * scale), round(x2 * scale)])
-    return pre_boxes
 
 
 def main():
@@ -199,11 +106,13 @@ def main():
             os.makedirs(color_floder)
         print("line", c, line)
         image = cv2.imread(os.path.join(IMAGE_DIR, vid, image_id) + '.jpg')
+        scale = get_scale(image.shape, config)
         pre_image_names = load_pre_image_names(line, key_num=config.PRE_MULTI_FRAMES)
         if len(pre_image_names) == 0:
             continue
-        pre_images, pre_masks, pre_parts, scale = load_pre_image_datas(line, pre_image_names, config)
-        pre_boxes = load_pre_image_boxes(pre_image_names, scale)
+        pre_images, pre_masks, pre_parts= load_pre_image_datas(line, pre_image_names, config, PRE_IMAGE_DIR,
+                                                                       PRE_PREDICT_DATA_DIR)
+        pre_boxes = load_pre_image_boxes(pre_image_names, scale, PRE_PREDICT_DATA_DIR)
         # Run detection
         t2 = time()
         results = model.detect([image], pre_images, pre_masks, pre_parts, pre_boxes, isopencv=config.ISOPENCV)
