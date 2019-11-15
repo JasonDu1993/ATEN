@@ -11,7 +11,7 @@ import math
 import time
 from multiprocessing import Queue, Process
 from tqdm import tqdm
-import skimage.io
+# import skimage.io
 import matplotlib
 
 from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
@@ -36,10 +36,10 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 
 # linux
 DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191112c/checkpoints" + "/" + \
-             "parsing_rcnn_mfp_20191112c_epoch017_loss0.505_valloss0.511.h5"
-RES_DIR = "./vis_mfp/val_mfp_20191112c_epoch017"
-gpus = ["3"]
+MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191113a/checkpoints" + "/" + \
+             "parsing_rcnn_mfp_20191113a_epoch045_loss0.580_valloss0.759.h5"
+RES_DIR = "./vis_mfp/val_mfp_20191113a_epoch045"
+gpus = ["1"]
 IMAGE_DIR = DATASET_DIR + "/Images"
 IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
 PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
@@ -68,9 +68,9 @@ if not os.path.exists(RES_DIR):
 class InferenceConfig(ParsingRCNNModelConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
-    PROCESS_NAME = "mfp_20191112c_epoch017"
+    PROCESS_NAME = "mfp_20191113a_epoch045"
     GPU_COUNT = 1  # only 1
-    PROCESS_COUNT = 2
+    PROCESS_COUNT = 3
     IMAGES_PER_GPU = 1  # only 1
     BATCH_SIZE = 1  # only 1
     # whether save the predicted visualized image
@@ -110,7 +110,7 @@ def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
     f_tested = open(tested_path, "a")
     tf_config = tf.ConfigProto()
     # config.gpu_options.allow_growth = True
-    tf_config.gpu_options.per_process_gpu_memory_fraction = 0.4
+    tf_config.gpu_options.per_process_gpu_memory_fraction = 0.3
     session = tf.Session(config=tf_config)
     # The below line need to correct every test time
     from models.mfp_model_roiprebox_tinyinput import MFP
