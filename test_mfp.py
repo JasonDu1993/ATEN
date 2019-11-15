@@ -1,7 +1,7 @@
 import os
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 # config.gpu_options.per_process_gpu_memory_fraction = 0.3
@@ -28,23 +28,23 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Path to trained weights file
 # Download this file and place in the root of your 
 # project (See README file for details)
-# DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-# MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191031a/checkpoints" + "/" + \
-#              "parsing_rcnn_mfp_20191031a_epoch023_loss0.899_valloss0.571.h5"
-# IMAGE_DIR = DATASET_DIR + "/Images"
-# IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
-# PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
-# PRE_PREDICT_DATA_DIR = r"/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
-
-DATASET_DIR = "D:\dataset\VIP_tiny"
-MODEL_PATH = "outputs/mfp_20191112b/checkpoints/parsing_rcnn_mfp_20191112b_epoch015_loss0.497_valloss0.506.h5"
+DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191112c/checkpoints" + "/" + \
+             "parsing_rcnn_mfp_20191112c_epoch017_loss0.505_valloss0.511.h5"
 IMAGE_DIR = DATASET_DIR + "/Images"
-IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
-PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
-PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
+IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
+PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
+PRE_PREDICT_DATA_DIR = r"/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
+RES_DIR = "./vis_mfp/val_mfp_20191112c_epoch017"
 
-RES_DIR = "./vis_mfp/debug"
-# RES_DIR = "./vis_mfp/traintiny_vip_mfp_20191112a"
+# DATASET_DIR = "D:\dataset\VIP_tiny"
+# MODEL_PATH = "outputs/mfp_20191112b/checkpoints/parsing_rcnn_mfp_20191112b_epoch015_loss0.497_valloss0.506.h5"
+# IMAGE_DIR = DATASET_DIR + "/Images"
+# IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
+# PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
+# PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
+# RES_DIR = "./vis_mfp/debug"
+
 flag = False
 if not os.path.exists(RES_DIR):
     os.makedirs(RES_DIR)

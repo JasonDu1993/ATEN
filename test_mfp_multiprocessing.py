@@ -35,28 +35,29 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # project (See README file for details)
 
 # linux
-# DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-# MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190408a/checkpoints" + "/" + \
-#              "parsing_rcnn_vip_singleframe_20190408a_epoch073_loss0.401_valloss0.391.h5"
-# RES_DIR = "./vis/origin_val_vip_singleframe_parsing_rcnn"
-# gpus = ["0", "1", "2", "3"]
-# IMAGE_DIR = DATASET_DIR + "/Images"
-# IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
-# PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
-# PRE_PREDICT_DATA_DIR = r"/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
+DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191112c/checkpoints" + "/" + \
+             "parsing_rcnn_mfp_20191112c_epoch017_loss0.505_valloss0.511.h5"
+RES_DIR = "./vis_mfp/val_mfp_20191112c_epoch017"
+gpus = ["3"]
+IMAGE_DIR = DATASET_DIR + "/Images"
+IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
+PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
+PRE_PREDICT_DATA_DIR = r"/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
+
 # test all val image in VIP dataset
 # IMAGE_DIR = DATASET_DIR + "/videos/val_videos_frames"
 # IMAGE_LIST = DATASET_DIR + "/lists/val_all_frames_id.txt"
 
 # win
-DATASET_DIR = "D:\dataset\VIP_tiny"
-MODEL_PATH = "outputs/mfp_20191112b/checkpoints/parsing_rcnn_mfp_20191112b_epoch015_loss0.497_valloss0.506.h5"
-RES_DIR = "./vis_mfp/mfp_debug"
-gpus = ["0"]
-IMAGE_DIR = DATASET_DIR + "/Images"
-IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
-PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
-PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
+# DATASET_DIR = "D:\dataset\VIP_tiny"
+# MODEL_PATH = "outputs/mfp_20191112b/checkpoints/parsing_rcnn_mfp_20191112b_epoch015_loss0.497_valloss0.506.h5"
+# RES_DIR = "./vis_mfp/mfp_debug"
+# gpus = ["0"]
+# IMAGE_DIR = DATASET_DIR + "/Images"
+# IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
+# PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
+# PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
 
 flag = False
 if not os.path.exists(RES_DIR):
@@ -67,11 +68,11 @@ if not os.path.exists(RES_DIR):
 class InferenceConfig(ParsingRCNNModelConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
-    PROCESS_NAME = "mfp_20191025a_epoch003"
+    PROCESS_NAME = "mfp_20191112c_epoch017"
     GPU_COUNT = 1  # only 1
-    PROCESS_COUNT = 1
-    IMAGES_PER_GPU = 1
-    BATCH_SIZE = 1
+    PROCESS_COUNT = 2
+    IMAGES_PER_GPU = 1  # only 1
+    BATCH_SIZE = 1  # only 1
     # whether save the predicted visualized image
     ISCOLOR = True
     # open image tool
@@ -82,7 +83,7 @@ class InferenceConfig(ParsingRCNNModelConfig):
     IMAGE_MIN_DIM = 450  # 450, 256
     IMAGE_MAX_DIM = 512  # 512, 416， 384（16*24）
     # use small pre image for training
-    PRE_IMAGE_SHAPE = [128, 128, 3]  # needed 128(PRE_IMAGE_SHAPE[0]) * 4 = 512(IMAGE_MAX_DIM)
+    PRE_IMAGE_SHAPE = [64, 64, 3]  # needed 128(PRE_IMAGE_SHAPE[0]) * 4 = 512(IMAGE_MAX_DIM)
 
     PRE_MULTI_FRAMES = 3
     RECURRENT_UNIT = "gru"
@@ -141,7 +142,7 @@ def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
         if len(pre_image_names) == 0:
             continue
         pre_images, pre_masks, pre_parts = load_pre_image_datas(line, pre_image_names, infer_config,
-                                                                       PRE_IMAGE_DIR, PRE_PREDICT_DATA_DIR)
+                                                                PRE_IMAGE_DIR, PRE_PREDICT_DATA_DIR)
         pre_boxes = load_pre_image_boxes(pre_image_names, scale, PRE_PREDICT_DATA_DIR)
         # Run detection
         t2 = time.time()
@@ -152,7 +153,7 @@ def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
         r = results[0]
         if iscolor:
             # visualize.vis_insts(image, color_floder, image_id, r['boxes'], r['masks'], r['class_ids'], r['scores'])
-            masked_image = visualize.vis_insts_opencv(image[:, :, ::-1], color_floder, image_id, r['boxes'], r['masks'],
+            masked_image = visualize.vis_insts_opencv(image, color_floder, image_id, r['boxes'], r['masks'],
                                                       r['class_ids'], r['scores'])
             # masked_image = visualize.vis_insts_opencv(image, color_floder, image_id, r['boxes'], r['masks'],
             #                       r['class_ids'], r['scores'])

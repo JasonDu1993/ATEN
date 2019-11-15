@@ -69,7 +69,7 @@ def compute_iou(box, boxes, box_area, boxes_area):
     x2 = np.minimum(box[3], boxes[:, 3])
     intersection = np.maximum(x2 - x1, 0) * np.maximum(y2 - y1, 0)
     union = box_area + boxes_area[:] - intersection[:]
-    iou = intersection / union
+    iou = intersection / (union + 1e-7)
     return iou
 
 
@@ -764,7 +764,7 @@ def compute_ap(gt_boxes, gt_class_ids,
 
     # Compute precision and recall at each prediction box step
     precisions = np.cumsum(pred_match) / (np.arange(len(pred_match)) + 1)
-    recalls = np.cumsum(pred_match).astype(np.float32) / len(gt_match)
+    recalls = np.cumsum(pred_match).astype(np.float32) / (len(gt_match) + 1e-7)
 
     # Pad with start and end values to simplify the math
     precisions = np.concatenate([[0], precisions, [0]])
@@ -798,7 +798,7 @@ def compute_recall(pred_boxes, gt_boxes, iou):
     positive_ids = np.where(iou_max >= iou)[0]
     matched_gt_boxes = iou_argmax[positive_ids]
 
-    recall = len(set(matched_gt_boxes)) / gt_boxes.shape[0]
+    recall = len(set(matched_gt_boxes)) / (gt_boxes.shape[0] + 1e-7)
     return recall, positive_ids
 
 

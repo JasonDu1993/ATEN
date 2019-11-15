@@ -473,7 +473,7 @@ def write_inst_result_quickly(res_dir, color_dir, height, width, image_id, boxes
         coo = np.where(mask > 0)
         u1_pixels = len(coo[0])
 
-        if float(u1_pixels) / float(u_pixels) <= nms_like_thre:
+        if float(u1_pixels) / (float(u_pixels) + 1e-7) <= nms_like_thre:
             continue
 
         # write score and bbox
