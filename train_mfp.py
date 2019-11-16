@@ -2,26 +2,28 @@ import os
 import sys
 from time import time
 
-sys.path.insert(0, os.getcwd())
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+sys.path.insert(0, os.getcwd())
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 
 from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
 from configs.vipdataset_for_mfp import VIPDatasetForMFP
-from models.mfp_model_roiprebox_tinyinput import MFP
+from models.mfp_model_roiprebox_tinyinput_rpn import MFP
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "mfp_20191113a"
+    NAME = "mfp_20191116a"
     # NAME = "mfp_debug"
     GPU_COUNT = 1
-    IMAGES_PER_GPU = 4
+    IMAGES_PER_GPU = 6
     # IMAGES_PER_GPU = 1
-    STEPS_PER_EPOCH = 2000
+    STEPS_PER_EPOCH = 1500
     # STEPS_PER_EPOCH = 2
     VALIDATION_STEPS = 100
     # VALIDATION_STEPS = 1
@@ -31,12 +33,13 @@ class trainConfig(ParsingRCNNModelConfig):
     IMAGE_MIN_DIM = 450  # 450, 256
     IMAGE_MAX_DIM = 512  # 512, 416， 384（16*24）
     # use small pre image for training
-    PRE_IMAGE_SHAPE = [64, 64, 3]  # needed 128(PRE_IMAGE_SHAPE[0]) * 4 = 512(IMAGE_MAX_DIM)
+    PRE_IMAGE_SHAPE = [128, 128, 3]  # needed 128(PRE_IMAGE_SHAPE[0]) * 4 = 512(IMAGE_MAX_DIM)
 
     PRE_MULTI_FRAMES = 3
     RECURRENT_UNIT = "gru"
     assert RECURRENT_UNIT in ["gru", "lstm"]
     RECURRENT_FILTER = 64
+    USE_RPN_ROIS = True  #
 
 
 # Root directory of the project
@@ -55,7 +58,6 @@ PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
 DEFAULT_DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
 pre_image_train_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_train_vip_singleframe_parsing_rcnn"
 pre_image_val_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
-
 
 # win
 # PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")

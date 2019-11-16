@@ -1934,7 +1934,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
                                                     gt_class_ids, gt_boxes, config)
 
             # Mask R-CNN Targets
-            random_rois = 256
+            random_rois = 0
             # detection_targets = True
             if random_rois:
                 rpn_rois = generate_random_rois(
@@ -2303,7 +2303,7 @@ class PARSING_RCNN():
         """
         import h5py
         import keras
-        if keras.__version__ > "2.1.3":
+        if keras.__version__ > "2.2.0":
             from keras.engine import saving as s
         else:
             from keras.engine import topology as s

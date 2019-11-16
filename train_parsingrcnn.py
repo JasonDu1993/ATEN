@@ -5,7 +5,7 @@ from time import time
 sys.path.insert(0, os.getcwd())
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
@@ -17,8 +17,8 @@ from models.parsing_rcnn_model import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    NAME = "vip_singleframe_20190923a"
-    # NAME = "vip_singleframe_test"
+    # NAME = "vip_singleframe_20190923a"
+    NAME = "vip_singleframe_test"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
     # IMAGES_PER_GPU = 1
@@ -33,8 +33,8 @@ class trainConfig(ParsingRCNNModelConfig):
 ROOT_DIR = os.getcwd()
 
 # Path to trained weights file
-# PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
-PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "mask_rcnn_coco.h5")
+PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
+# PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "mask_rcnn_coco.h5")
 # PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190326a/checkpoints/" \
 #                       "parsing_rcnn_vip_singleframe_20190326a_epoch038_loss0.491_valloss0.550.h5"
 
@@ -55,7 +55,9 @@ if __name__ == '__main__':
     tail -f outs/train_vip_video_20190903a.out
     """
     import argparse
+    from time import strftime
 
+    print("training at:", strftime("%Y_%m%d_%H%M%S"))
     t0 = time()
     # Parse command line arguments
     parser = argparse.ArgumentParser(
