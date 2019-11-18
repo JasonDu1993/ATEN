@@ -2883,7 +2883,7 @@ class MFP(object):
 
         return boxes, class_ids, scores, full_masks, global_parsing
 
-    def detect(self, images, pre_images, pre_masks, pre_parts, pre_boxes, verbose=0, isopencv=False):
+    def detect(self, images, pre_images, pre_masks, pre_parts, verbose=0, isopencv=False):
         """Runs the detection pipeline.
         Args:
             images: List of images, potentially of different sizes.
@@ -2904,15 +2904,16 @@ class MFP(object):
                 log("image", image)
         # Mold inputs to format expected by the neural network
         molded_images, image_metas, windows = self.mold_inputs(images, isopencv=isopencv)
-        random_rois = 256
-        rpn_rois = generate_random_rois(images[0].shape, random_rois, pre_boxes)
+        # random_rois = 256
+        # rpn_rois = generate_random_rois(images[0].shape, random_rois, pre_boxes)
         if verbose:
             log("molded_images", molded_images)
             log("image_metas", image_metas)
         # Run object detection
-        detections, mrcnn_class, mrcnn_bbox, mrcnn_mask, mrcnn_global_parsing_prob = \
+        detections, mrcnn_class, mrcnn_bbox, mrcnn_mask, \
+        rpn_rois, rpn_class, rpn_bbox, mrcnn_global_parsing_prob = \
             self.keras_model.predict(
-                [molded_images, image_metas] + pre_images + pre_masks + pre_parts + [rpn_rois[np.newaxis, ...]],
+                [molded_images, image_metas] + pre_images + pre_masks + pre_parts,
                 verbose=0)
         # Process detections
         results = []

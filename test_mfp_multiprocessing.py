@@ -10,8 +10,6 @@ import cv2
 import math
 import time
 from multiprocessing import Queue, Process
-from tqdm import tqdm
-# import skimage.io
 import matplotlib
 
 from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
@@ -35,29 +33,29 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # project (See README file for details)
 
 # linux
-DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191113a/checkpoints" + "/" + \
-             "parsing_rcnn_mfp_20191113a_epoch045_loss0.580_valloss0.759.h5"
-RES_DIR = "./vis_mfp/val_mfp_20191113a_epoch045"
-gpus = ["1"]
-IMAGE_DIR = DATASET_DIR + "/Images"
-IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
-PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
-PRE_PREDICT_DATA_DIR = r"/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
+# DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+# MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191113a/checkpoints" + "/" + \
+#              "parsing_rcnn_mfp_20191113a_epoch045_loss0.580_valloss0.759.h5"
+# RES_DIR = "./vis_mfp/val_mfp_20191113a_epoch045"
+# gpus = ["1"]
+# IMAGE_DIR = DATASET_DIR + "/Images"
+# IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
+# PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
+# PRE_PREDICT_DATA_DIR = r"/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
 
 # test all val image in VIP dataset
 # IMAGE_DIR = DATASET_DIR + "/videos/val_videos_frames"
 # IMAGE_LIST = DATASET_DIR + "/lists/val_all_frames_id.txt"
 
 # win
-# DATASET_DIR = "D:\dataset\VIP_tiny"
-# MODEL_PATH = "outputs/mfp_20191112b/checkpoints/parsing_rcnn_mfp_20191112b_epoch015_loss0.497_valloss0.506.h5"
-# RES_DIR = "./vis_mfp/mfp_debug"
-# gpus = ["0"]
-# IMAGE_DIR = DATASET_DIR + "/Images"
-# IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
-# PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
-# PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
+DATASET_DIR = "D:\dataset\VIP_tiny"
+MODEL_PATH = "outputs/mfp_20191116a/checkpoints/parsing_rcnn_mfp_20191116a_epoch003_loss0.741_valloss0.753.h5"
+RES_DIR = "./vis_mfp/mfp_debug1"
+gpus = ["0"]
+IMAGE_DIR = DATASET_DIR + "/Images"
+IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
+PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
+PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
 
 flag = False
 if not os.path.exists(RES_DIR):
@@ -68,9 +66,9 @@ if not os.path.exists(RES_DIR):
 class InferenceConfig(ParsingRCNNModelConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
-    PROCESS_NAME = "mfp_20191113a_epoch045"
+    PROCESS_NAME = "mfp_20191113a_epoch045"  # for tmp tested image name
     GPU_COUNT = 1  # only 1
-    PROCESS_COUNT = 3
+    PROCESS_COUNT = 1
     IMAGES_PER_GPU = 1  # only 1
     BATCH_SIZE = 1  # only 1
     # whether save the predicted visualized image
@@ -83,12 +81,13 @@ class InferenceConfig(ParsingRCNNModelConfig):
     IMAGE_MIN_DIM = 450  # 450, 256
     IMAGE_MAX_DIM = 512  # 512, 416， 384（16*24）
     # use small pre image for training
-    PRE_IMAGE_SHAPE = [64, 64, 3]  # needed 128(PRE_IMAGE_SHAPE[0]) * 4 = 512(IMAGE_MAX_DIM)
+    PRE_IMAGE_SHAPE = [128, 128, 3]  # needed 128(PRE_IMAGE_SHAPE[0]) * 4 = 512(IMAGE_MAX_DIM)
 
     PRE_MULTI_FRAMES = 3
     RECURRENT_UNIT = "gru"
     assert RECURRENT_UNIT in ["gru", "lstm"]
     RECURRENT_FILTER = 64
+    USE_RPN_ROIS = True  # for rpn
 
 
 def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
@@ -113,7 +112,7 @@ def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
     tf_config.gpu_options.per_process_gpu_memory_fraction = 0.3
     session = tf.Session(config=tf_config)
     # The below line need to correct every test time
-    from models.mfp_model_roiprebox_tinyinput import MFP
+    from models.mfp_model_roiprebox_tinyinput_rpn import MFP
     if infer_config is None:
         infer_config = InferenceConfig()
     model = MFP(mode="inference", config=infer_config, model_dir=MODEL_DIR)
@@ -137,16 +136,16 @@ def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
 
         print("line", c, line, "pid:", os.getpid())
         image = cv2.imread(os.path.join(IMAGE_DIR, vid, image_id) + '.jpg')
-        scale = get_scale(image.shape, infer_config)
+        # scale = get_scale(image.shape, infer_config)
         pre_image_names = load_pre_image_names(line, key_num=infer_config.PRE_MULTI_FRAMES)
         if len(pre_image_names) == 0:
             continue
         pre_images, pre_masks, pre_parts = load_pre_image_datas(line, pre_image_names, infer_config,
                                                                 PRE_IMAGE_DIR, PRE_PREDICT_DATA_DIR)
-        pre_boxes = load_pre_image_boxes(pre_image_names, scale, PRE_PREDICT_DATA_DIR)
+        # pre_boxes = load_pre_image_boxes(pre_image_names, scale, PRE_PREDICT_DATA_DIR)
         # Run detection
         t2 = time.time()
-        results = model.detect([image], pre_images, pre_masks, pre_parts, pre_boxes, isopencv=infer_config.ISOPENCV)
+        results = model.detect([image], pre_images, pre_masks, pre_parts, isopencv=infer_config.ISOPENCV)
         t3 = time.time()
         print("  1, model test one image:", t3 - t2, "s")
         # Visualize results

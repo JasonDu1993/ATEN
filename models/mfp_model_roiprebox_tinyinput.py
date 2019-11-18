@@ -2882,7 +2882,8 @@ class MFP(object):
         # Mold inputs to format expected by the neural network
         molded_images, image_metas, windows = self.mold_inputs(images, isopencv=isopencv)
         random_rois = 256
-        rpn_rois = generate_random_rois(images[0].shape, random_rois, pre_boxes)
+        # rpn_rois = generate_random_rois(images[0].shape, random_rois, pre_boxes)
+        rpn_rois = generate_rois(images[0].shape, random_rois, pre_boxes)
         if verbose:
             log("molded_images", molded_images)
             log("image_metas", image_metas)

@@ -77,6 +77,7 @@ class InferenceConfig(ParsingRCNNModelConfig):
     RECURRENT_UNIT = "gru"
     assert RECURRENT_UNIT in ["gru", "lstm"]
     RECURRENT_FILTER = 64
+    USE_RPN_ROIS = True  #
 
 
 def main():
