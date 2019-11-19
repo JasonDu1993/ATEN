@@ -78,28 +78,35 @@ def load_pre_image_datas(image_name, pre_image_names, config, pre_image_dir, pre
     pre_masks = []
     pre_parts = []
     scale = 1
-    for pre_video_name, pre_image_id in pre_image_names:
-        pre_image_path = os.path.join(pre_image_dir, "adjacent_frames", pre_video_name, image_id, pre_image_id + ".jpg")
-        pre_mask_path = os.path.join(pre_predict_data_dir, "vp_results", pre_video_name, "instance_segmentation",
-                                     pre_image_id + ".png")
-        pre_part_path = os.path.join(pre_predict_data_dir, "vp_results", pre_video_name, "global_parsing",
-                                     pre_image_id + ".png")
-        pre_image = cv2.imread(pre_image_path)  # shape [h=720, w=1080, 3(bgr)]
-        pre_mask = cv2.imread(pre_mask_path, flags=cv2.IMREAD_GRAYSCALE)  # shape [h=720, w=1080]
-        pre_part_tmp = cv2.imread(pre_part_path, flags=cv2.IMREAD_GRAYSCALE)  # shape [h=720, w=1080]
-        pre_part = np.zeros(pre_part_tmp.shape + (config.NUM_PART_CLASS,))
-        import time
-        t0 = time.time()
-        for i in range(1, config.NUM_PART_CLASS):
-            pre_part[pre_part_tmp == i] = 1
-        # print("pre_part generate cost:", time.time() - t0, "s")
-        pre_image, window, scale, padding = resize_image(pre_image, max_dim=config.PRE_IMAGE_SHAPE[0],
-                                                         padding=config.IMAGE_PADDING, isopencv=True)
-        pre_mask = resize_mask(pre_mask, scale, padding, isopencv=True)[:, :, np.newaxis]  # shape [512, 512,1]
-        pre_part = resize_part_mfp(pre_part, scale, padding, isopencv=True)  # [512,512,20]
-        pre_images.append(pre_image[np.newaxis, ...])
-        pre_masks.append(pre_mask[np.newaxis, ...])
-        pre_parts.append(pre_part[np.newaxis, ...])
+    padding = [(0, 0), (0, 0), (0, 0)]
+    if config.IS_PRE_IMAGE:
+        for pre_video_name, pre_image_id in pre_image_names:
+            pre_image_path = os.path.join(pre_image_dir, "adjacent_frames", pre_video_name, image_id,
+                                          pre_image_id + ".jpg")
+            pre_image = cv2.imread(pre_image_path)  # shape [h=720, w=1080, 3(bgr)]
+            pre_image, window, scale, padding = resize_image(pre_image, max_dim=config.PRE_IMAGE_SHAPE[0],
+                                                             padding=config.IMAGE_PADDING, isopencv=True)
+            pre_images.append(pre_image[np.newaxis, ...])
+    if config.IS_PRE_MASK:
+        for pre_video_name, pre_image_id in pre_image_names:
+            pre_mask_path = os.path.join(pre_predict_data_dir, "vp_results", pre_video_name, "instance_segmentation",
+                                         pre_image_id + ".png")
+            pre_mask = cv2.imread(pre_mask_path, flags=cv2.IMREAD_GRAYSCALE)  # shape [h=720, w=1080]
+            pre_mask = resize_mask(pre_mask, scale, padding, isopencv=True)[:, :, np.newaxis]  # shape [512, 512,1]
+            pre_masks.append(pre_mask[np.newaxis, ...])
+    if config.IS_PRE_PART:
+        for pre_video_name, pre_image_id in pre_image_names:
+            pre_part_path = os.path.join(pre_predict_data_dir, "vp_results", pre_video_name, "global_parsing",
+                                         pre_image_id + ".png")
+            pre_part_tmp = cv2.imread(pre_part_path, flags=cv2.IMREAD_GRAYSCALE)  # shape [h=720, w=1080]
+            pre_part = np.zeros(pre_part_tmp.shape + (config.NUM_PART_CLASS,))
+            import time
+            t0 = time.time()
+            for i in range(1, config.NUM_PART_CLASS):
+                pre_part[pre_part_tmp == i] = 1
+            # print("pre_part generate cost:", time.time() - t0, "s")
+            pre_part = resize_part_mfp(pre_part, scale, padding, isopencv=True)  # [512,512,20]
+            pre_parts.append(pre_part[np.newaxis, ...])
     return pre_images, pre_masks, pre_parts
 
 

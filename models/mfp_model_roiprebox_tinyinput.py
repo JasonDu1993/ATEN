@@ -21,6 +21,29 @@ from utils import util
 
 assert LooseVersion(tf.__version__) >= LooseVersion("1.3")
 assert LooseVersion(keras.__version__) >= LooseVersion('2.0.8')
+from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
+
+
+############################################################
+#  config
+############################################################
+class MFPConfig(ParsingRCNNModelConfig):
+    IS_PRE_IMAGE = True
+    IS_PRE_MASK = False
+    IS_PRE_PART = False
+
+    # Use small images for faster training. Set the limits of the small side
+    # the large side, and that determines the image shape.
+    IMAGE_MIN_DIM = 450  # 450, 256
+    IMAGE_MAX_DIM = 512  # 512, 416， 384（16*24）
+    # use small pre image for training
+    PRE_IMAGE_SHAPE = [128, 128, 3]  # needed 128(PRE_IMAGE_SHAPE[0]) * 4 = 512(IMAGE_MAX_DIM)
+
+    PRE_MULTI_FRAMES = 3
+    RECURRENT_UNIT = "gru"
+    assert RECURRENT_UNIT in ["gru", "lstm"]
+    RECURRENT_FILTER = 64
+    USE_RPN_ROIS = True  #
 
 
 ############################################################
@@ -2048,7 +2071,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois_num=
             # 7. pre_images(input_pre_images): pre frame image input
             #    pre_masks(input_pre_masks): pre frame mask input
             #    pre_parts(input_pre_parts): pre frame part input
-            pre_images, pre_masks, pre_parts,= dataset.load_pre_image_datas(image_id, pre_image_names, config, )
+            pre_images, pre_masks, pre_parts, = dataset.load_pre_image_datas(image_id, pre_image_names, config, )
             pre_boxes = dataset.load_pre_image_boxes(image_id, pre_image_names, scale)
             # Skip images that have no instances. This can happen in cases
             # where we train on a subset of classes and the image doesn't

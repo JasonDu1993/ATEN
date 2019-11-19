@@ -1,6 +1,8 @@
 import os
+import platform
 import tensorflow as tf
 
+MACHINE_NAME = platform.node()
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -12,8 +14,7 @@ import cv2
 sys.path.insert(0, os.getcwd())
 import numpy as np
 
-from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
-from models.mfp_model_roiprebox_tinyinput import MFP
+from models.mfp_model_roiprebox_tinyinput_rpn import MFP, MFPConfig
 from utils import visualize
 from utils.util_load_mfp_data import get_scale, load_pre_image_names, load_pre_image_datas, load_pre_image_boxes
 from time import time
@@ -28,22 +29,23 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Path to trained weights file
 # Download this file and place in the root of your 
 # project (See README file for details)
-DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191112c/checkpoints" + "/" + \
-             "parsing_rcnn_mfp_20191112c_epoch017_loss0.505_valloss0.511.h5"
-IMAGE_DIR = DATASET_DIR + "/Images"
-IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
-PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
-PRE_PREDICT_DATA_DIR = r"/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
-RES_DIR = "./vis_mfp/val_mfp_20191112c_epoch017"
-
-# DATASET_DIR = "D:\dataset\VIP_tiny"
-# MODEL_PATH = "outputs/mfp_20191112b/checkpoints/parsing_rcnn_mfp_20191112b_epoch015_loss0.497_valloss0.506.h5"
-# IMAGE_DIR = DATASET_DIR + "/Images"
-# IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
-# PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
-# PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
-# RES_DIR = "./vis_mfp/debug"
+if MACHINE_NAME == "Jason":
+    DATASET_DIR = "D:\dataset\VIP_tiny"
+    MODEL_PATH = "outputs/mfp_20191112b/checkpoints/parsing_rcnn_mfp_20191112b_epoch015_loss0.497_valloss0.506.h5"
+    IMAGE_DIR = DATASET_DIR + "/Images"
+    IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
+    PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
+    PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
+    RES_DIR = "./vis_mfp/debug"
+else:
+    DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191112c/checkpoints" + "/" + \
+                 "parsing_rcnn_mfp_20191112c_epoch017_loss0.505_valloss0.511.h5"
+    IMAGE_DIR = DATASET_DIR + "/Images"
+    IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
+    PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
+    PRE_PREDICT_DATA_DIR = r"/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
+    RES_DIR = "./vis_mfp/val_mfp_20191112c_epoch017"
 
 flag = False
 if not os.path.exists(RES_DIR):
@@ -54,7 +56,7 @@ if not os.path.exists(RES_DIR):
 # else:
 #     print(RES_DIR, "测试文件已存在，请检查是否需要修改预测文件名")
 
-class InferenceConfig(ParsingRCNNModelConfig):
+class InferenceConfig(MFPConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     GPU_COUNT = 1
@@ -65,19 +67,6 @@ class InferenceConfig(ParsingRCNNModelConfig):
     ISCOLOR = True
     # open image tool
     ISOPENCV = True
-
-    # Use small images for faster training. Set the limits of the small side
-    # the large side, and that determines the image shape.
-    IMAGE_MIN_DIM = 450  # 450, 256
-    IMAGE_MAX_DIM = 512  # 512, 416， 384（16*24）
-    # use small pre image for training
-    PRE_IMAGE_SHAPE = [128, 128, 3]  # needed 128(PRE_IMAGE_SHAPE[0]) * 4 = 512(IMAGE_MAX_DIM)
-
-    PRE_MULTI_FRAMES = 3
-    RECURRENT_UNIT = "gru"
-    assert RECURRENT_UNIT in ["gru", "lstm"]
-    RECURRENT_FILTER = 64
-    USE_RPN_ROIS = True  #
 
 
 def main():
@@ -111,12 +100,12 @@ def main():
         pre_image_names = load_pre_image_names(line, key_num=config.PRE_MULTI_FRAMES)
         if len(pre_image_names) == 0:
             continue
-        pre_images, pre_masks, pre_parts= load_pre_image_datas(line, pre_image_names, config, PRE_IMAGE_DIR,
-                                                                       PRE_PREDICT_DATA_DIR)
-        pre_boxes = load_pre_image_boxes(pre_image_names, scale, PRE_PREDICT_DATA_DIR)
+        pre_images, pre_masks, pre_parts = load_pre_image_datas(line, pre_image_names, config, PRE_IMAGE_DIR,
+                                                                PRE_PREDICT_DATA_DIR)
+        # pre_boxes = load_pre_image_boxes(pre_image_names, scale, PRE_PREDICT_DATA_DIR)
         # Run detection
         t2 = time()
-        results = model.detect([image], pre_images, pre_masks, pre_parts, pre_boxes, isopencv=config.ISOPENCV)
+        results = model.detect([image], pre_images, pre_masks, pre_parts, isopencv=config.ISOPENCV)
         t3 = time()
         print("  1, model test one image:", t3 - t2, "s")
         # Visualize results
@@ -137,4 +126,7 @@ def main():
 
 
 if __name__ == '__main__':
+    from time import strftime
+
+    print("testing at:", strftime("%Y_%m%d_%H%M%S"))
     main()

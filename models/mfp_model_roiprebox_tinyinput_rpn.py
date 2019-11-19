@@ -21,6 +21,29 @@ from utils import util
 
 assert LooseVersion(tf.__version__) >= LooseVersion("1.3")
 assert LooseVersion(keras.__version__) >= LooseVersion('2.0.8')
+from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
+
+
+############################################################
+#  config
+############################################################
+class MFPConfig(ParsingRCNNModelConfig):
+    IS_PRE_IMAGE = True
+    IS_PRE_MASK = False
+    IS_PRE_PART = True
+
+    # Use small images for faster training. Set the limits of the small side
+    # the large side, and that determines the image shape.
+    IMAGE_MIN_DIM = 450  # 450, 256
+    IMAGE_MAX_DIM = 512  # 512, 416， 384（16*24）
+    # use small pre image for training
+    PRE_IMAGE_SHAPE = [128, 128, 3]  # needed 128(PRE_IMAGE_SHAPE[0]) * 4 = 512(IMAGE_MAX_DIM)
+
+    PRE_MULTI_FRAMES = 3
+    RECURRENT_UNIT = "gru"
+    assert RECURRENT_UNIT in ["gru", "lstm"]
+    RECURRENT_FILTER = 64
+    USE_RPN_ROIS = True  # for rpn
 
 
 ############################################################
@@ -2257,17 +2280,22 @@ class MFP(object):
         input_pre_images = []
         input_pre_masks = []
         input_pre_parts = []
-        for i in range(config.PRE_MULTI_FRAMES):
-            # pre image
-            input_pre_images.append(KL.Input(shape=config.PRE_IMAGE_SHAPE, name="input_pre_image_" + str(i)))
-            # pre mask
-            input_pre_masks.append(
-                KL.Input(shape=[config.PRE_IMAGE_SHAPE[0], config.PRE_IMAGE_SHAPE[1], 1],
-                         name="input_pre_mask_" + str(i)))
-            # pre part
-            input_pre_parts.append(
-                KL.Input(shape=[config.PRE_IMAGE_SHAPE[0], config.PRE_IMAGE_SHAPE[1], 20],
-                         name="input_pre_part_" + str(i)))
+        if config.IS_PRE_IMAGE:
+            for i in range(config.PRE_MULTI_FRAMES):
+                # pre image
+                input_pre_images.append(KL.Input(shape=config.PRE_IMAGE_SHAPE, name="input_pre_image_" + str(i)))
+        if config.IS_PRE_MASK:
+            for i in range(config.PRE_MULTI_FRAMES):
+                # pre mask
+                input_pre_masks.append(
+                    KL.Input(shape=[config.PRE_IMAGE_SHAPE[0], config.PRE_IMAGE_SHAPE[1], 1],
+                             name="input_pre_mask_" + str(i)))
+        if config.IS_PRE_PART:
+            for i in range(config.PRE_MULTI_FRAMES):
+                # pre part
+                input_pre_parts.append(
+                    KL.Input(shape=[config.PRE_IMAGE_SHAPE[0], config.PRE_IMAGE_SHAPE[1], 20],
+                             name="input_pre_part_" + str(i)))
         # # 8, rois from pre frames
         # # Ignore predicted ROIs and use ROIs provided as an input.
         # input_rois = KL.Input(shape=[config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4],
@@ -2288,16 +2316,26 @@ class MFP(object):
             feature_pre_parts = conv_lstm_unit(input_pre_parts, name="feature_pre_parts", initial_state=None)
         elif config.RECURRENT_UNIT == 'gru':
             # deal with pre images
-            feature_pre_images = conv3d_gru2d_unit(input_pre_images, filter=config.RECURRENT_FILTER,
-                                                   name="feature_pre_images")
+            feature_pre_images = []
+            if config.IS_PRE_IMAGE:
+                feature_pre_images.append(
+                    conv3d_gru2d_unit(input_pre_images, filter=config.RECURRENT_FILTER, name="feature_pre_images"))
             # deal with pre masks
-            feature_pre_masks = conv3d_gru2d_unit(input_pre_masks, filter=config.RECURRENT_FILTER,
-                                                  name="feature_pre_masks")
+            feature_pre_masks = []
+            if config.IS_PRE_MASK:
+                feature_pre_masks.append(
+                    conv3d_gru2d_unit(input_pre_masks, filter=config.RECURRENT_FILTER, name="feature_pre_masks"))
             # deal with pre parts
-            feature_pre_parts = conv3d_gru2d_unit(input_pre_parts, filter=config.RECURRENT_FILTER,
-                                                  name="feature_pre_parts")
-            feature_merge = conv3d_gru2d_unit([feature_pre_images, feature_pre_masks, feature_pre_parts],
-                                              filter=config.RECURRENT_FILTER, name="merge")
+            feature_pre_parts = []
+            if config.IS_PRE_PART:
+                feature_pre_parts.append(
+                    conv3d_gru2d_unit(input_pre_parts, filter=config.RECURRENT_FILTER, name="feature_pre_parts"))
+            features = feature_pre_images + feature_pre_masks + feature_pre_parts
+            if len(features) > 1:
+                feature_merge = conv3d_gru2d_unit(features,
+                                                  filter=config.RECURRENT_FILTER, name="merge")
+            else:
+                feature_merge = features[0]
         C1, C2, C3, C4, C5 = deeplab_resnet(input_image, 'resnet50')
         coarse_feature = global_parsing_encoder(C5)
         fine_feature = global_parsing_decoder(coarse_feature, feature_merge)

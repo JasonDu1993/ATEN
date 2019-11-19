@@ -3,6 +3,7 @@ import logging
 import os
 import random
 import re
+import math
 # Requires TensorFlow 1.3+ and Keras 2.0.8+.
 from distutils.version import LooseVersion
 
@@ -42,7 +43,7 @@ class MFPConfig(ParsingRCNNModelConfig):
     RECURRENT_UNIT = "gru"
     assert RECURRENT_UNIT in ["gru", "lstm"]
     RECURRENT_FILTER = 64
-    USE_RPN_ROIS = True  #
+    USE_RPN_ROIS = True  # for rpn
 
 
 ############################################################
@@ -1578,7 +1579,7 @@ def load_image_gt(dataset, config, image_id, augment=False,
 
     # Image meta data
     image_meta = compose_image_meta(image_id, shape, window, active_class_ids)
-    return image, image_meta, class_ids, bbox, mask, part
+    return image, image_meta, class_ids, bbox, mask, part, scale
 
 
 def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
@@ -1907,6 +1908,92 @@ def generate_random_rois(image_shape, count, gt_boxes):
     return rois
 
 
+def generate_rois(image_shape, counts, gt_boxes):
+    """Generates ROI proposals similar to what a region proposal network
+    would generate.
+    Args:
+        image_shape: [resize_height=512, resize_width=512, Depth]
+        counts: Number of ROIs to generate
+        gt_boxes: list, [N, (y1, x1, y2, x2)] Ground truth boxes in pixels. Needed N > 0
+    Returns:
+        rois: ndarray, [count, (y1, x1, y2, x2)] ROI boxes in pixels.
+    """
+    # placeholder
+    rois = np.zeros((counts, 4), dtype=np.int32)
+    new_rois = []  # tmp
+    resize_height, resize_width, _ = image_shape
+    new_rois.extend(gt_boxes)
+    gt_boxes = np.array(gt_boxes)
+    N = gt_boxes.shape[0]
+    count = counts - N
+    # Generate random ROIs around GT boxes (90% of count)
+    rois_per_box = int(count / N)
+    for i in range(N):
+        gt_y1, gt_x1, gt_y2, gt_x2 = gt_boxes[i]
+        cx = (gt_x1 + gt_x2) // 2
+        cy = (gt_y1 + gt_y2) // 2
+        w = gt_x2 - gt_x1
+        h = gt_y2 - gt_y1
+        w_scale = [0.8, 1, 1.2]
+        h_scale = [0.8, 1, 1.2]
+        for hs in h_scale:
+            for ws in w_scale:
+                new_w = int(w * ws)
+                new_h = int(h * hs)
+                new_x1 = max(cx - new_w // 2, 0)
+                new_x2 = min(cx + new_w // 2, resize_width)
+                new_y1 = max(cy - new_h // 2, 0)
+                new_y2 = min(cy + new_h // 2, resize_height)
+                new_rois.append([new_y1, new_x1, new_y2, new_x2])
+        if rois_per_box > 9:
+            grid_num = math.ceil(math.sqrt((rois_per_box - 9) / (len(w_scale) * len(h_scale))))
+            if grid_num & 1 == 1:
+                grid_num += 1
+            grid_per_w = w // grid_num
+            grid_per_h = h // grid_num
+            for w_i in range(grid_num):
+                for h_j in range(grid_num):
+                    new_cx = gt_x1 + w_i * grid_per_w + grid_per_w // 2
+                    new_cy = gt_y1 + h_j * grid_per_h + grid_per_h // 2
+                    for hs in h_scale:
+                        for ws in w_scale:
+                            new_w = int(w * ws)
+                            new_h = int(h * hs)
+                            new_x1 = max(new_cx - new_w // 2, 0)
+                            new_x2 = min(new_cx + new_w // 2, resize_width)
+                            new_y1 = max(new_cy - new_h // 2, 0)
+                            new_y2 = min(new_cy + new_h // 2, resize_height)
+                            new_rois.append([new_y1, new_x1, new_y2, new_x2])
+    # Generate random ROIs anywhere in the image
+    remaining_count = counts - len(new_rois)
+    # To avoid generating boxes with zero area, we generate double what
+    # we need and filter out the extra. If we get fewer valid boxes
+    # than we need, we loop and try again.
+    if remaining_count > 0:
+        while True:
+            y1y2 = np.random.randint(0, image_shape[0], (remaining_count * 2, 2))
+            x1x2 = np.random.randint(0, image_shape[1], (remaining_count * 2, 2))
+            # Filter out zero area boxes
+            threshold = 1
+            y1y2 = y1y2[np.abs(y1y2[:, 0] - y1y2[:, 1]) >=
+                        threshold][:remaining_count]
+            x1x2 = x1x2[np.abs(x1x2[:, 0] - x1x2[:, 1]) >=
+                        threshold][:remaining_count]
+            if y1y2.shape[0] == remaining_count and x1x2.shape[0] == remaining_count:
+                break
+
+        # Sort on axis 1 to ensure x1 <= x2 and y1 <= y2 and then reshape
+        # into x1, y1, x2, y2 order
+        x1, x2 = np.split(np.sort(x1x2, axis=1), 2, axis=1)
+        y1, y2 = np.split(np.sort(y1y2, axis=1), 2, axis=1)
+        global_rois = np.hstack([y1, x1, y2, x2])
+        rois[:-remaining_count] = np.array(new_rois)
+        rois[-remaining_count:] = global_rois
+    else:
+        rois[:] = np.array(new_rois)[:counts]
+    return rois
+
+
 def data_generator(dataset, config, shuffle=True, augment=True, random_rois_num=0,
                    batch_size=1, detection_targets=False):
     """A generator that returns images and corresponding target class ids,
@@ -1977,14 +2064,14 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois_num=
             # 5. gt_masks(input_cur_mask): GT Masks (zero padded), [batch, height(default 56), width, MAX_GT_INSTANCES]
             # 6. gt_parts(input_cur_part):GT Part [resize_height(IMAGE_MAX_DIM=512), resize_width(IMAGE_MAX_DIM=512)]
             #    the value is 0-19, 0 is bg, 1-19 is the person part label
-            image, image_meta, gt_class_ids, gt_boxes, gt_masks, gt_parts = \
+            image, image_meta, gt_class_ids, gt_boxes, gt_masks, gt_parts, scale = \
                 load_image_gt(dataset, config, image_id, augment=augment,
                               use_mini_mask=config.USE_MINI_MASK)
             pre_image_names = dataset.load_pre_image_names(image_id)
             # 7. pre_images(input_pre_images): pre frame image input
             #    pre_masks(input_pre_masks): pre frame mask input
             #    pre_parts(input_pre_parts): pre frame part input
-            pre_images, pre_masks, pre_parts, scale = dataset.load_pre_image_datas(image_id, pre_image_names, config, )
+            pre_images, pre_masks, pre_parts, = dataset.load_pre_image_datas(image_id, pre_image_names, config, )
             pre_boxes = dataset.load_pre_image_boxes(image_id, pre_image_names, scale)
             # Skip images that have no instances. This can happen in cases
             # where we train on a subset of classes and the image doesn't
@@ -1994,23 +2081,24 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois_num=
             if len(pre_boxes) == 0:
                 continue
             # RPN Targets
-            # rpn_match, rpn_bbox = build_rpn_targets(image.shape, anchors,
-            #                                         gt_class_ids, gt_boxes, config)
+            rpn_match, rpn_bbox = build_rpn_targets(image.shape, anchors,
+                                                    gt_class_ids, gt_boxes, config)
 
             # Mask R-CNN Targets
             # random_rois_num = 256
             # detection_targets = True
             if random_rois_num:
-                rpn_rois = generate_random_rois(image.shape, random_rois_num, pre_boxes)
+                # rpn_rois = generate_random_rois(image.shape, random_rois, pre_boxes)
+                rpn_rois = generate_rois(image.shape, random_rois_num, pre_boxes)
                 if detection_targets:
                     rois, mrcnn_class_ids, mrcnn_bbox, mrcnn_mask, mrcnn_part = \
                         build_detection_targets(rpn_rois, gt_class_ids, gt_boxes, gt_masks, gt_parts, config)
             # Init batch arrays
             if b == 0:
-                # batch_rpn_match = np.zeros(
-                #     [batch_size, anchors.shape[0], 1], dtype=rpn_match.dtype)
-                # batch_rpn_bbox = np.zeros(
-                #     [batch_size, config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4], dtype=rpn_bbox.dtype)
+                batch_rpn_match = np.zeros(
+                    [batch_size, anchors.shape[0], 1], dtype=rpn_match.dtype)
+                batch_rpn_bbox = np.zeros(
+                    [batch_size, config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4], dtype=rpn_bbox.dtype)
                 batch_images = np.zeros(
                     (batch_size,) + image.shape, dtype=np.float32)
                 batch_image_meta = np.zeros(
@@ -2059,8 +2147,8 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois_num=
                 gt_masks = gt_masks[:, :, ids]
 
             # Add to batch
-            # batch_rpn_match[b] = rpn_match[:, np.newaxis]
-            # batch_rpn_bbox[b] = rpn_bbox
+            batch_rpn_match[b] = rpn_match[:, np.newaxis]
+            batch_rpn_bbox[b] = rpn_bbox
             batch_images[b] = mold_image(image.astype(np.float32), config)
             batch_image_meta[b] = image_meta
             batch_gt_class_ids[b, :gt_class_ids.shape[0]] = gt_class_ids
@@ -2086,6 +2174,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois_num=
             # Batch full?
             if b >= batch_size:
                 inputs = [batch_images, batch_image_meta,
+                          batch_rpn_match, batch_rpn_bbox,
                           batch_gt_class_ids, batch_gt_boxes, batch_gt_masks,
                           batch_gt_parts] + batch_pre_images + batch_pre_masks + batch_pre_parts
                 outputs = []
@@ -2182,26 +2271,38 @@ class MFP(object):
             input_cur_part = KL.Input(
                 shape=[config.IMAGE_SHAPE[0], config.IMAGE_SHAPE[1]],
                 name="input_cur_part", dtype=tf.uint8)
+            # 8, RPN GT
+            input_rpn_match = KL.Input(
+                shape=[None, 1], name="input_rpn_match", dtype=tf.int32)
+            input_rpn_bbox = KL.Input(
+                shape=[None, 4], name="input_rpn_bbox", dtype=tf.float32)
         # 7, pre frame input(pre image+mask+part)
         input_pre_images = []
         input_pre_masks = []
         input_pre_parts = []
-        for i in range(config.PRE_MULTI_FRAMES):
-            # pre image
-            input_pre_images.append(KL.Input(shape=config.IMAGE_SHAPE.tolist(), name="input_pre_image_" + str(i)))
-            # pre mask
-            input_pre_masks.append(
-                KL.Input(shape=[config.IMAGE_SHAPE[0], config.IMAGE_SHAPE[1], 1], name="input_pre_mask_" + str(i)))
-            # pre part
-            input_pre_parts.append(
-                KL.Input(shape=[config.IMAGE_SHAPE[0], config.IMAGE_SHAPE[1], 20], name="input_pre_part_" + str(i)))
-        # 8, rois from pre frames
-        # Ignore predicted ROIs and use ROIs provided as an input.
-        input_rois = KL.Input(shape=[config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4],
-                              name="input_roi", dtype=tf.float32)
-        # Normalize coordinates
-        target_rois = KL.Lambda(lambda x: norm_boxes_graph(
-            x, K.shape(input_image)[1:3]))(input_rois)
+        if config.IS_PRE_IMAGE:
+            for i in range(config.PRE_MULTI_FRAMES):
+                # pre image
+                input_pre_images.append(KL.Input(shape=config.PRE_IMAGE_SHAPE, name="input_pre_image_" + str(i)))
+        if config.IS_PRE_MASK:
+            for i in range(config.PRE_MULTI_FRAMES):
+                # pre mask
+                input_pre_masks.append(
+                    KL.Input(shape=[config.PRE_IMAGE_SHAPE[0], config.PRE_IMAGE_SHAPE[1], 1],
+                             name="input_pre_mask_" + str(i)))
+        if config.IS_PRE_PART:
+            for i in range(config.PRE_MULTI_FRAMES):
+                # pre part
+                input_pre_parts.append(
+                    KL.Input(shape=[config.PRE_IMAGE_SHAPE[0], config.PRE_IMAGE_SHAPE[1], 20],
+                             name="input_pre_part_" + str(i)))
+        # # 8, rois from pre frames
+        # # Ignore predicted ROIs and use ROIs provided as an input.
+        # input_rois = KL.Input(shape=[config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4],
+        #                       name="input_roi", dtype=tf.float32)
+        # # Normalize coordinates
+        # target_rois = KL.Lambda(lambda x: norm_boxes_graph(
+        #     x, K.shape(input_image)[1:3]))(input_rois)
 
         # above is the model input
 
@@ -2215,26 +2316,36 @@ class MFP(object):
             feature_pre_parts = conv_lstm_unit(input_pre_parts, name="feature_pre_parts", initial_state=None)
         elif config.RECURRENT_UNIT == 'gru':
             # deal with pre images
-            feature_pre_images = conv3d_gru2d_unit(input_pre_images + [input_image], filter=config.RECURRENT_FILTER,
-                                                   name="feature_pre_images")
+            feature_pre_images = []
+            if config.IS_PRE_IMAGE:
+                feature_pre_images.append(
+                    conv3d_gru2d_unit(input_pre_images, filter=config.RECURRENT_FILTER, name="feature_pre_images"))
             # deal with pre masks
-            feature_pre_masks = conv3d_gru2d_unit(input_pre_masks, filter=config.RECURRENT_FILTER,
-                                                  name="feature_pre_masks")
+            feature_pre_masks = []
+            if config.IS_PRE_MASK:
+                feature_pre_masks.append(
+                    conv3d_gru2d_unit(input_pre_masks, filter=config.RECURRENT_FILTER, name="feature_pre_masks"))
             # deal with pre parts
-            feature_pre_parts = conv3d_gru2d_unit(input_pre_parts, filter=config.RECURRENT_FILTER,
-                                                  name="feature_pre_parts")
-            feature_merge = conv3d_gru2d_unit([feature_pre_images, feature_pre_masks, feature_pre_parts],
-                                              filter=config.RECURRENT_FILTER, name="merge")
-        C1, C2, C3, C4, C5 = deeplab_resnet(feature_merge, 'resnet50')
+            feature_pre_parts = []
+            if config.IS_PRE_PART:
+                feature_pre_parts.append(
+                    conv3d_gru2d_unit(input_pre_parts, filter=config.RECURRENT_FILTER, name="feature_pre_parts"))
+            features = feature_pre_images + feature_pre_masks + feature_pre_parts
+            if len(features) > 1:
+                feature_merge = conv3d_gru2d_unit(features,
+                                                  filter=config.RECURRENT_FILTER, name="merge")
+            else:
+                feature_merge = features[0]
+        C1, C2, C3, C4, C5 = deeplab_resnet(input_image, 'resnet50')
         coarse_feature = global_parsing_encoder(C5)
-        fine_feature = global_parsing_decoder(coarse_feature, C1)
+        fine_feature = global_parsing_decoder(coarse_feature, feature_merge)
         # global parsing branch
         global_parsing_map = global_parsing_graph(fine_feature, config.NUM_PART_CLASS)
 
-        # rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
-        #                             name='mrcnn_share_rpn_conv1')(fine_feature)
-        # rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
-        #                             name='mrcnn_share_rpn_conv2')(rpn_feature_map)  # shape [batch, 128, 128, 256]
+        rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
+                                    name='mrcnn_share_rpn_conv1')(fine_feature)
+        rpn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
+                                    name='mrcnn_share_rpn_conv2')(rpn_feature_map)  # shape [batch, 128, 128, 256]
 
         mrcnn_feature_map = KL.Conv2D(256, (3, 3), activation='relu', padding='same',
                                       name='mrcnn_share_recog_conv1')(fine_feature)
@@ -2249,9 +2360,9 @@ class MFP(object):
                                              config.RPN_ANCHOR_STRIDE)
 
         # RPN Model
-        # rpn_class_logits, rpn_class, rpn_bbox = rpn_graph(rpn_feature_map,
-        #                                                 len(config.RPN_ANCHOR_RATIOS) * len(config.RPN_ANCHOR_SCALES),
-        #                                                   config.RPN_ANCHOR_STRIDE)
+        rpn_class_logits, rpn_class, rpn_bbox = rpn_graph(rpn_feature_map,
+                                                          len(config.RPN_ANCHOR_RATIOS) * len(config.RPN_ANCHOR_SCALES),
+                                                          config.RPN_ANCHOR_STRIDE)
 
         # Generate proposals
         # Proposals are [batch, N, (y1, x1, y2, x2)] in normalized coordinates
@@ -2260,19 +2371,27 @@ class MFP(object):
             else config.POST_NMS_ROIS_INFERENCE
         pre_proposal_count = config.PRE_NMS_ROIS_TRAINING if mode == "training" \
             else config.PRE_NMS_ROIS_INFERENCE
-        # rpn_rois = ProposalLayer(proposal_count=proposal_count,
-        #                          pre_proposal_count=pre_proposal_count,
-        #                          nms_threshold=config.RPN_NMS_THRESHOLD,
-        #                          name="ROI",
-        #                          anchors=self.anchors,
-        #                          config=config)([rpn_class, rpn_bbox])
+        rpn_rois = ProposalLayer(proposal_count=proposal_count,
+                                 pre_proposal_count=pre_proposal_count,
+                                 nms_threshold=config.RPN_NMS_THRESHOLD,
+                                 name="ROI",
+                                 anchors=self.anchors,
+                                 config=config)([rpn_class, rpn_bbox])
         # rpn_rois: [batch, proposal_count, 4], the coordinate is normalized to 1
         if mode == "training":
             # Class ID mask to mark class IDs supported by the dataset the image
             # came from.
             _, _, _, active_class_ids = KL.Lambda(lambda x: parse_image_meta_graph(x),
                                                   mask=[None, None, None, None])(input_image_meta)
-
+            if not config.USE_RPN_ROIS:
+                # Ignore predicted ROIs and use ROIs provided as an input.
+                input_rois = KL.Input(shape=[config.POST_NMS_ROIS_TRAINING, 4],
+                                      name="input_roi", dtype=np.int32)
+                # Normalize coordinates
+                target_rois = KL.Lambda(lambda x: norm_boxes_graph(
+                    x, K.shape(input_image)[1:3]))(input_rois)
+            else:
+                target_rois = rpn_rois  # shape [batch, proposal_count, 4], the coordinate is normalized to 1
             # Generate detection targets
             # Subsamples proposals and generates target outputs for training
             # Note that proposal class IDs, gt_boxes, and gt_masks are zero
@@ -2300,10 +2419,10 @@ class MFP(object):
             output_rois = KL.Lambda(lambda x: x * 1, name="output_rois")(rois)
 
             # Losses
-            # rpn_class_loss = KL.Lambda(lambda x: rpn_class_loss_graph(*x), name="rpn_class_loss")(
-            #     [input_rpn_match, rpn_class_logits])
-            # rpn_bbox_loss = KL.Lambda(lambda x: rpn_bbox_loss_graph(config, *x), name="rpn_bbox_loss")(
-            #     [input_rpn_bbox, input_rpn_match, rpn_bbox])
+            rpn_class_loss = KL.Lambda(lambda x: rpn_class_loss_graph(*x), name="rpn_class_loss")(
+                [input_rpn_match, rpn_class_logits])
+            rpn_bbox_loss = KL.Lambda(lambda x: rpn_bbox_loss_graph(config, *x), name="rpn_bbox_loss")(
+                [input_rpn_bbox, input_rpn_match, rpn_bbox])
             class_loss = KL.Lambda(lambda x: mrcnn_class_loss_graph(*x), name="mrcnn_class_loss")(
                 [target_class_ids, mrcnn_class_logits, active_class_ids])
             bbox_loss = KL.Lambda(lambda x: mrcnn_bbox_loss_graph(*x), name="mrcnn_bbox_loss")(
@@ -2315,24 +2434,29 @@ class MFP(object):
                 [input_cur_part, global_parsing_map])
 
             # Model
-            inputs = [input_image, input_image_meta, input_cur_class_ids, input_cur_boxes,
+            inputs = [input_image, input_image_meta,
+                      input_rpn_match, input_rpn_bbox,
+                      input_cur_class_ids, input_cur_boxes,
                       input_cur_mask,
                       input_cur_part] + input_pre_images + input_pre_masks + input_pre_parts
             if not config.USE_RPN_ROIS:
                 inputs.append(input_rois)
-            outputs = [mrcnn_class_logits, mrcnn_class, mrcnn_bbox, mrcnn_mask,
-                       output_rois, class_loss, bbox_loss, mask_loss,
+            outputs = [rpn_class_logits, rpn_class, rpn_bbox,
+                       mrcnn_class_logits, mrcnn_class, mrcnn_bbox, mrcnn_mask,
+                       rpn_rois, output_rois,
+                       rpn_class_loss, rpn_bbox_loss, class_loss, bbox_loss, mask_loss,
                        global_parsing_loss]
             model = KM.Model(inputs, outputs, name='parsing_rcnn')
         else:
             # Network Heads
             # Proposal classifier and BBox regressor heads
+            target_rois = rpn_rois
             mrcnn_class_logits, mrcnn_class, mrcnn_bbox = \
                 fpn_classifier_graph(target_rois, mrcnn_feature_map, config.IMAGE_SHAPE,
                                      config.POOL_SIZE, config.NUM_CLASSES)
 
             # Detections
-            target_rois = KL.Lambda(lambda x: x * 1, name="output_rois")(target_rois)
+            # target_rois = KL.Lambda(lambda x: x * 1, name="output_rois")(target_rois)
             # output is [batch, num_detections(default 100), (y1, x1, y2, x2, class_id, score)] in image coordinates
             detections = DetectionLayer(config, name="mrcnn_detection")(
                 [target_rois, mrcnn_class, mrcnn_bbox, input_image_meta])
@@ -2354,8 +2478,10 @@ class MFP(object):
             global_parsing_prob = KL.Lambda(lambda x: post_processing_graph(*x))([global_parsing_map, input_image])
 
             model = KM.Model(
-                [input_image, input_image_meta] + input_pre_images + input_pre_masks + input_pre_parts + [input_rois],
-                [detections, mrcnn_class, mrcnn_bbox, mrcnn_mask, global_parsing_prob], name='parsing_rcnn')
+                [input_image, input_image_meta] + input_pre_images + input_pre_masks + input_pre_parts,
+                [detections, mrcnn_class, mrcnn_bbox, mrcnn_mask,
+                 rpn_rois, rpn_class, rpn_bbox,
+                 global_parsing_prob], name='parsing_rcnn')
 
         # Add multi-GPU support.
         if config.GPU_COUNT > 1:
@@ -2431,7 +2557,8 @@ class MFP(object):
         print("load model", filepath)
 
         if by_name:
-            s.load_weights_from_hdf5_group_by_name(f, layers, skip_mismatch=True)
+            # s.load_weights_from_hdf5_group_by_name(f, layers, skip_mismatch=True)
+            s.load_weights_from_hdf5_group_by_name(f, layers)
         else:
             s.load_weights_from_hdf5_group(f, layers)
         if hasattr(f, 'close'):
@@ -2451,7 +2578,8 @@ class MFP(object):
         # First, clear previously set losses to avoid duplication
         self.keras_model._losses = []
         self.keras_model._per_input_losses = {}
-        loss_names = ["mrcnn_class_loss", "mrcnn_bbox_loss", "mrcnn_mask_loss",
+        loss_names = ["rpn_class_loss", "rpn_bbox_loss",
+                      "mrcnn_class_loss", "mrcnn_bbox_loss", "mrcnn_mask_loss",
                       "mrcnn_global_parsing_loss"]
         for name in loss_names:
             layer = self.keras_model.get_layer(name)
@@ -2602,10 +2730,10 @@ class MFP(object):
         # Data generators
         print("get train generator")
         train_generator = data_generator(train_dataset, self.config, shuffle=True,
-                                         random_rois_num=self.config.RANDOM_ROIS_NUM, batch_size=self.config.BATCH_SIZE)
+                                         random_rois_num=0, batch_size=self.config.BATCH_SIZE)
         print("get val generator")
         val_generator = data_generator(val_dataset, self.config, shuffle=True,
-                                       random_rois_num=self.config.RANDOM_ROIS_NUM, batch_size=self.config.BATCH_SIZE)
+                                       random_rois_num=0, batch_size=self.config.BATCH_SIZE)
 
         # Callbacks
         callbacks = [
@@ -2793,7 +2921,7 @@ class MFP(object):
 
         return boxes, class_ids, scores, full_masks, global_parsing
 
-    def detect(self, images, pre_images, pre_masks, pre_parts, pre_boxes, verbose=0, isopencv=False):
+    def detect(self, images, pre_images, pre_masks, pre_parts, verbose=0, isopencv=False):
         """Runs the detection pipeline.
         Args:
             images: List of images, potentially of different sizes.
@@ -2814,15 +2942,16 @@ class MFP(object):
                 log("image", image)
         # Mold inputs to format expected by the neural network
         molded_images, image_metas, windows = self.mold_inputs(images, isopencv=isopencv)
-        random_rois = 256
-        rpn_rois = generate_random_rois(images[0].shape, random_rois, pre_boxes)
+        # random_rois = 256
+        # rpn_rois = generate_random_rois(images[0].shape, random_rois, pre_boxes)
         if verbose:
             log("molded_images", molded_images)
             log("image_metas", image_metas)
         # Run object detection
-        detections, mrcnn_class, mrcnn_bbox, mrcnn_mask, mrcnn_global_parsing_prob = \
+        detections, mrcnn_class, mrcnn_bbox, mrcnn_mask, \
+        rpn_rois, rpn_class, rpn_bbox, mrcnn_global_parsing_prob = \
             self.keras_model.predict(
-                [molded_images, image_metas] + pre_images + pre_masks + pre_parts + [rpn_rois[np.newaxis, ...]],
+                [molded_images, image_metas] + pre_images + pre_masks + pre_parts,
                 verbose=0)
         # Process detections
         results = []

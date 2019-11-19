@@ -9,66 +9,37 @@ import sys
 import cv2
 import math
 import time
+import platform
 from multiprocessing import Queue, Process
 import matplotlib
 
-from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
 from utils import visualize
 from utils.util_load_mfp_data import get_scale, load_pre_image_names, load_pre_image_datas, load_pre_image_boxes
-
 import tensorflow as tf
+import importlib
 
+# modified 1
+name = "models.mfp_model_roiprebox_tinyinput_rpn"
+module = importlib.import_module(name)
 sys.path.insert(0, os.getcwd())
 
 matplotlib.use('Agg')
-
+MACHINE_NAME = platform.node()
 # Root directory of the project
 ROOT_DIR = os.getcwd()
 
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 
-# Path to trained weights file
-# Download this file and place in the root of your
-# project (See README file for details)
 
-# linux
-# DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-# MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191113a/checkpoints" + "/" + \
-#              "parsing_rcnn_mfp_20191113a_epoch045_loss0.580_valloss0.759.h5"
-# RES_DIR = "./vis_mfp/val_mfp_20191113a_epoch045"
-# gpus = ["1"]
-# IMAGE_DIR = DATASET_DIR + "/Images"
-# IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
-# PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
-# PRE_PREDICT_DATA_DIR = r"/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
-
-# test all val image in VIP dataset
-# IMAGE_DIR = DATASET_DIR + "/videos/val_videos_frames"
-# IMAGE_LIST = DATASET_DIR + "/lists/val_all_frames_id.txt"
-
-# win
-DATASET_DIR = "D:\dataset\VIP_tiny"
-MODEL_PATH = "outputs/mfp_20191116a/checkpoints/parsing_rcnn_mfp_20191116a_epoch003_loss0.741_valloss0.753.h5"
-RES_DIR = "./vis_mfp/mfp_debug1"
-gpus = ["0"]
-IMAGE_DIR = DATASET_DIR + "/Images"
-IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
-PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
-PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
-
-flag = False
-if not os.path.exists(RES_DIR):
-    os.makedirs(RES_DIR)
-    flag = True
-
-
-class InferenceConfig(ParsingRCNNModelConfig):
+class InferenceConfig(module.MFPConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
-    PROCESS_NAME = "mfp_20191113a_epoch045"  # for tmp tested image name
+    # modified 5
+    PROCESS_NAME = "mfp_20191116a_epoch022"  # for tmp tested image name
     GPU_COUNT = 1  # only 1
-    PROCESS_COUNT = 1
+    # modified 6
+    PROCESS_COUNT = 3
     IMAGES_PER_GPU = 1  # only 1
     BATCH_SIZE = 1  # only 1
     # whether save the predicted visualized image
@@ -76,18 +47,47 @@ class InferenceConfig(ParsingRCNNModelConfig):
     # open image tool
     ISOPENCV = True
 
-    # Use small images for faster training. Set the limits of the small side
-    # the large side, and that determines the image shape.
-    IMAGE_MIN_DIM = 450  # 450, 256
-    IMAGE_MAX_DIM = 512  # 512, 416， 384（16*24）
-    # use small pre image for training
-    PRE_IMAGE_SHAPE = [128, 128, 3]  # needed 128(PRE_IMAGE_SHAPE[0]) * 4 = 512(IMAGE_MAX_DIM)
 
-    PRE_MULTI_FRAMES = 3
-    RECURRENT_UNIT = "gru"
-    assert RECURRENT_UNIT in ["gru", "lstm"]
-    RECURRENT_FILTER = 64
-    USE_RPN_ROIS = True  # for rpn
+# Path to trained weights file
+# Download this file and place in the root of your
+# project (See README file for details)
+
+# linux
+if MACHINE_NAME == "Jason":
+    # win
+    DATASET_DIR = r"D:\dataset\VIP_tiny"
+    # modified 2
+    MODEL_PATH = "outputs/mfp_20191116a/checkpoints/parsing_rcnn_mfp_20191116a_epoch003_loss0.741_valloss0.753.h5"
+    # modified 3
+    RES_DIR = "./vis_mfp/val_mfp_20191116a_epoch003"
+    # modified 4
+    gpus = ["0"]
+    IMAGE_DIR = DATASET_DIR + "/Images"
+    IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
+    PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
+    PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
+else:
+    DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+    # modified 2
+    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191116a/checkpoints" + "/" + \
+                 "parsing_rcnn_mfp_20191116a_epoch022_loss0.682_valloss0.714.h5"
+    # modified 3
+    RES_DIR = "./vis_mfp/val_mfp_20191116a_epoch022"
+    # modified 4
+    gpus = ["1"]
+    IMAGE_DIR = DATASET_DIR + "/Images"
+    IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
+    PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
+    PRE_PREDICT_DATA_DIR = r"/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
+
+    # test all val image in VIP dataset
+    # IMAGE_DIR = DATASET_DIR + "/videos/val_videos_frames"
+    # IMAGE_LIST = DATASET_DIR + "/lists/val_all_frames_id.txt"
+
+flag = False
+if not os.path.exists(RES_DIR):
+    os.makedirs(RES_DIR)
+    flag = True
 
 
 def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
@@ -112,10 +112,10 @@ def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
     tf_config.gpu_options.per_process_gpu_memory_fraction = 0.3
     session = tf.Session(config=tf_config)
     # The below line need to correct every test time
-    from models.mfp_model_roiprebox_tinyinput_rpn import MFP
+    # from models.mfp_model_roiprebox_tinyinput_rpn import MFP
     if infer_config is None:
         infer_config = InferenceConfig()
-    model = MFP(mode="inference", config=infer_config, model_dir=MODEL_DIR)
+    model = module.MFP(mode="inference", config=infer_config, model_dir=MODEL_DIR)
     # Load weights trained on MS-COCO
     s0 = time.time()
     model.load_weights(MODEL_PATH, by_name=True)
@@ -226,6 +226,9 @@ def multiprocess_main():
 
 
 if __name__ == '__main__':
+    from time import strftime
+
+    print("testing multi process at:", strftime("%Y_%m%d_%H%M%S"))
     t0 = time.time()
     multiprocess_main()
     print("MAIN END!")

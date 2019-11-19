@@ -1,9 +1,11 @@
 import os
 import sys
+import platform
 from time import time
 
 import tensorflow as tf
 
+MACHINE_NAME = platform.node()
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 sys.path.insert(0, os.getcwd())
 
@@ -12,13 +14,12 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 
-from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
 from configs.vipdataset_for_mfp import VIPDatasetForMFP
-from models.mfp_model_roiprebox_tinyinput_rpn import MFP
+from models.mfp_model_roiprebox_tinyinput_rpn_preimage import MFP, MFPConfig
 
 
-class trainConfig(ParsingRCNNModelConfig):
-    NAME = "mfp_20191116a"
+class trainConfig(MFPConfig):
+    NAME = "mfp_20191119a"
     # NAME = "mfp_debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 6
@@ -28,18 +29,6 @@ class trainConfig(ParsingRCNNModelConfig):
     VALIDATION_STEPS = 100
     # VALIDATION_STEPS = 1
     SAVE_MODEL_PERIOD = 1
-    # Use small images for faster training. Set the limits of the small side
-    # the large side, and that determines the image shape.
-    IMAGE_MIN_DIM = 450  # 450, 256
-    IMAGE_MAX_DIM = 512  # 512, 416， 384（16*24）
-    # use small pre image for training
-    PRE_IMAGE_SHAPE = [128, 128, 3]  # needed 128(PRE_IMAGE_SHAPE[0]) * 4 = 512(IMAGE_MAX_DIM)
-
-    PRE_MULTI_FRAMES = 3
-    RECURRENT_UNIT = "gru"
-    assert RECURRENT_UNIT in ["gru", "lstm"]
-    RECURRENT_FILTER = 64
-    USE_RPN_ROIS = True  #
 
 
 # Root directory of the project
@@ -52,18 +41,19 @@ ROOT_DIR = os.getcwd()
 # through the command line argument --logs
 DEFAULT_LOGS_DIR = "./outputs"
 # linux
-# PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191028b/checkpoints" + "/" + \
-#                       "parsing_rcnn_mfp_20191028b_epoch003_loss1.366_valloss1.006.h5"
-PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
-DEFAULT_DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-pre_image_train_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_train_vip_singleframe_parsing_rcnn"
-pre_image_val_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
-
-# win
-# PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
-# DEFAULT_DATASET_DIR = "D:\dataset\VIP_tiny"
-# pre_image_train_dir = "D:\dataset\VIP_tiny"
-# pre_image_val_dir = "D:\dataset\VIP_tiny"
+if MACHINE_NAME == "Jason":
+    # win
+    PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
+    DEFAULT_DATASET_DIR = "D:\dataset\VIP_tiny"
+    pre_image_train_dir = "D:\dataset\VIP_tiny"
+    pre_image_val_dir = "D:\dataset\VIP_tiny"
+else:
+    # PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191028b/checkpoints" + "/" + \
+    #                       "parsing_rcnn_mfp_20191028b_epoch003_loss1.366_valloss1.006.h5"
+    PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
+    DEFAULT_DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+    pre_image_train_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_train_vip_singleframe_parsing_rcnn"
+    pre_image_val_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
 
 ############################################################
 #  Training
@@ -123,20 +113,22 @@ if __name__ == '__main__':
     print("Loaded weights ", time() - t0, "s")
     # Training dataset. Use the training set and 35K from the
     # validation set, as as in the Mask RCNN paper.
-    dataset_train = VIPDatasetForMFP()
-    dataset_train.load_vip(args.dataset, "train", pre_image_train_dir)
-    dataset_train.prepare()
-    # dataset_train = VIPDatasetForMFP()
-    # dataset_train.load_vip(args.dataset, "traintiny", pre_image_train_dir)
-    # dataset_train.prepare()
-
-    # Validation dataset
-    dataset_val = VIPDatasetForMFP()
-    dataset_val.load_vip(args.dataset, "val", pre_image_val_dir)
-    dataset_val.prepare()
-    # dataset_val = VIPDatasetForMFP()
-    # dataset_val.load_vip(args.dataset, "traintiny", pre_image_val_dir)
-    # dataset_val.prepare()
+    if MACHINE_NAME == "Jason":
+        dataset_train = VIPDatasetForMFP()
+        dataset_train.load_vip(args.dataset, "traintiny", pre_image_train_dir)
+        dataset_train.prepare()
+        # Validation dataset
+        dataset_val = VIPDatasetForMFP()
+        dataset_val.load_vip(args.dataset, "traintiny", pre_image_val_dir)
+        dataset_val.prepare()
+    else:
+        dataset_train = VIPDatasetForMFP()
+        dataset_train.load_vip(args.dataset, "train", pre_image_train_dir)
+        dataset_train.prepare()
+        # Validation dataset
+        dataset_val = VIPDatasetForMFP()
+        dataset_val.load_vip(args.dataset, "val", pre_image_val_dir)
+        dataset_val.prepare()
 
     # *** This training schedule is an example. Update to your needs ***
 
