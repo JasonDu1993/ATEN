@@ -19,7 +19,7 @@ import tensorflow as tf
 import importlib
 
 # modified 1
-name = "models.mfp_model_roiprebox_tinyinput_rpn"
+name = "models.mfp_model_roiprebox_tinyinput_rpn_prepart"
 module = importlib.import_module(name)
 sys.path.insert(0, os.getcwd())
 
@@ -36,7 +36,7 @@ class InferenceConfig(module.MFPConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     # modified 5
-    PROCESS_NAME = "mfp_20191116a_epoch022"  # for tmp tested image name
+    PROCESS_NAME = "mfp_20191120a_epoch032"  # for tmp tested image name
     GPU_COUNT = 1  # only 1
     # modified 6
     PROCESS_COUNT = 3
@@ -61,7 +61,7 @@ if MACHINE_NAME == "Jason":
     # modified 3
     RES_DIR = "./vis_mfp/val_mfp_20191116a_epoch003"
     # modified 4
-    gpus = ["0"]
+    gpus = ["1"]
     IMAGE_DIR = DATASET_DIR + "/Images"
     IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
     PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
@@ -69,10 +69,10 @@ if MACHINE_NAME == "Jason":
 else:
     DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
     # modified 2
-    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191116a/checkpoints" + "/" + \
-                 "parsing_rcnn_mfp_20191116a_epoch022_loss0.682_valloss0.714.h5"
+    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191120a/checkpoints" + "/" + \
+                 "parsing_rcnn_mfp_20191120a_epoch032_loss0.614_valloss0.761.h5"
     # modified 3
-    RES_DIR = "./vis_mfp/val_mfp_20191116a_epoch022"
+    RES_DIR = "./vis_mfp/val_mfp_20191120a_epoch032"
     # modified 4
     gpus = ["1"]
     IMAGE_DIR = DATASET_DIR + "/Images"

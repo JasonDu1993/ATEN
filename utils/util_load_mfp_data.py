@@ -77,10 +77,15 @@ def load_pre_image_datas(image_name, pre_image_names, config, pre_image_dir, pre
     pre_images = []
     pre_masks = []
     pre_parts = []
-    scale = 1
-    padding = [(0, 0), (0, 0), (0, 0)]
+    pre_image_path = os.path.join(pre_image_dir, "adjacent_frames", pre_image_names[0][0], image_id,
+                                  pre_image_names[0][1] + ".jpg")
+    pre_image = cv2.imread(pre_image_path)  # shape [h=720, w=1080, 3(bgr)]
+    pre_image, window, scale, padding = resize_image(pre_image, max_dim=config.PRE_IMAGE_SHAPE[0],
+                                                     padding=config.IMAGE_PADDING, isopencv=True)
+
     if config.IS_PRE_IMAGE:
-        for pre_video_name, pre_image_id in pre_image_names:
+        pre_images.append(pre_image[np.newaxis, ...])
+        for pre_video_name, pre_image_id in pre_image_names[1:]:
             pre_image_path = os.path.join(pre_image_dir, "adjacent_frames", pre_video_name, image_id,
                                           pre_image_id + ".jpg")
             pre_image = cv2.imread(pre_image_path)  # shape [h=720, w=1080, 3(bgr)]

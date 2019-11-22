@@ -399,6 +399,33 @@ class Dataset(object):
         return mask, class_ids
 
 
+def get_sacle(image, max_dim, min_dim=None,):
+    # Default window (y1, x1, y2, x2) and default scale == 1.
+    h, w = image.shape[:2]
+    scale = 1
+    assert max_dim != None, "must provided max_dim"
+    # Scale?
+    if min_dim:
+        # Scale up but not down
+        scale = max(1, min_dim / min(h, w))
+    # Does it exceed max dim?
+    if max_dim:
+        image_max = max(h, w)
+        if round(image_max * scale) > max_dim:
+            scale = max_dim / image_max
+    return scale
+
+
+def get_padding(image, max_dim):
+    h, w = image.shape[:2]
+    top_pad = (max_dim - h) // 2
+    bottom_pad = max_dim - h - top_pad
+    left_pad = (max_dim - w) // 2
+    right_pad = max_dim - w - left_pad
+    padding = [(top_pad, bottom_pad), (left_pad, right_pad), (0, 0)]
+    return padding
+
+
 def resize_image(image, min_dim=None, max_dim=None, padding=False, isopencv=False):
     """
     Resizes an image keeping the aspect ratio.

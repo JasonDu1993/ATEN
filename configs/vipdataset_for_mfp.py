@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 import skimage.io
 import skimage.transform
-from utils.util import Dataset, resize_image, resize_mask, resize_part_mfp
+from utils.util import Dataset, resize_image, resize_mask, resize_part_mfp, get_sacle, get_padding
 from configs.config import Config
 
 
@@ -271,10 +271,15 @@ class VIPDatasetForMFP(Dataset):
         pre_images = []
         pre_masks = []
         pre_parts = []
-        scale = 1
-        padding = [(0, 0), (0, 0), (0, 0)]
+        # get scale and get padding
+        pre_image_path = os.path.join(image_dir, "adjacent_frames", pre_image_names[0][0], image_id,
+                                      pre_image_names[0][1] + ".jpg")
+        pre_image = cv2.imread(pre_image_path)  # shape [h=720, w=1080, 3(bgr)]
+        pre_image, window, scale, padding = resize_image(pre_image, max_dim=config.PRE_IMAGE_SHAPE[0],
+                                                         padding=config.IMAGE_PADDING, isopencv=True)
         if config.IS_PRE_IMAGE:
-            for pre_video_name, pre_image_id in pre_image_names:
+            pre_images.append(pre_image)
+            for pre_video_name, pre_image_id in pre_image_names[1:]:
                 pre_image_path = os.path.join(image_dir, "adjacent_frames", pre_video_name, image_id,
                                               pre_image_id + ".jpg")
                 pre_image = cv2.imread(pre_image_path)  # shape [h=720, w=1080, 3(bgr)]
