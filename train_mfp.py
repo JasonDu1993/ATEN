@@ -15,11 +15,11 @@ config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 
 from configs.vipdataset_for_mfp import VIPDatasetForMFP
-from models.mfp_model_roiprebox_tinyinput_rpn_prepart import MFP, MFPConfig
+from models.mfp_model_roiprebox_tinyinput_rpn_premask import MFP, MFPConfig
 
 
 class trainConfig(MFPConfig):
-    NAME = "mfp_20191120a"
+    NAME = "mfp_20191122a"
     # NAME = "mfp_debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 6

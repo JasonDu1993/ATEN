@@ -13,14 +13,15 @@ CLASSES = ['background', 'hat', 'hair', 'sun-glasses', 'upper-clothes', 'dress',
 Category_ids:存储人体解析身体部位的注解part_anno，其中每个部位一个数字表示，
 此次不区分不同的人，即每个人的部位数字是一样的
 """
+
+PRE_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis_mfp/val_mfp_20191116a_epoch022/vp_results'
+NAME = "val_mfp_20191116a_epoch022"
+TMP_DIR = "./eval_results"
+
 GT_DIR = '/home/sk49/workspace/dataset/VIP/Category_ids'
-# PRE_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe'
-# PRE_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20181229a_epoch041'
-PRE_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190904a_epoch016/vp_results'
-
-evalute_result_path = "/home/sk49/workspace/zhoudu/ATEN/outs" + "/" + \
-                      "eval_20190904a_epoch016_parsing.txt"
-
+evalute_result_path = os.path.join(TMP_DIR, NAME, "eval_" + NAME + "_parsing.txt")
+if not os.path.exists(os.path.join(TMP_DIR, NAME)):
+    os.makedirs(os.path.join(TMP_DIR, NAME))
 f = open(evalute_result_path, "w")
 res = ""
 
@@ -156,6 +157,7 @@ def show_result(hist):
 
 
 if __name__ == '__main__':
+    # testing vip val dataset 2445 images spend almost 1 min
     t0 = time.time()
     main()
     print("total time", time.time() - t0, "s")

@@ -4,16 +4,22 @@ from PIL import Image
 import numpy as np
 import multiprocessing
 
-PREDICT_DIR = "/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190918c_epoch020/vp_results"
-# PREDICT_DIR = r'D:\workspaces\ATEN\vis\viptiny_test\vp_results'
-INST_PART_GT_DIR = '/home/sk49/workspace/dataset/VIP/Instance_ids'
+PREDICT_DIR = "/home/sk49/workspace/zhoudu/ATEN/vis_mfp/val_mfp_20191118a_epoch027/vp_results"
+NAME = "val_mfp_20191118a_epoch027"  # tmp class file
+TMP_DIR = "./eval_results"
+NUM_PROCESS = 10
+
+# PREDICT_DIR = r'D:\workspaces\ATEN\vis\viptiny_test_eval\vp_results'
 # INST_PART_GT_DIR = r'D:\dataset\VIP_tiny\Instance_ids'
 
+INST_PART_GT_DIR = '/home/sk49/workspace/dataset/VIP/Instance_ids'
 CLASSES = ['background', 'hat', 'hair', 'gloves', 'sun-glasses', 'upper-clothes', 'dress',
            'coat', 'socks', 'pants', 'torso-skin', 'scarf', 'skirt',
            'face', 'left-arm', 'right-arm', 'left-leg', 'right-leg', 'left-shoe', 'right-shoe']
 
 IOU_THRE = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+if not os.path.exists(os.path.join(TMP_DIR, NAME)):
+    os.makedirs(os.path.join(TMP_DIR, NAME))
 
 
 # compute mask overlap
@@ -37,7 +43,7 @@ def compute_mask_iou(mask_gt, masks_pre, mask_gt_area, masks_pre_area):
 
     union = mask_gt_areas + masks_pre_area[:] - intersection[:]
 
-    iou = intersection / union
+    iou = intersection / (union + 1e-7)
 
     return iou
 
@@ -156,7 +162,7 @@ def convert2evalformat(inst_id_map_gt, id_to_convert=None):
     return masks, len(masks)
 
 
-def compute_class_ap(image_id_list, class_id, iou_threshold):
+def compute_class_ap(image_id_list, class_id, iou_threshold, save_path):
     """Compute Average Precision at a set IoU threshold (default 0.5).
     Args:
         image_id_list : list(list), all pictures id list, the second list len is 2, [videoid, imageid]
@@ -181,6 +187,10 @@ def compute_class_ap(image_id_list, class_id, iou_threshold):
         fp.append([])
 
     print("process class", CLASSES[class_id], class_id)
+    if os.path.exists(save_path):
+        ap = np.loadtxt(save_path)
+        print(CLASSES[class_id], "exists in", save_path)
+        return ap
 
     for image_id in image_id_list:
 
@@ -266,20 +276,22 @@ def compute_class_ap(image_id_list, class_id, iou_threshold):
         m_fp = np.cumsum(m_fp)
         # print('m_tp : ',m_tp)
         # print('m_fp : ', m_fp)
-        recall = m_tp / float(gt_mask_num)
+        recall = m_tp / (float(gt_mask_num) + 1e-7)
         precition = m_tp / np.maximum(m_fp + m_tp, np.finfo(np.float64).eps)
 
         # Compute mean AP over recall range
         ap[k] = voc_ap(recall, precition, False)
-
+    np.savetxt(save_path, ap)
     return ap
 
 
 if __name__ == '__main__':
-    """command
+    """
+    # testing vip val dataset 2445 images spend almost 19 min
+    command
     1: nohup python3 -u evaluate/evalute_inst_part_ap.py >> outs/eval_20190520a_epoch038.txt &
     2: tail -f outs/eval_20190520a_epoch038.txt
-Instance_ids:存储人和身体部位组合之后的结果，每个人的每个身体部位使用的不同的标签表示，该文件夹内主要用于评估evalute_inst_part_ap.py
+    Instance_ids:存储人和身体部位组合之后的结果，每个人的每个身体部位使用的不同的标签表示，该文件夹内主要用于评估evalute_inst_part_ap.py
     身体部位标签如下所示：
     (1, "hat")(2, "hair")(3, "gloves")(4, "sun-glasses")(5, "upper-clothes")(6, "dress")(7, "coat")(8, "socks")(9, "pants")(10, "torso-skin")
     (11, "scarf")(12, "skirt")(13, "face")(14, "left-arm")(15, "right-arm")(16, "left-leg")(17, "right-leg")(18, "left-shoe")(19, "right-shoe")
@@ -306,7 +318,7 @@ Instance_ids:存储人和身体部位组合之后的结果，每个人的每个�
     """
     print("result of", PREDICT_DIR)
     t0 = time.time()
-    pool = multiprocessing.Pool(processes=5)
+    pool = multiprocessing.Pool(processes=NUM_PROCESS)
     image_list = []  # list, the value is also a list, len 2, [videoid, imageid]
     for vid in os.listdir(PREDICT_DIR):
         for img in os.listdir(os.path.join(PREDICT_DIR, vid, 'instance_parsing')):
@@ -319,7 +331,8 @@ Instance_ids:存储人和身体部位组合之后的结果，每个人的每个�
     for ind in range(1, len(CLASSES)):
         t1 = time.time()
         print("start:", CLASSES[ind], ind)
-        a = pool.apply_async(compute_class_ap, args=(image_list, ind, IOU_THRE))
+        save_path = os.path.join(TMP_DIR, NAME, str(ind) + "_" + CLASSES[ind] + ".txt")
+        a = pool.apply_async(compute_class_ap, args=(image_list, ind, IOU_THRE, save_path))
         res[ind - 1] = a
         print("eval", CLASSES[ind], "cost", time.time() - t1, "s")
     pool.close()
@@ -328,11 +341,19 @@ Instance_ids:存储人和身体部位组合之后的结果，每个人的每个�
         # print("r", r)
         AP[r, :] = res[r].get()
     print("-----------------AP-----------------")
+    np.savetxt(os.path.join(TMP_DIR, NAME, "AP.txt"), AP)
     print(AP)
-    print("-------------------------------------")
-    mAP = np.mean(AP, axis=0)
+
     print("-----------------mAP-----------------")
+    mAP = np.mean(AP, axis=0)
+    mAP_path = os.path.join(TMP_DIR, NAME, "mAP.txt")
+    np.savetxt(mAP_path, mAP)
     print(mAP)
-    print(np.mean(mAP))
-    print("-------------------------------------")
+
+    print("-----------------mAP_mean-----------------")
+    mAP_mean = np.mean(mAP)
+    with open(mAP_path, "a") as f:
+        f.write("mAP:\n")
+        f.write(str(mAP_mean))
+    print(mAP_mean)
     print("total time:", time.time() - t0, "s")

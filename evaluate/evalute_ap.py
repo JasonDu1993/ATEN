@@ -2,14 +2,26 @@ import os
 import cv2
 import numpy as np
 import time
+import math
+import multiprocessing
 
 """
 Human_ids:存储实例注解inst_anno，图片大小和原始帧大小一致，里面存储为灰度值，
 min:0， max:person_num uint8，0表示背景，其他数值表示每个人体
 """
-PREDICT_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis/val_vip_singleframe_20190821a_epoch012/vp_results'
+PREDICT_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis_mfp/val_mfp_20191118a_epoch027/vp_results'
+# PREDICT_DIR = r'D:\workspaces\ATEN\vis\viptiny_test_eval\vp_results'
 
 GT_DIR = '/home/sk49/workspace/dataset/VIP/Human_ids'
+# GT_DIR = r'D:\dataset\VIP_tiny\Human_ids'
+
+NAME = "val_mfp_20191118a_epoch027"  # tmp class file
+# NAME = "viptiny_test_eval"  # tmp class file
+TMP_DIR = "./eval_results"
+NUM_PROCESS = 5
+
+if not os.path.exists(os.path.join(TMP_DIR, NAME)):
+    os.makedirs(os.path.join(TMP_DIR, NAME))
 BBOX_IOU_THRE = [float(x) / 100.0 for x in list(range(50, 100, 5))]
 MASK_IOU_THRE = [float(x) / 100.0 for x in list(range(50, 100, 5))]
 
@@ -47,7 +59,7 @@ def compute_mask_iou(mask_gt, masks_pre, mask_gt_area, masks_pre_area):
 
     union = mask_gt_areas + masks_pre_area[:] - intersection[:]
 
-    iou = intersection / union
+    iou = intersection / (union + 1e-7)
 
     return iou
 
@@ -130,7 +142,7 @@ def voc_ap(rec, prec, use_07_metric=False):
     return ap
 
 
-def compute_mask_ap(image_list, iou_threshold):
+def compute_mask_ap(image_list, iou_threshold, save_path):
     """Compute Average Precision at a set IoU threshold (default 0.5).
     Input:
     image_list : all picures' id list
@@ -145,9 +157,63 @@ def compute_mask_ap(image_list, iou_threshold):
     # recalls: List of recall values at different class score thresholds.
     # overlaps: [pred_masks, gt_masks] IoU overlaps.
     """
+    f = open(save_path, "a")
     iou_thre_num = len(iou_threshold)
     mAp = np.zeros((iou_thre_num,))
+    gt_mask_nums = 0
+    pre_mask_num = 0
+    tps = []
+    fps = []
+    scores = []
+    for i in range(iou_thre_num):
+        tps.append([])
+        fps.append([])
+    pool = multiprocessing.Pool(processes=NUM_PROCESS)
+    per_num = math.ceil(len(image_list) / NUM_PROCESS)
+    results = []
+    for i in range(NUM_PROCESS):
+        image_list_p = image_list[i * per_num:(i + 1) * per_num]
+        print(len(image_list_p))
+        results.append(pool.apply_async(deal_image_mask, args=(image_list_p, iou_thre_num, iou_threshold)))
+    for res in results:
+        tp, fp, gt_mask_num, score = res.get()
+        gt_mask_nums += gt_mask_num
+        scores += score
+        for i in range(iou_thre_num):
+            fps[i] += fp[i]
+            tps[i] += tp[i]
 
+    ind = np.argsort(scores)[::-1]
+
+    print("----------------seg---------------------")
+
+    for k in range(iou_thre_num):
+        m_tp = tps[k]
+        m_fp = fps[k]
+        m_tp = np.array(m_tp)
+        m_fp = np.array(m_fp)
+
+        m_tp = m_tp[ind]
+        m_fp = m_fp[ind]
+
+        m_tp = np.cumsum(m_tp)
+        m_fp = np.cumsum(m_fp)
+        # print('m_tp : ',m_tp)
+        # print('m_fp : ', m_fp)
+        recall = m_tp / (float(gt_mask_nums) + 1e-7)
+        precition = m_tp / np.maximum(m_fp + m_tp, np.finfo(np.float64).eps)
+
+        # Compute mean AP over recall range
+        mAp[k] = voc_ap(recall, precition, False)
+        strs = "IOU Threshold:%.2f, mAP:%f" % (iou_threshold[k], mAp[k])
+        f.write(strs + "\n")
+        print(strs)
+    f.write("averge mAP:" + str(np.mean(mAp)))
+    print("averge mAP:", np.mean(mAp))
+    f.close()
+
+
+def deal_image_mask(image_list, iou_thre_num, iou_threshold):
     gt_mask_num = 0
     pre_mask_num = 0
     tp = []
@@ -156,7 +222,6 @@ def compute_mask_ap(image_list, iou_threshold):
     for i in range(iou_thre_num):
         tp.append([])
         fp.append([])
-
     for image_id in image_list:
         gt_mask = cv2.imread(os.path.join(GT_DIR, image_id[0], '%s.png' % image_id[1]), 0)
         pre_mask = cv2.imread(os.path.join(PREDICT_DIR, image_id[0], 'instance_segmentation', '%s.png' % image_id[1]),
@@ -204,33 +269,7 @@ def compute_mask_ap(image_list, iou_threshold):
                 else:
                     tp[k].append(0)
                     fp[k].append(1)
-
-    ind = np.argsort(scores)[::-1]
-
-    print("----------------seg---------------------")
-
-    for k in range(iou_thre_num):
-        m_tp = tp[k]
-        m_fp = fp[k]
-        m_tp = np.array(m_tp)
-        m_fp = np.array(m_fp)
-
-        m_tp = m_tp[ind]
-        m_fp = m_fp[ind]
-
-        m_tp = np.cumsum(m_tp)
-        m_fp = np.cumsum(m_fp)
-        # print('m_tp : ',m_tp)
-        # print('m_fp : ', m_fp)
-        recall = m_tp / float(gt_mask_num)
-        precition = m_tp / np.maximum(m_fp + m_tp, np.finfo(np.float64).eps)
-
-        # Compute mean AP over recall range
-        mAp[k] = voc_ap(recall, precition, False)
-        print("IOU Threshold:%.2f, mAP:%f" % (iou_threshold[k], mAp[k]))
-
-    print("averge mAP:", np.mean(mAp))
-    print("----------------------------------------")
+    return tp, fp, gt_mask_num, scores
 
 
 ############################################################
@@ -285,7 +324,7 @@ def compute_bbox_iou(box, boxes, box_area, boxes_area):
     intersection = np.maximum(x2 - x1, 0) * np.maximum(y2 - y1, 0)
 
     union = box_area + boxes_area[:] - intersection[:]
-    iou = intersection / union
+    iou = intersection / (union + 1e-7)
     return iou
 
 
@@ -402,7 +441,7 @@ def compute_bbox_ap(image_list, iou_threshold):
         m_fp = np.cumsum(m_fp)
         # print('m_tp : ',m_tp)
         # print('m_fp : ', m_fp)
-        recall = m_tp / float(gt_bbox_num)
+        recall = m_tp / (float(gt_bbox_num) + 1e-7)
         precition = m_tp / np.maximum(m_fp + m_tp, np.finfo(np.float64).eps)
 
         # Compute mean AP over recall range
@@ -442,6 +481,9 @@ if __name__ == '__main__':
         for img in os.listdir(dir_vid):
             if img.endswith(".png"):
                 image_list.append([vid, img[:-4]])
-
-    compute_mask_ap(image_list, MASK_IOU_THRE)
-    print("total time", time.time() - t0, "s")
+    save_path = os.path.join(TMP_DIR, NAME, "eval_" + NAME + "_ap.txt")
+    with open(save_path, "a") as f:
+        f.write("result of " + PREDICT_DIR + "\n")
+        compute_mask_ap(image_list, MASK_IOU_THRE, save_path)
+        f.write("total time" + str(time.time() - t0) + " s")
+        print("total time", time.time() - t0, "s")
