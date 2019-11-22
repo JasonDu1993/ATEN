@@ -9,16 +9,17 @@ import multiprocessing
 Human_ids:存储实例注解inst_anno，图片大小和原始帧大小一致，里面存储为灰度值，
 min:0， max:person_num uint8，0表示背景，其他数值表示每个人体
 """
-PREDICT_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis_mfp/val_mfp_20191118a_epoch027/vp_results'
-# PREDICT_DIR = r'D:\workspaces\ATEN\vis\viptiny_test_eval\vp_results'
+PREDICT_DIR = '/home/sk49/workspace/zhoudu/ATEN/vis_mfp/val_mfp_20191120a_epoch032/vp_results'
+NAME = "val_mfp_20191120a_epoch032"  # tmp class file
+TMP_DIR = "./eval_results"
+NUM_PROCESS = 10
 
 GT_DIR = '/home/sk49/workspace/dataset/VIP/Human_ids'
+
+# PREDICT_DIR = r'D:\workspaces\ATEN\vis\viptiny_test_eval\vp_results'
+# NAME = "viptiny_test_eval"  # tmp class file
 # GT_DIR = r'D:\dataset\VIP_tiny\Human_ids'
 
-NAME = "val_mfp_20191118a_epoch027"  # tmp class file
-# NAME = "viptiny_test_eval"  # tmp class file
-TMP_DIR = "./eval_results"
-NUM_PROCESS = 5
 
 if not os.path.exists(os.path.join(TMP_DIR, NAME)):
     os.makedirs(os.path.join(TMP_DIR, NAME))
@@ -473,6 +474,7 @@ def convert2evalformat(inst_id_map):
 
 
 if __name__ == '__main__':
+    # testing vip val dataset 2445 images spend almost 3 min 5 process
     print("result of", PREDICT_DIR)
     t0 = time.time()
     image_list = []

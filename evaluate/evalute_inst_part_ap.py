@@ -4,8 +4,8 @@ from PIL import Image
 import numpy as np
 import multiprocessing
 
-PREDICT_DIR = "/home/sk49/workspace/zhoudu/ATEN/vis_mfp/val_mfp_20191118a_epoch027/vp_results"
-NAME = "val_mfp_20191118a_epoch027"  # tmp class file
+PREDICT_DIR = "/home/sk49/workspace/zhoudu/ATEN/vis_mfp/val_mfp_20191120a_epoch032/vp_results"
+NAME = "val_mfp_20191120a_epoch032"  # tmp class file
 TMP_DIR = "./eval_results"
 NUM_PROCESS = 10
 
@@ -287,7 +287,7 @@ def compute_class_ap(image_id_list, class_id, iou_threshold, save_path):
 
 if __name__ == '__main__':
     """
-    # testing vip val dataset 2445 images spend almost 19 min
+    # testing vip val dataset 2445 images spend almost 19 min 5 process
     command
     1: nohup python3 -u evaluate/evalute_inst_part_ap.py >> outs/eval_20190520a_epoch038.txt &
     2: tail -f outs/eval_20190520a_epoch038.txt
