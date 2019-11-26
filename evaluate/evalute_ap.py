@@ -9,8 +9,8 @@ import multiprocessing
 Human_ids:存储实例注解inst_anno，图片大小和原始帧大小一致，里面存储为灰度值，
 min:0， max:person_num uint8，0表示背景，其他数值表示每个人体
 """
-PREDICT_DIR = "/home/sk49/workspace/zhoudu/ATEN/vis_mfp/val_mfp_20191122b_epoch026/vp_results"
-NAME = "val_mfp_20191122b_epoch026"  # tmp class file
+PREDICT_DIR = "/home/sk49/workspace/zhoudu/ATEN/vis_mfp/val_mfp_20191125a_epoch016/vp_results"
+NAME = "val_mfp_20191125a_epoch016"  # tmp class file
 TMP_DIR = "./eval_results"
 NUM_PROCESS = 10
 

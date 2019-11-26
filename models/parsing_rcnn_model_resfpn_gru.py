@@ -1196,8 +1196,29 @@ def resfpn(feature_stages, output_shape, base_name="resfpn"):
     return x
 
 
+def resfpn_gru(feature_stages, output_shape, base_name="resfpn"):
+    res = []
+    oh, ow = output_shape
+    for i, x in enumerate(feature_stages):
+        xh, xw = x.shape[1], x.shape[2]
+        x = KL.Conv2D(256, (1, 1), strides=(xh // oh, xw // ow),
+                      name="conv_" + base_name + "_" + str(i + 1), use_bias=False)(x)
+        x = BatchNorm(axis=-1, name="bn_" + base_name + "_" + str(i + 1))(x)
+        x = KL.Activation('relu')(x)
+        res.append(x)
+    # init_feature_map = KL.Lambda(lambda x: average_after_element_add(x))(res)
+    # x = conv_gru_unit(res, initial_state=init_feature_map)
+    res_stack = KL.Lambda(lambda x: K.stack(res, axis=1), name=base_name + "_stack")(res)
+    initial_state = K.mean(res_stack, axis=1)
+    # initial_state = KL.Add(name="resfpn_add")(res) / 3
+    from models.convolutional_recurrent import ConvGRU2D
+    x = ConvGRU2D(filters=256, kernel_size=(3, 3), name="resfpn_gru",
+                  padding="same", return_sequences=False)(res_stack, initial_state=initial_state)
+    return x
+
+
 def global_parsing_encoder(feature_maps):
-    feature_map = resfpn(feature_maps, output_shape=(32, 32))
+    feature_map = resfpn_gru(feature_maps, output_shape=(32, 32))
     x1 = KL.Conv2D(256, (1, 1), padding='same',
                    name='mrcnn_global_parsing_encoder_c1')(feature_map)
     # x1 = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn1')(x1)

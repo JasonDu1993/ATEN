@@ -14,8 +14,8 @@ Category_ids:存储人体解析身体部位的注解part_anno，其中每个部�
 此次不区分不同的人，即每个人的部位数字是一样的
 """
 
-PRE_DIR = "/home/sk49/workspace/zhoudu/ATEN/vis_mfp/val_mfp_20191122b_epoch026/vp_results"
-NAME = "val_mfp_20191122b_epoch026"
+PRE_DIR = "/home/sk49/workspace/zhoudu/ATEN/vis_mfp/val_mfp_20191125a_epoch016/vp_results"
+NAME = "val_mfp_20191125a_epoch016"
 TMP_DIR = "./eval_results"
 
 GT_DIR = '/home/sk49/workspace/dataset/VIP/Category_ids'
