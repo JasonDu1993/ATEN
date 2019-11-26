@@ -17,8 +17,8 @@ from models.parsing_rcnn_model import PARSING_RCNN
 
 
 class trainConfig(ParsingRCNNModelConfig):
-    # NAME = "vip_singleframe_20190923a"
-    NAME = "vip_singleframe_test"
+    NAME = "vip_singleframe_20191126a"
+    # NAME = "vip_singleframe_test"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
     # IMAGES_PER_GPU = 1
@@ -33,7 +33,8 @@ class trainConfig(ParsingRCNNModelConfig):
 ROOT_DIR = os.getcwd()
 
 # Path to trained weights file
-PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
+# PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
+PRETRAIN_MODEL_PATH = ""
 # PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "mask_rcnn_coco.h5")
 # PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190326a/checkpoints/" \
 #                       "parsing_rcnn_vip_singleframe_20190326a_epoch038_loss0.491_valloss0.550.h5"
@@ -89,17 +90,19 @@ if __name__ == '__main__':
                          model_dir=args.logs)
 
     # Select weights file to load
-    if args.model.lower() == "last":
-        # Find last trained weights
-        model_path = model.find_last()[1]
-    elif args.model.lower() == "pretrain":
-        model_path = PRETRAIN_MODEL_PATH
-    else:
-        model_path = args.model
-    # common load weight 
+    # if args.model.lower() == "last":
+    #     # Find last trained weights
+    #     model_path = model.find_last()[1]
+    # elif args.model.lower() == "pretrain":
+    #     model_path = PRETRAIN_MODEL_PATH
+    # else:
+    #     model_path = args.model
+    # common load weight
+    model_path = PRETRAIN_MODEL_PATH
     print("Loading weights ", model_path)
     t0 = time()
-    model.load_weights(model_path, by_name=True)
+    if model_path:
+        model.load_weights(model_path, by_name=True)
     print("Loaded weights ", time() - t0, "s")
     # Training dataset. Use the training set and 35K from the
     # validation set, as as in the Mask RCNN paper.

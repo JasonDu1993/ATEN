@@ -19,7 +19,7 @@ import tensorflow as tf
 import importlib
 
 # modified 1
-name = "models.mfp_model_roiprebox_tinyinput_rpn_preimagemask"
+name = "models.mfp_model_roiprebox_tinyinput_rpn_premaskpart"
 module = importlib.import_module(name)
 sys.path.insert(0, os.getcwd())
 
@@ -36,7 +36,7 @@ class InferenceConfig(module.MFPConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     # modified 5
-    PROCESS_NAME = "mfp_20191124a_epoch027"  # for tmp tested image name
+    PROCESS_NAME = "mfp_20191125a_epoch016"  # for tmp tested image name
     GPU_COUNT = 1  # only 1
     # modified 6
     PROCESS_COUNT = 3
@@ -69,10 +69,10 @@ if MACHINE_NAME == "Jason":
 else:
     DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
     # modified 2
-    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191124a/checkpoints" + "/" + \
-                 "parsing_rcnn_mfp_20191124a_epoch027_loss0.664_valloss0.699.h5"
+    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191125a/checkpoints" + "/" + \
+                 "parsing_rcnn_mfp_20191125a_epoch016_loss0.681_valloss0.639.h5"
     # modified 3
-    RES_DIR = "./vis_mfp/val_mfp_20191124a_epoch027"
+    RES_DIR = "./vis_mfp/val_mfp_20191125a_epoch016"
     # modified 4
     gpus = ["1"]
     IMAGE_DIR = DATASET_DIR + "/Images"
