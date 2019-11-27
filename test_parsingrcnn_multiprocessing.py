@@ -35,7 +35,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Download this file and place in the root of your
 # project (See README file for details)
 # modified 1
-name = "models.parsing_rcnn_model_resfpn_gru"
+name = "models.parsing_rcnn_model"
 module = importlib.import_module(name)
 
 
@@ -43,7 +43,7 @@ class InferenceConfig(ParsingRCNNModelConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     # modified 2
-    PROCESS_NAME = "val_vip_singleframe_20191126c_epoch032"  # for process name
+    PROCESS_NAME = "val_vip_singleframe_20191126a_epoch029"  # for process name
     GPU_COUNT = 1
     PROCESS_COUNT = 3
     IMAGES_PER_GPU = 1
@@ -66,12 +66,12 @@ if MACHINE_NAME == "Jason":
 else:
     DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
     # modified 3
-    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20191126c/checkpoints" + "/" + \
-                 "parsing_rcnn_vip_singleframe_20191126c_epoch032_loss4.479_valloss4.983.h5"
+    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20191126a/checkpoints" + "/" + \
+                 "parsing_rcnn_vip_singleframe_20191126a_epoch029_loss4.181_valloss4.490.h5"
     # modified 4
-    RES_DIR = "./vis/val_vip_singleframe_20191126c_epoch032"
+    RES_DIR = "./vis/val_vip_singleframe_20191126a_epoch029"
     # modified 5
-    gpus = ["3"]
+    gpus = ["1"]
     IMAGE_DIR = DATASET_DIR + "/Images"
     IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
 

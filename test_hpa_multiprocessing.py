@@ -32,13 +32,13 @@ ROOT_DIR = os.getcwd()
 MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 
 
-class InferenceConfig(module.MFPConfig):
+class InferenceConfig(module.HPAConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     # modified 2
     PROCESS_NAME = "mfp_20191125a_epoch016"  # for tmp tested image name
     GPU_COUNT = 1  # only 1
-    PROCESS_COUNT = 3
+    PROCESS_COUNT = 1
     IMAGES_PER_GPU = 1  # only 1
     BATCH_SIZE = 1  # only 1
     # whether save the predicted visualized image
@@ -56,9 +56,9 @@ if MACHINE_NAME == "Jason":
     # win
     DATASET_DIR = r"D:\dataset\VIP_tiny"
     # modified 3
-    MODEL_PATH = "outputs/mfp_20191116a/checkpoints/parsing_rcnn_mfp_20191116a_epoch003_loss0.741_valloss0.753.h5"
+    MODEL_PATH = "outputs/debug/checkpoints/parsing_rcnn_mfp_debug_epoch009_loss1.732_valloss3.082.h5"
     # modified 4
-    RES_DIR = "./vis_mfp/val_mfp_20191116a_epoch003"
+    RES_DIR = "./vis_hpa/val_hpa_debug"
     # modified 5
     gpus = ["1"]
     IMAGE_DIR = DATASET_DIR + "/Images"
@@ -71,7 +71,7 @@ else:
     MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191125a/checkpoints" + "/" + \
                  "parsing_rcnn_mfp_20191125a_epoch016_loss0.681_valloss0.639.h5"
     # modified 4
-    RES_DIR = "./vis_mfp/val_mfp_20191125a_epoch016"
+    RES_DIR = "./vis_hpa/val_hap_20191125a_epoch016"
     # modified 5
     gpus = ["1"]
     IMAGE_DIR = DATASET_DIR + "/Images"
