@@ -1231,7 +1231,24 @@ def arbitrary_size_pooling(feature_map):
     return b2
 
 
-def global_parsing_encoder(feature_map):
+def resfpn(feature_stages, output_shape, base_name="resfpn"):
+    res = []
+    oh, ow = output_shape
+    for i, x in enumerate(feature_stages):
+        xh, xw = x.shape[1], x.shape[2]
+        x = KL.Conv2D(256, (1, 1), strides=(xh // oh, xw // ow),
+                      name="conv_" + base_name + "_" + str(i + 1), use_bias=False)(x)
+        x = BatchNorm(axis=-1, name="bn_" + base_name + "_" + str(i + 1))(x)
+        x = KL.Activation('relu')(x)
+        res.append(x)
+    # init_feature_map = KL.Lambda(lambda x: average_after_element_add(x))(res)
+    # x = conv_gru_unit(res, initial_state=init_feature_map)
+    x = KL.Add(name="resfpn_add")(res)
+    return x
+
+
+def global_parsing_encoder(feature_maps):
+    feature_map = resfpn(feature_maps, output_shape=(32, 32))
     x1 = KL.Conv2D(256, (1, 1), padding='same',
                    name='mrcnn_global_parsing_encoder_c1')(feature_map)
     # x1 = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn1')(x1)
@@ -2352,7 +2369,7 @@ class HPANet(object):
                     feature_merge = features[0]
         else:
             feature_merge = C1
-        coarse_feature = global_parsing_encoder(C5)
+        coarse_feature = global_parsing_encoder([C3, C4, C5])
         fine_feature = global_parsing_decoder(coarse_feature, feature_merge)
         # global parsing branch
         global_parsing_map = global_parsing_graph(fine_feature, config.NUM_PART_CLASS)
@@ -2572,8 +2589,7 @@ class HPANet(object):
         print("load model", filepath)
 
         if by_name:
-            # s.load_weights_from_hdf5_group_by_name(f, layers, skip_mismatch=True)
-            s.load_weights_from_hdf5_group_by_name(f, layers)
+            s.load_weights_from_hdf5_group_by_name(f, layers, skip_mismatch=True)
         else:
             s.load_weights_from_hdf5_group(f, layers)
         if hasattr(f, 'close'):
