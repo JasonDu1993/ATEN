@@ -15,11 +15,11 @@ config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 
 from configs.vipdataset_for_mfp import VIPDatasetForMFP
-from models.hpa import HPANet, HPAConfig
+from models.hpa_resfpn import HPANet, HPAConfig
 
 
 class trainConfig(HPAConfig):
-    NAME = "hpa_20191127a"
+    NAME = "hpa_20191127b"
     # NAME = "hpa_debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
