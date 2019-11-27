@@ -9,13 +9,14 @@ import sys
 import cv2
 import math
 import time
+import platform
+import importlib
 from multiprocessing import Queue, Process
 from tqdm import tqdm
 import skimage.io
 import matplotlib
 
 from configs.vip import ParsingRCNNModelConfig
-# from models.parsing_rcnn_model import PARSING_RCNN
 from utils import visualize
 
 import tensorflow as tf
@@ -23,7 +24,7 @@ import tensorflow as tf
 sys.path.insert(0, os.getcwd())
 
 matplotlib.use('Agg')
-
+MACHINE_NAME = platform.node()
 # Root directory of the project
 ROOT_DIR = os.getcwd()
 
@@ -33,24 +34,50 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 # Path to trained weights file
 # Download this file and place in the root of your
 # project (See README file for details)
-DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
-# MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190408a/checkpoints" + "/" + \
-#              "parsing_rcnn_vip_singleframe_20190408a_epoch073_loss0.401_valloss0.391.h5"
-RES_DIR = "./vis/origin_val_vip_singleframe_parsing_rcnn"
-gpus = ["0", "1", "2", "3"]
+# modified 1
+name = "models.parsing_rcnn_model_resfpn_gru"
+module = importlib.import_module(name)
 
-# Directory of images to run detection on
-# IMAGE_DIR = DATASET_DIR + "/Images"
-# IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
-IMAGE_DIR = DATASET_DIR + "/videos/val_videos_frames"
-IMAGE_LIST = DATASET_DIR + "/lists/val_all_frames_id.txt"
 
-# DATASET_DIR = "D:\dataset\VIP_tiny"
-MODEL_PATH = "./checkpoints/parsing_rcnn.h5"
-# RES_DIR = "./vis/debug"
-# gpus = ["0"]
-# IMAGE_DIR = DATASET_DIR + "/Images"
-# IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
+class InferenceConfig(ParsingRCNNModelConfig):
+    # Set batch size to 1 since we'll be running inference on
+    # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
+    # modified 2
+    PROCESS_NAME = "val_vip_singleframe_20191126c_epoch032"  # for process name
+    GPU_COUNT = 1
+    PROCESS_COUNT = 3
+    IMAGES_PER_GPU = 1
+    BATCH_SIZE = 1
+    ISCOLOR = True
+
+
+# linux
+if MACHINE_NAME == "Jason":
+    # win
+    DATASET_DIR = r"D:\dataset\VIP_tiny"
+    # modified 3
+    MODEL_PATH = "./checkpoints/parsing_rcnn.h5"
+    # modified 4
+    RES_DIR = "./vis/debug"
+    # modified 5
+    gpus = ["2"]
+    IMAGE_DIR = DATASET_DIR + "/Images"
+    IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
+else:
+    DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+    # modified 3
+    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20191126c/checkpoints" + "/" + \
+                 "parsing_rcnn_vip_singleframe_20191126c_epoch032_loss4.479_valloss4.983.h5"
+    # modified 4
+    RES_DIR = "./vis/val_vip_singleframe_20191126c_epoch032"
+    # modified 5
+    gpus = ["3"]
+    IMAGE_DIR = DATASET_DIR + "/Images"
+    IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
+
+    # test all val image in VIP dataset
+    # IMAGE_DIR = DATASET_DIR + "/videos/val_videos_frames"
+    # IMAGE_LIST = DATASET_DIR + "/lists/val_all_frames_id.txt"
 
 flag = False
 if not os.path.exists(RES_DIR):
@@ -60,16 +87,6 @@ if not os.path.exists(RES_DIR):
 
 # else:
 #     print(RES_DIR, "测试文件已存在，请检查是否需要修改预测文件名")
-
-class InferenceConfig(ParsingRCNNModelConfig):
-    # Set batch size to 1 since we'll be running inference on
-    # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
-    PROCESS_NAME = "parsing_rcnn"  # for process name
-    GPU_COUNT = 1
-    PROCESS_COUNT = 2
-    IMAGES_PER_GPU = 1
-    BATCH_SIZE = 1
-    ISCOLOR = False
 
 
 def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
@@ -89,16 +106,13 @@ def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
     l = len(images_set)
     images_set = images_set - tested_images_set
     f_tested = open(tested_path, "a")
-    import keras.backend as K
     tf_config = tf.ConfigProto()
     # config.gpu_options.allow_growth = True
-    tf_config.gpu_options.per_process_gpu_memory_fraction = 0.4
+    tf_config.gpu_options.per_process_gpu_memory_fraction = 0.3
     session = tf.Session(config=tf_config)
-    # from models.parsing_rcnn_model_resfpn_dilated_se import PARSING_RCNN
-    from models.parsing_rcnn_model import PARSING_RCNN
     if infer_config is None:
         infer_config = InferenceConfig()
-    model = PARSING_RCNN(mode="inference", config=infer_config, model_dir=MODEL_DIR)
+    model = module.PARSING_RCNN(mode="inference", config=infer_config, model_dir=MODEL_DIR)
     # Load weights trained on MS-COCO
     s0 = time.time()
     model.load_weights(MODEL_PATH, by_name=True)
@@ -182,7 +196,8 @@ def multiprocess_main():
                 split_data = images_list[start:end]
                 # 各个进程开始
                 tested_path = os.path.join(RES_DIR,
-                                           "tested_" + infer_config.PROCESS_NAME + "_gpu" + str(i) + "_proc" + str(j) + ".txt")
+                                           "tested_" + infer_config.PROCESS_NAME + "_gpu" + str(i) + "_proc" + str(
+                                               j) + ".txt")
                 proc = Process(target=worker,
                                args=(split_data, infer_config, gpu_id, tested_images_set, tested_path))
                 proc.start()
@@ -203,6 +218,9 @@ def multiprocess_main():
 
 
 if __name__ == '__main__':
+    from time import strftime
+
+    print("testing multi process at:", strftime("%Y_%m%d_%H%M%S"))
     t0 = time.time()
     multiprocess_main()
     print("MAIN END!")

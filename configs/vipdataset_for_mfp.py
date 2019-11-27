@@ -44,6 +44,8 @@ class ParsingRCNNModelConfig(Config):
 
     # Image me an (RGB)
     MEAN_PIXEL = np.array([123.7, 116.8, 103.9])
+    # Image me an (BRG)
+    MEAN_PIXEL_BGR = np.array([103.9, 116.8, 123.7])
 
     STEPS_PER_EPOCH = 1000
 
@@ -276,7 +278,7 @@ class VIPDatasetForMFP(Dataset):
                                       pre_image_names[0][1] + ".jpg")
         pre_image = cv2.imread(pre_image_path)  # shape [h=720, w=1080, 3(bgr)]
         pre_image, window, scale, padding = resize_image(pre_image, max_dim=config.PRE_IMAGE_SHAPE[0],
-                                                         padding=config.IMAGE_PADDING, isopencv=True)
+                                                         padding=config.IMAGE_PADDING, isopencv=config.ISOPENCV)
         if config.IS_PRE_IMAGE:
             pre_images.append(pre_image)
             for pre_video_name, pre_image_id in pre_image_names[1:]:
@@ -284,14 +286,15 @@ class VIPDatasetForMFP(Dataset):
                                               pre_image_id + ".jpg")
                 pre_image = cv2.imread(pre_image_path)  # shape [h=720, w=1080, 3(bgr)]
                 pre_image, window, scale, padding = resize_image(pre_image, max_dim=config.PRE_IMAGE_SHAPE[0],
-                                                                 padding=config.IMAGE_PADDING, isopencv=True)
+                                                                 padding=config.IMAGE_PADDING, isopencv=config.ISOPENCV)
                 pre_images.append(pre_image)
         if config.IS_PRE_MASK:
             for pre_video_name, pre_image_id in pre_image_names:
                 pre_mask_path = os.path.join(self.pre_image_dir, "vp_results", pre_video_name, "instance_segmentation",
                                              pre_image_id + ".png")
                 pre_mask = cv2.imread(pre_mask_path, flags=cv2.IMREAD_GRAYSCALE)  # shape [h=720, w=1080]
-                pre_mask = resize_mask(pre_mask, scale, padding, isopencv=True)[:, :, np.newaxis]  # shape [512, 512,1]
+                pre_mask = resize_mask(pre_mask, scale, padding, isopencv=config.ISOPENCV)[:, :,
+                           np.newaxis]  # shape [512, 512,1]
                 pre_masks.append(pre_mask)
         if config.IS_PRE_PART:
             for pre_video_name, pre_image_id in pre_image_names:
@@ -304,7 +307,7 @@ class VIPDatasetForMFP(Dataset):
                 for i in range(1, config.NUM_PART_CLASS):
                     pre_part[pre_part_tmp == i] = 1
                 # print("pre_part generate cost:", time.time() - t0, "s")
-                pre_part = resize_part_mfp(pre_part, scale, padding, isopencv=True)  # [512,512,20]
+                pre_part = resize_part_mfp(pre_part, scale, padding, isopencv=config.ISOPENCV)  # [512,512,20]
                 pre_parts.append(pre_part)
         return pre_images, pre_masks, pre_parts
 
@@ -499,7 +502,7 @@ class VIPDatasetForMFP(Dataset):
         in the form of a bitmap [height, width, instances].
 
         Returns:
-        masks: A bool array of shape [height, width, instance count] with
+        masks: A np.int8 array of shape [height, width, instance count] with
             one mask per instance.
         class_ids: a 1D array of class IDs of the instance masks.
         """

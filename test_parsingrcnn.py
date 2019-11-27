@@ -129,4 +129,7 @@ def main():
 
 
 if __name__ == '__main__':
+    from time import strftime
+
+    print("testing multi process at:", strftime("%Y_%m%d_%H%M%S"))
     main()

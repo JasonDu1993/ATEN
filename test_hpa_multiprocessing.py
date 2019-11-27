@@ -19,7 +19,7 @@ import tensorflow as tf
 import importlib
 
 # modified 1
-name = "models.mfp_model_roiprebox_tinyinput_rpn_premaskpart"
+name = "models.hpa"
 module = importlib.import_module(name)
 sys.path.insert(0, os.getcwd())
 
@@ -114,7 +114,7 @@ def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
     # from models.mfp_model_roiprebox_tinyinput_rpn import MFP
     if infer_config is None:
         infer_config = InferenceConfig()
-    model = module.MFP(mode="inference", config=infer_config, model_dir=MODEL_DIR)
+    model = module.HPANet(mode="inference", config=infer_config, model_dir=MODEL_DIR)
     # Load weights trained on MS-COCO
     s0 = time.time()
     model.load_weights(MODEL_PATH, by_name=True)
@@ -136,11 +136,13 @@ def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
         print("line", c, line, "pid:", os.getpid())
         image = cv2.imread(os.path.join(IMAGE_DIR, vid, image_id) + '.jpg')
         # scale = get_scale(image.shape, infer_config)
-        pre_image_names = load_pre_image_names(line, key_num=infer_config.PRE_MULTI_FRAMES)
-        if len(pre_image_names) == 0:
-            continue
-        pre_images, pre_masks, pre_parts = load_pre_image_datas(line, pre_image_names, infer_config,
-                                                                PRE_IMAGE_DIR, PRE_PREDICT_DATA_DIR)
+        pre_images, pre_masks, pre_parts = [], [], []
+        if infer_config.IS_PRE_IMAGE or infer_config.IS_PRE_MASK or infer_config.IS_PRE_PART:
+            pre_image_names = load_pre_image_names(line, key_num=infer_config.PRE_MULTI_FRAMES)
+            if len(pre_image_names) == 0:
+                continue
+            pre_images, pre_masks, pre_parts = load_pre_image_datas(line, pre_image_names, infer_config,
+                                                                    PRE_IMAGE_DIR, PRE_PREDICT_DATA_DIR)
         # pre_boxes = load_pre_image_boxes(pre_image_names, scale, PRE_PREDICT_DATA_DIR)
         # Run detection
         t2 = time.time()
