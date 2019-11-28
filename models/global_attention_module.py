@@ -47,50 +47,50 @@ def position_se_block(input_feature, ratio=8):
     """
 
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
-    pse_feature = KL.Lambda(lambda x: K.mean(x, axis=channel_axis, keepdims=True), name="pse_mean")(input_feature)
-    pse_feature = Conv2D(1, (1, 1), padding='same', use_bias=False, kernel_initializer='he_normal', activation="relu",
-                         name="pse_conv1")(pse_feature)
+    pse_feature = KL.Lambda(lambda x: K.mean(x, axis=channel_axis, keepdims=True))(input_feature)
+    pse_feature = Conv2D(1, (1, 1), padding='same', use_bias=False, kernel_initializer='he_normal', activation="relu"
+                         )(pse_feature)
     pse_feature = Conv2D(1, (1, 1), padding='same', use_bias=False, kernel_initializer='he_normal',
-                         activation="sigmoid", name="pse_conv2")(
+                         activation="sigmoid")(
         pse_feature)
-    pse_feature = multiply([input_feature, pse_feature], name="pse_multiply")
+    pse_feature = multiply([input_feature, pse_feature])
     return pse_feature
 
 
-def global_attention_module(input_feature, ratio=8, add_residual=False):
+def global_attention_module(input_feature, ratio=8, add_residual=False, name="base"):
     """
     """
 
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
     shape = K.int_shape(input_feature)
     channel = shape[channel_axis]
-    se_feature = GlobalAveragePooling2D(name="gam_gap")(input_feature)
-    se_feature = Reshape((1, 1, channel), name="gam_reshape")(se_feature)
+    se_feature = GlobalAveragePooling2D()(input_feature)
+    se_feature = Reshape((1, 1, channel))(se_feature)
     assert K.int_shape(se_feature)[1:] == (1, 1, channel)
     se_feature = Dense(channel // ratio,
                        activation='relu',
                        kernel_initializer='he_normal',
                        use_bias=True,
-                       bias_initializer='zeros', name="gam_dense1")(se_feature)
+                       bias_initializer='zeros')(se_feature)
     assert K.int_shape(se_feature)[1:] == (1, 1, channel // ratio)
     se_feature = Dense(channel,
                        activation='sigmoid',
                        kernel_initializer='he_normal',
                        use_bias=True,
-                       bias_initializer='zeros', name="gam_dense2")(se_feature)
+                       bias_initializer='zeros')(se_feature)
     assert K.int_shape(se_feature)[1:] == (1, 1, channel)
     if K.image_data_format() == 'channels_first':
-        se_feature = Permute((3, 1, 2), name="gam_permute")(se_feature)
-    pse_feature = KL.Lambda(lambda x: K.mean(x, axis=channel_axis, keepdims=True), name="gam_mean")(input_feature)
-    pse_feature = Conv2D(1, (1, 1), padding='same', use_bias=False, kernel_initializer='he_normal', activation="relu",
-                         name="gam_conv1")(pse_feature)
+        se_feature = Permute((3, 1, 2))(se_feature)
+    pse_feature = KL.Lambda(lambda x: K.mean(x, axis=channel_axis, keepdims=True))(input_feature)
+    pse_feature = Conv2D(1, (1, 1), padding='same', use_bias=False, kernel_initializer='he_normal', activation="relu"
+                         )(pse_feature)
     pse_feature = Conv2D(1, (1, 1), padding='same', use_bias=False, kernel_initializer='he_normal',
-                         activation="sigmoid", name="gam_conv2")(
+                         activation="sigmoid")(
         pse_feature)
-    gam_feature = multiply([pse_feature, se_feature], name="gam_multiply1")
-    gam_feature = multiply([input_feature, gam_feature], name="gam_multiply2")
+    gam_feature = multiply([pse_feature, se_feature])
+    gam_feature = multiply([input_feature, gam_feature])
     if add_residual:
-        gam_feature = add([input_feature, gam_feature], name="gam_res")
+        gam_feature = add([input_feature, gam_feature])
     return gam_feature
 
 
