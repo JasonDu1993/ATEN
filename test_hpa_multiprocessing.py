@@ -19,7 +19,7 @@ import tensorflow as tf
 import importlib
 
 # modified 1
-name = "models.hpa"
+name = "models.hpa_resfpn_gru"
 module = importlib.import_module(name)
 sys.path.insert(0, os.getcwd())
 
@@ -36,9 +36,9 @@ class InferenceConfig(module.HPAConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     # modified 2
-    PROCESS_NAME = "mfp_20191125a_epoch016"  # for tmp tested image name
+    PROCESS_NAME = "val_hpa_20191127c_epoch018"  # for tmp tested image name
     GPU_COUNT = 1  # only 1
-    PROCESS_COUNT = 1
+    PROCESS_COUNT = 3
     IMAGES_PER_GPU = 1  # only 1
     BATCH_SIZE = 1  # only 1
     # whether save the predicted visualized image
@@ -68,10 +68,10 @@ if MACHINE_NAME == "Jason":
 else:
     DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
     # modified 3
-    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191125a/checkpoints" + "/" + \
-                 "parsing_rcnn_mfp_20191125a_epoch016_loss0.681_valloss0.639.h5"
+    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/hpa_20191127c/checkpoints" + "/" + \
+                 "parsing_rcnn_hpa_20191127c_epoch018_loss1.015_valloss0.949.h5"
     # modified 4
-    RES_DIR = "./vis_hpa/val_hap_20191125a_epoch016"
+    RES_DIR = "./vis_hpa/val_hpa_20191127c_epoch018"
     # modified 5
     gpus = ["1"]
     IMAGE_DIR = DATASET_DIR + "/Images"
