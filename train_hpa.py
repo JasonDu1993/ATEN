@@ -9,17 +9,17 @@ MACHINE_NAME = platform.node()
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 sys.path.insert(0, os.getcwd())
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 
 from configs.vipdataset_for_mfp import VIPDatasetForMFP
-from models.hpa_resfpn_c5d import HPANet, HPAConfig
+from models.hpa_resfpn_c5d_edgam import HPANet, HPAConfig
 
 
 class trainConfig(HPAConfig):
-    NAME = "hpa_20191128c"
+    NAME = "hpa_20191128d"
     # NAME = "hpa_debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     # Fine tune all layers
 
     model.train(dataset_train, dataset_val,
-                learning_rate=0.0001,
+                learning_rate=0.001,
                 epochs=200,
                 layers='all',
                 period=config.SAVE_MODEL_PERIOD)
