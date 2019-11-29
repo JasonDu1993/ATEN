@@ -36,7 +36,7 @@ class InferenceConfig(module.HPAConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     # modified 2
-    PROCESS_NAME = "val_hpa_20191127b_epoch030"  # for tmp tested image name
+    PROCESS_NAME = "val_hpa_20191128g_epoch024"  # for tmp tested image name
     GPU_COUNT = 1  # only 1
     PROCESS_COUNT = 3
     IMAGES_PER_GPU = 1  # only 1
@@ -68,12 +68,12 @@ if MACHINE_NAME == "Jason":
 else:
     DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
     # modified 3
-    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/hpa_20191127b/checkpoints" + "/" + \
-                 "parsing_rcnn_hpa_20191127b_epoch030_loss0.872_valloss1.191.h5"
+    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/hpa_20191128g/checkpoints" + "/" + \
+                 "parsing_rcnn_hpa_20191128g_epoch024_loss0.768_valloss0.989.h5"
     # modified 4
-    RES_DIR = "./vis_hpa/val_hpa_20191127b_epoch030"
+    RES_DIR = "./vis_hpa/val_hpa_20191128g_epoch024"
     # modified 5
-    gpus = ["3"]
+    gpus = ["1"]
     IMAGE_DIR = DATASET_DIR + "/Images"
     IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
     PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
