@@ -57,6 +57,24 @@ def position_se_block(input_feature, ratio=8):
     return pse_feature
 
 
+def position_se_block_f9(input_feature, ratio=8, f=9):
+    """
+    """
+
+    channel_axis = 1 if K.image_data_format() == "channels_first" else -1
+    pse_feature = KL.Lambda(lambda x: K.mean(x, axis=channel_axis, keepdims=True))(input_feature)
+    pse_feature = Conv2D(f, (1, 1), padding='same', use_bias=False, kernel_initializer='he_normal', activation="relu"
+                         )(pse_feature)
+    pse_feature = KL.Lambda(lambda x: K.mean(x, axis=channel_axis, keepdims=True))(pse_feature)
+    pse_feature = Conv2D(f, (1, 1), padding='same', use_bias=False, kernel_initializer='he_normal',
+                         activation="relu")(
+        pse_feature)
+    pse_feature = KL.Lambda(lambda x: K.mean(x, axis=channel_axis, keepdims=True))(pse_feature)
+    pse_feature = KL.Activation("sigmoid")(pse_feature)
+    pse_feature = multiply([input_feature, pse_feature])
+    return pse_feature
+
+
 def global_attention_module(input_feature, ratio=8, add_residual=False, name="base"):
     """
     """
