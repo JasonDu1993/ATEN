@@ -112,6 +112,46 @@ def global_attention_module(input_feature, ratio=8, add_residual=False, name="ba
     return gam_feature
 
 
+def global_attention_module_f(input_feature, ratio=8, f=128, add_residual=False):
+    """
+    """
+
+    channel_axis = 1 if K.image_data_format() == "channels_first" else -1
+    shape = K.int_shape(input_feature)
+    channel = shape[channel_axis]
+    se_feature = GlobalAveragePooling2D()(input_feature)
+    se_feature = Reshape((1, 1, channel))(se_feature)
+    assert K.int_shape(se_feature)[1:] == (1, 1, channel)
+    se_feature = Dense(channel // ratio,
+                       activation='relu',
+                       kernel_initializer='he_normal',
+                       use_bias=True,
+                       bias_initializer='zeros')(se_feature)
+    assert K.int_shape(se_feature)[1:] == (1, 1, channel // ratio)
+    se_feature = Dense(channel,
+                       activation='sigmoid',
+                       kernel_initializer='he_normal',
+                       use_bias=True,
+                       bias_initializer='zeros')(se_feature)
+    assert K.int_shape(se_feature)[1:] == (1, 1, channel)
+    if K.image_data_format() == 'channels_first':
+        se_feature = Permute((3, 1, 2))(se_feature)
+    pse_feature = KL.Lambda(lambda x: K.mean(x, axis=channel_axis, keepdims=True))(input_feature)
+    pse_feature = Conv2D(f, (1, 1), padding='same', use_bias=False, kernel_initializer='he_normal', activation="relu"
+                         )(pse_feature)
+    pse_feature = KL.Lambda(lambda x: K.mean(x, axis=channel_axis, keepdims=True))(pse_feature)
+    pse_feature = Conv2D(f, (1, 1), padding='same', use_bias=False, kernel_initializer='he_normal',
+                         activation="relu")(
+        pse_feature)
+    pse_feature = KL.Lambda(lambda x: K.mean(x, axis=channel_axis, keepdims=True))(pse_feature)
+    pse_feature = KL.Activation("sigmoid")(pse_feature)
+    gam_feature = multiply([pse_feature, se_feature])
+    gam_feature = multiply([input_feature, gam_feature])
+    if add_residual:
+        gam_feature = add([input_feature, gam_feature])
+    return gam_feature
+
+
 def non_local_block(ip, intermediate_dim=None, compression=2,
                     mode='embedded', add_residual=True):
     """
