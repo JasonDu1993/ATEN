@@ -493,7 +493,7 @@ def resize_mask(mask, scale, padding, isopencv=False):
     if isopencv:
         mask = np.array(mask, dtype=np.uint8)
         mask = cv2.resize(mask, (round(w * scale), round(h * scale)))
-        # padding = padding[:2]
+        padding = padding[:2]
     else:
         import scipy.ndimage
         mask = scipy.ndimage.zoom(mask, zoom=[scale, scale, 1], order=0)  # 上采样、最近邻插法

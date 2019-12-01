@@ -15,16 +15,16 @@ config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 
 from configs.vipdataset_for_mfp import VIPDatasetForMFP
-from models.mfp_model_roiprebox_tinyinput_rpn_premaskpart import MFP, MFPConfig
+from models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_mask import MFPNet, MFPConfig
 
 
 class trainConfig(MFPConfig):
-    NAME = "mfp_20191125a"
+    NAME = "mfp_20191201d"
     # NAME = "mfp_debug"
     GPU_COUNT = 1
-    IMAGES_PER_GPU = 6
+    IMAGES_PER_GPU = 4
     # IMAGES_PER_GPU = 1
-    STEPS_PER_EPOCH = 1000
+    STEPS_PER_EPOCH = 2000
     # STEPS_PER_EPOCH = 2
     VALIDATION_STEPS = 100
     # VALIDATION_STEPS = 1
@@ -96,21 +96,23 @@ if __name__ == '__main__':
     config.display()
 
     # Create model
-    model = MFP(mode="training", config=config, model_dir=args.logs)
+    model = MFPNet(mode="training", config=config, model_dir=args.logs)
 
     # Select weights file to load
-    if args.model.lower() == "last":
-        # Find last trained weights
-        model_path = model.find_last()[1]
-    elif args.model.lower() == "pretrain":
-        model_path = PRETRAIN_MODEL_PATH
-    else:
-        model_path = args.model
-    # common load weight 
+    # if args.model.lower() == "last":
+    #     # Find last trained weights
+    #     model_path = model.find_last()[1]
+    # elif args.model.lower() == "pretrain":
+    #     model_path = PRETRAIN_MODEL_PATH
+    # else:
+    #     model_path = args.model
+    # common load weight
+    model_path = PRETRAIN_MODEL_PATH
     print("Loading weights ", model_path)
     t0 = time()
-    model.load_weights(model_path, by_name=True)
-    print("Loaded weights ", time() - t0, "s")
+    if model_path:
+        model.load_weights(model_path, by_name=True)
+        print("Loaded weights ", time() - t0, "s")
     # Training dataset. Use the training set and 35K from the
     # validation set, as as in the Mask RCNN paper.
     if MACHINE_NAME == "Jason":
