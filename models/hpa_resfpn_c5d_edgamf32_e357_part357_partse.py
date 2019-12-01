@@ -24,7 +24,7 @@ assert LooseVersion(keras.__version__) >= LooseVersion('2.0.8')
 from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
 from models.non_local import non_local_block
 from models.global_attention_module import global_attention_module, global_attention_module_f
-from models.global_attention_module import se_block, position_se_block, position_se_block_f9
+from models.global_attention_module import se_block, position_se_block, position_se_block_f
 
 
 ############################################################

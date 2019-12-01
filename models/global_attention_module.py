@@ -57,7 +57,7 @@ def position_se_block(input_feature, ratio=8):
     return pse_feature
 
 
-def position_se_block_f9(input_feature, ratio=8, f=9):
+def position_se_block_f(input_feature, ratio=8, f=9):
     """
     """
 

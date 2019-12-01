@@ -24,7 +24,7 @@ assert LooseVersion(keras.__version__) >= LooseVersion('2.0.8')
 from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
 from models.non_local import non_local_block
 from models.global_attention_module import global_attention_module
-from models.global_attention_module import se_block, position_se_block, position_se_block_f9
+from models.global_attention_module import se_block, position_se_block, position_se_block_f
 
 
 ############################################################
@@ -1285,7 +1285,7 @@ def global_parsing_encoder(feature_maps):
                   name='mrcnn_global_parsing_encoder_conconv')(x)
     # x = BatchNorm(axis=-1, name='mrcnn_global_parsing_encoder_bn')(x)
     x = KL.Activation('relu')(x)
-    x = position_se_block_f9(x)
+    x = position_se_block_f(x)
     return x
 
 
@@ -1306,7 +1306,7 @@ def global_parsing_decoder(feature_map, low_feature_map):
     x = KL.Conv2D(256, (3, 3), padding='same',
                   name='mrcnn_global_parsing_decoder_conv3')(x)
     x = KL.Activation('relu')(x)
-    x = position_se_block_f9(x)
+    x = position_se_block_f(x)
     return x
 
 
