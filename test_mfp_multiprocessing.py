@@ -19,7 +19,7 @@ import tensorflow as tf
 import importlib
 
 # modified 1
-name = "models.mfp_model_roiprebox_tinyinput_rpn_premaskpart"
+name = "models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_mask"
 module = importlib.import_module(name)
 sys.path.insert(0, os.getcwd())
 
@@ -36,7 +36,7 @@ class InferenceConfig(module.MFPConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     # modified 2
-    PROCESS_NAME = "mfp_20191125a_epoch016"  # for tmp tested image name
+    PROCESS_NAME = "val_mfp_20191202b_epoch010"  # for tmp tested image name
     GPU_COUNT = 1  # only 1
     PROCESS_COUNT = 3
     IMAGES_PER_GPU = 1  # only 1
@@ -68,10 +68,10 @@ if MACHINE_NAME == "Jason":
 else:
     DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
     # modified 3
-    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191125a/checkpoints" + "/" + \
-                 "parsing_rcnn_mfp_20191125a_epoch016_loss0.681_valloss0.639.h5"
+    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191202b/checkpoints" + "/" + \
+                 "parsing_rcnn_mfp_20191202b_epoch010_loss1.400_valloss1.836.h5"
     # modified 4
-    RES_DIR = "./vis_mfp/val_mfp_20191125a_epoch016"
+    RES_DIR = "./vis_mfp/val_mfp_20191202b_epoch010"
     # modified 5
     gpus = ["1"]
     IMAGE_DIR = DATASET_DIR + "/Images"
@@ -114,7 +114,7 @@ def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
     # from models.mfp_model_roiprebox_tinyinput_rpn import MFP
     if infer_config is None:
         infer_config = InferenceConfig()
-    model = module.MFP(mode="inference", config=infer_config, model_dir=MODEL_DIR)
+    model = module.MFPNet(mode="inference", config=infer_config, model_dir=MODEL_DIR)
     # Load weights trained on MS-COCO
     s0 = time.time()
     model.load_weights(MODEL_PATH, by_name=True)

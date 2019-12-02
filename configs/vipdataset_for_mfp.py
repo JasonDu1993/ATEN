@@ -294,7 +294,7 @@ class VIPDatasetForMFP(Dataset):
                                              pre_image_id + ".png")
                 pre_mask = cv2.imread(pre_mask_path, flags=cv2.IMREAD_GRAYSCALE)  # shape [h=720, w=1080]
                 pre_mask = resize_mask(pre_mask, scale, padding, isopencv=config.ISOPENCV)[:, :,
-                           np.newaxis]  # shape [512, 512,1]
+                           np.newaxis]  # shape [128, 128,1]
                 pre_masks.append(pre_mask)
         if config.IS_PRE_PART:
             for pre_video_name, pre_image_id in pre_image_names:
@@ -307,7 +307,7 @@ class VIPDatasetForMFP(Dataset):
                 for i in range(1, config.NUM_PART_CLASS):
                     pre_part[pre_part_tmp == i] = 1
                 # print("pre_part generate cost:", time.time() - t0, "s")
-                pre_part = resize_part_mfp(pre_part, scale, padding, isopencv=config.ISOPENCV)  # [512,512,20]
+                pre_part = resize_part_mfp(pre_part, scale, padding, isopencv=config.ISOPENCV)  # [128,128,20]
                 pre_parts.append(pre_part)
         return pre_images, pre_masks, pre_parts
 
