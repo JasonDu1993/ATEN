@@ -30,7 +30,7 @@ from models.global_attention_module import se_block, position_se_block, position
 ############################################################
 #  config
 ############################################################
-class HPAConfig(ParsingRCNNModelConfig):
+class MFPConfig(ParsingRCNNModelConfig):
     IS_PRE_IMAGE = True
     IS_PRE_MASK = False
     IS_PRE_PART = False
@@ -2249,7 +2249,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois_num=
             #     raise
 
 
-class HPANet(object):
+class MFPNet(object):
     """Encapsulates the Mask RCNN model functionality.
 
     The actual Keras model is in the keras_model property.
