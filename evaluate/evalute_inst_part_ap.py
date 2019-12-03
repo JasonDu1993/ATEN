@@ -4,8 +4,8 @@ from PIL import Image
 import numpy as np
 import multiprocessing
 
-PREDICT_DIR = "/home/sk49/workspace/zhoudu/ATEN/vis_mfp/val_mfp_20191202a_epoch045/vp_results"
-NAME = "val_mfp_20191202a_epoch045"  # tmp class file
+PREDICT_DIR = "/home/sk49/workspace/zhoudu/ATEN/vis_hpa/val_hpa_20191202a_epoch021/vp_results"
+NAME = "val_hpa_20191202a_epoch021"  # tmp class file
 TMP_DIR = "./eval_results"
 NUM_PROCESS = 10
 
