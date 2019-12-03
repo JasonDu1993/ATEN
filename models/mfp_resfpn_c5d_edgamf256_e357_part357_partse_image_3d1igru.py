@@ -2366,6 +2366,7 @@ class MFPNet(object):
         # Returns a list of the last layers of each stage, 5 in total.
         # Don't create the thead (stage 5), so we pick the 4th item in the list.
         C1, C2, C3, C4, C5 = deeplab_resnet(input_image, 'resnet50')
+        temporal_feature = None
         if config.IS_PRE_IMAGE or config.IS_PRE_MASK or config.IS_PRE_PART:
             if config.RECURRENT_UNIT == 'lstm':
                 feature_pre_images = conv_lstm_unit(input_pre_images, name="feature_pre_images", initial_state=None)

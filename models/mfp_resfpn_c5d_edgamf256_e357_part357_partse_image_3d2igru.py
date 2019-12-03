@@ -32,7 +32,7 @@ from models.global_attention_module import se_block, position_se_block, position
 ############################################################
 class MFPConfig(ParsingRCNNModelConfig):
     IS_PRE_IMAGE = True
-    IS_PRE_MASK = True
+    IS_PRE_MASK = False
     IS_PRE_PART = False
 
     # Use small images for faster training. Set the limits of the small side
@@ -248,11 +248,35 @@ def conv3d_gru2d_unit(temporal_features, filter, name, kernel_size=(3, 3), paddi
         input_tensor)
     feature_conv3d = KL.Conv3D(filter, (3, 3, 3), padding="same", activation="relu", name=name + "_conv3d2")(
         feature_conv3d)
-    feature_conv3d = KL.Conv3D(filter, (3, 3, 3), padding="same", activation="relu", name=name + "_conv3d3")(
-        feature_conv3d)
     initial_state = K.mean(feature_conv3d, axis=1)
     x = ConvGRU2D(filters=filter, kernel_size=kernel_size, name=name,
                   padding=padding, return_sequences=False)(feature_conv3d, initial_state=initial_state)
+    x = KL.Activation("relu")(x)
+    return x
+
+
+def conv3d_init_gru2d_unit(temporal_features, filter, name, kernel_size=(3, 3), padding="same"):
+    input_tensor = KL.Lambda(lambda x: tf.stack(x, axis=1, name=name + "_stack"))(temporal_features)
+    from models.convolutional_recurrent import ConvGRU2D
+    feature_conv3d = KL.Conv3D(filter, (3, 3, 3), padding="same", activation="relu", name=name + "_conv3d1")(
+        input_tensor)
+    initial_state = K.mean(feature_conv3d, axis=1)
+    x = ConvGRU2D(filters=filter, kernel_size=kernel_size, name=name,
+                  padding=padding, return_sequences=False)(input_tensor, initial_state=initial_state)
+    x = KL.Activation("relu")(x)
+    return x
+
+
+def conv3d2_init_gru2d_unit(temporal_features, filter, name, kernel_size=(3, 3), padding="same"):
+    input_tensor = KL.Lambda(lambda x: tf.stack(x, axis=1, name=name + "_stack"))(temporal_features)
+    from models.convolutional_recurrent import ConvGRU2D
+    feature_conv3d = KL.Conv3D(filter, (3, 3, 3), padding="same", activation="relu", name=name + "_conv3d1")(
+        input_tensor)
+    feature_conv3d = KL.Conv3D(filter, (3, 3, 3), padding="same", activation="relu", name=name + "_conv3d2")(
+        feature_conv3d)
+    initial_state = K.mean(feature_conv3d, axis=1)
+    x = ConvGRU2D(filters=filter, kernel_size=kernel_size, name=name,
+                  padding=padding, return_sequences=False)(input_tensor, initial_state=initial_state)
     x = KL.Activation("relu")(x)
     return x
 
@@ -1305,7 +1329,7 @@ def global_parsing_decoder(feature_map, low_feature_map, temporal_feature=None):
     temporal = []
     if temporal_feature is not None:
         temporal_feature = KL.Conv2D(64, (1, 1), padding='same',
-                             name='temporal_decoder_conv1')(temporal_feature)
+                                     name='temporal_decoder_conv1')(temporal_feature)
         temporal_feature = KL.Activation('relu')(temporal_feature)
         temporal.append(temporal_feature)
     # x = KL.Concatenate(axis=-1)([top, low])
@@ -2367,21 +2391,24 @@ class MFPNet(object):
                 feature_pre_images = []
                 if config.IS_PRE_IMAGE:
                     feature_pre_images.append(
-                        conv3d_gru2d_unit(input_pre_images, filter=config.RECURRENT_FILTER, name="feature_pre_images"))
+                        conv3d2_init_gru2d_unit(input_pre_images, filter=config.RECURRENT_FILTER,
+                                               name="feature_pre_images"))
                 # deal with pre masks
                 feature_pre_masks = []
                 if config.IS_PRE_MASK:
                     feature_pre_masks.append(
-                        conv3d_gru2d_unit(input_pre_masks, filter=config.RECURRENT_FILTER, name="feature_pre_masks"))
+                        conv3d2_init_gru2d_unit(input_pre_masks, filter=config.RECURRENT_FILTER,
+                                               name="feature_pre_masks"))
                 # deal with pre parts
                 feature_pre_parts = []
                 if config.IS_PRE_PART:
                     feature_pre_parts.append(
-                        conv3d_gru2d_unit(input_pre_parts, filter=config.RECURRENT_FILTER, name="feature_pre_parts"))
+                        conv3d2_init_gru2d_unit(input_pre_parts, filter=config.RECURRENT_FILTER,
+                                               name="feature_pre_parts"))
                 features = feature_pre_images + feature_pre_masks + feature_pre_parts
                 if len(features) > 1:
-                    temporal_feature = conv3d_gru2d_unit(features,
-                                                      filter=config.RECURRENT_FILTER, name="merge")
+                    temporal_feature = conv3d2_init_gru2d_unit(features,
+                                                              filter=config.RECURRENT_FILTER, name="merge")
                 else:
                     temporal_feature = features[0]
         coarse_feature = global_parsing_encoder([C3, C4, C5])
