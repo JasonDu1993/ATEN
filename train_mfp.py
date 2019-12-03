@@ -9,17 +9,17 @@ MACHINE_NAME = platform.node()
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 sys.path.insert(0, os.getcwd())
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 
 from configs.vipdataset_for_mfp import VIPDatasetForMFP
-from models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_imagemask import MFPNet, MFPConfig
+from models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_image_3d1igru import MFPNet, MFPConfig
 
 
 class trainConfig(MFPConfig):
-    NAME = "mfp_20191202d"
+    NAME = "mfp_20191203a"
     # NAME = "mfp_debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
