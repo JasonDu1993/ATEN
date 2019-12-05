@@ -19,7 +19,7 @@ import tensorflow as tf
 import importlib
 
 # modified 1
-name = "models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_imagek3g0"
+name = "models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_image_lstm"
 module = importlib.import_module(name)
 sys.path.insert(0, os.getcwd())
 
@@ -36,7 +36,7 @@ class InferenceConfig(module.MFPConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     # modified 2
-    PROCESS_NAME = "val_mfp_20191205c_epoch006"  # for tmp tested image name
+    PROCESS_NAME = "val_mfp_20191205a_epoch008"  # for tmp tested image name
     GPU_COUNT = 1  # only 1
     PROCESS_COUNT = 3
     IMAGES_PER_GPU = 1  # only 1
@@ -68,12 +68,12 @@ if MACHINE_NAME == "Jason":
 else:
     DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
     # modified 3
-    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191205c/checkpoints" + "/" + \
-                 "parsing_rcnn_mfp_20191205c_epoch006_loss1.414_valloss1.574.h5"
+    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191205a/checkpoints" + "/" + \
+                 "parsing_rcnn_mfp_20191205a_epoch008_loss1.393_valloss1.559.h5"
     # modified 4
-    RES_DIR = "./vis_mfp/val_mfp_20191205c_epoch006"
+    RES_DIR = "./vis_mfp/val_mfp_20191205a_epoch008"
     # modified 5
-    gpus = ["0"]
+    gpus = ["1"]
     IMAGE_DIR = DATASET_DIR + "/Images"
     IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
     PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
