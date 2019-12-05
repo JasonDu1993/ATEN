@@ -228,7 +228,7 @@ class VIPDatasetForMFP(Dataset):
             pre_image_names: list, the value is list, len=2, which represent video_name, pre_image_id
 
         """
-        assert key_num * (gap + 1) < 10, "key_num(%d) * (gap(%d) + 1) >= 10" % (key_num, gap)
+        assert (key_num - 1) * (gap + 1) < 10, "(key_num(%d) - 1) * (gap(%d) + 1) >= 10" % (key_num, gap)
         image_info = self.image_info[image_index]  # image_index is index, for example 0, 1, 2 ...
         video_name, image_id = image_info["id"].split("/")  # image_id like 000000000001
         if image_id.endswith("000000000001"):
