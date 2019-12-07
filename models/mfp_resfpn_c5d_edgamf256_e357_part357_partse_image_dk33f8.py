@@ -1305,8 +1305,11 @@ def global_parsing_decoder(feature_map, low_feature_map, temporal_feature=None):
     low = KL.Activation('relu')(low)
     temporal = []
     if temporal_feature is not None:
-        temporal_feature = KL.Conv2D(64, (1, 1), padding='same',
+        temporal_feature = KL.Conv2D(64, (3, 3), padding='same',
                              name='temporal_decoder_conv1')(temporal_feature)
+        temporal_feature = KL.Activation('relu')(temporal_feature)
+        temporal_feature = KL.Conv2D(8, (1, 1), padding='same',
+                             name='temporal_decoder_conv2')(temporal_feature)
         temporal_feature = KL.Activation('relu')(temporal_feature)
         temporal.append(temporal_feature)
     # x = KL.Concatenate(axis=-1)([top, low])
