@@ -138,7 +138,7 @@ if __name__ == '__main__':
     # Fine tune all layers
 
     model.train(dataset_train, dataset_val,
-                learning_rate=0.0001,
+                learning_rate=0.001,
                 epochs=200,
                 layers='all',
                 period=config.SAVE_MODEL_PERIOD)
