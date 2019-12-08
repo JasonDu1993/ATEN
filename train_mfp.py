@@ -15,7 +15,7 @@ config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 
 from configs.vipdataset_for_mfp import VIPDatasetForMFP
-from models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_image_dk33f8 import MFPNet, MFPConfig
+from models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_image_dk33f1 import MFPNet, MFPConfig
 
 
 class trainConfig(MFPConfig):
