@@ -15,11 +15,11 @@ config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 
 from configs.vipdataset_for_mfp import VIPDatasetForMFP
-from models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_image_dk33f1 import MFPNet, MFPConfig
+from models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_image_dk33f8 import MFPNet, MFPConfig
 
 
 class trainConfig(MFPConfig):
-    NAME = "mfp_20191207b"
+    NAME = "mfp_20191208a"
     # NAME = "mfp_debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
@@ -48,10 +48,10 @@ if MACHINE_NAME == "Jason":
     pre_image_train_dir = "D:\dataset\VIP_tiny"
     pre_image_val_dir = "D:\dataset\VIP_tiny"
 else:
-    # PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191202a/checkpoints" + "/" + \
-    #                       "parsing_rcnn_mfp_20191202a_epoch045_loss1.333_valloss1.690.h5"
+    PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191207b/checkpoints" + "/" + \
+                          "parsing_rcnn_mfp_20191207b_epoch014_loss1.373_valloss1.443.h5"
     # PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
-    PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "hpa_20191130d_epoch019.h5")
+    # PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "hpa_20191130d_epoch019.h5")
     DEFAULT_DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
     pre_image_train_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_train_vip_singleframe_parsing_rcnn"
     pre_image_val_dir = "/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
