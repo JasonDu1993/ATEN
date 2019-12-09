@@ -36,7 +36,7 @@ class InferenceConfig(module.MFPConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     # modified 2
-    PROCESS_NAME = "val_mfp_20191207b_epoch014"  # for tmp tested image name
+    PROCESS_NAME = "val_mfp_20191208d_epoch042"  # for tmp tested image name
     GPU_COUNT = 1  # only 1
     PROCESS_COUNT = 3
     IMAGES_PER_GPU = 1  # only 1
@@ -68,12 +68,12 @@ if MACHINE_NAME == "Jason":
 else:
     DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
     # modified 3
-    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191207b/checkpoints" + "/" + \
-                 "parsing_rcnn_mfp_20191207b_epoch014_loss1.373_valloss1.443.h5"
+    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191208d/checkpoints" + "/" + \
+                 "parsing_rcnn_mfp_20191208d_epoch042_loss0.596_valloss1.173.h5"
     # modified 4
-    RES_DIR = "./vis_mfp/val_mfp_20191207b_epoch014"
+    RES_DIR = "./vis_mfp/val_mfp_20191208d_epoch042"
     # modified 5
-    gpus = ["2"]
+    gpus = ["0"]
     IMAGE_DIR = DATASET_DIR + "/Images"
     IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
     PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
