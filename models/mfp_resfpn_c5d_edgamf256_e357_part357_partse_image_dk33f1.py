@@ -25,7 +25,7 @@ from configs.vipdataset_for_mfp import ParsingRCNNModelConfig
 from models.non_local import non_local_block
 from models.global_attention_module import global_attention_module, global_attention_module_f
 from models.global_attention_module import se_block, position_se_block, position_se_block_f
-
+from utils.get_model_flops import get_flops
 
 ############################################################
 #  config
@@ -2539,6 +2539,9 @@ class MFPNet(object):
         if config.GPU_COUNT > 1:
             from utils.parallel_model import ParallelModel
             model = ParallelModel(model, config.GPU_COUNT)
+        # print("model........................")
+        # # print(model.summary())
+        # print("model flops:", get_flops(model))
         import platform
         sys = platform.system()
         if sys == "Windows":

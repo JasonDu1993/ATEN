@@ -9,7 +9,7 @@ MACHINE_NAME = platform.node()
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 sys.path.insert(0, os.getcwd())
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
@@ -17,9 +17,11 @@ session = tf.Session(config=config)
 from configs.vipdataset_for_mfp import VIPDatasetForMFP
 from models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_image_dk33f1 import MFPNet, MFPConfig
 
+lr = 0.01
+
 
 class trainConfig(MFPConfig):
-    NAME = "mfp_20191208c"
+    NAME = "mfp_20191208d"
     # NAME = "mfp_debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
@@ -138,7 +140,7 @@ if __name__ == '__main__':
     # Fine tune all layers
 
     model.train(dataset_train, dataset_val,
-                learning_rate=0.001,
+                learning_rate=lr,
                 epochs=200,
                 layers='all',
                 period=config.SAVE_MODEL_PERIOD)

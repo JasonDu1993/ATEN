@@ -17,6 +17,8 @@ session = tf.Session(config=config)
 from configs.vipdataset_for_mfp import VIPDatasetForMFP
 from models.hpa_resfpn_c5d_edgamresf256_e357_part357_partse import HPANet, HPAConfig
 
+lr = 1e-3
+
 
 class trainConfig(HPAConfig):
     NAME = "hpa_20191204a"
@@ -138,7 +140,7 @@ if __name__ == '__main__':
     # Fine tune all layers
 
     model.train(dataset_train, dataset_val,
-                learning_rate=0.001,
+                learning_rate=lr,
                 epochs=200,
                 layers='all',
                 period=config.SAVE_MODEL_PERIOD)
