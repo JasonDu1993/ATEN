@@ -15,13 +15,13 @@ config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 
 from configs.vipdataset_for_mfp import VIPDatasetForMFP
-from models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_image_dk33f1 import MFPNet, MFPConfig
+from models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_image_3d3 import MFPNet, MFPConfig
 
-lr = 0.001
+lr = 0.01
 
 
 class trainConfig(MFPConfig):
-    NAME = "mfp_20191212a"
+    NAME = "mfp_20191212b"
     # NAME = "mfp_debug"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 4
