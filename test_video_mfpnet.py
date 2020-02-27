@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-# @Time    : 2019/5/17 16:35
+# @Time    : 2020/2/27 19:50
 # @Author  : Jason
 # @Email   : 1358681631@qq.com
-# @File    : test_video.py
+# @File    : test_video_mfpnet.py
 # @Software: PyCharm
 import os
 import tensorflow as tf
@@ -18,10 +18,10 @@ import cv2
 
 sys.path.insert(0, os.getcwd())
 
-from configs.vip import ParsingRCNNModelConfig
+from models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_image_dk33f1 import MFPConfig
 
 # from models.parsing_rcnn_model import PARSING_RCNN
-from models.parsing_rcnn_model_dilated import PARSING_RCNN
+from models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_image_dk33f1 import MFPNet
 from utils import visualize
 from time import time
 
@@ -34,14 +34,33 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 
 if MACHINE_NAME == "Jason":
     # win
-    MODEL_PATH = r"C:\ATEN_weights\vip_singleframe_20190408a\checkpoints\parsing_rcnn_vip_singleframe_20190408a_epoch074_loss0.401_valloss0.389.h5"
+    DATASET_DIR = r"D:\dataset\VIP_tiny"
+    # modified 3
+    MODEL_PATH = "outputs/mfp_20191116a/checkpoints/parsing_rcnn_mfp_20191116a_epoch003_loss0.741_valloss0.753.h5"
+    # modified 4
+    RES_DIR = "./vis_mfp/val_mfp_20191116a_epoch003"
+    # modified 5
+    gpus = ["0"]
+    IMAGE_DIR = DATASET_DIR + "/Images"
+    IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
+    PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
+    PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
 else:
-    # linux
-    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190408a/checkpoints/" \
-                 "parsing_rcnn_vip_singleframe_20190408a_epoch073_loss0.401_valloss0.391.h5"
+    DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
+    # modified 3
+    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191212b/checkpoints" + "/" + \
+                 "parsing_rcnn_mfp_20191212b_epoch052_loss0.531_valloss0.709.h5"
+    # modified 4
+    RES_DIR = "./vis_mfp/val_mfp_20191212b_epoch052"
+    # modified 5
+    gpus = ["0"]
+    IMAGE_DIR = DATASET_DIR + "/Images"
+    IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
+    PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
+    PRE_PREDICT_DATA_DIR = r"/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
 
 
-class InferenceConfig(ParsingRCNNModelConfig):
+class InferenceConfig(MFPConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     GPU_COUNT = 1
@@ -56,7 +75,7 @@ def main():
     vid = os.path.split(read_video_path)[-1].split(".")[0]
     print("vid:", vid)
     # Create model object in inference mode.
-    model = PARSING_RCNN(mode="inference", config=config, model_dir=MODEL_DIR)
+    model = MFPNet(mode="inference", config=config, model_dir=MODEL_DIR)
     # Load weights trained on MS-COCO
     s0 = time()
     model.load_weights(MODEL_PATH, by_name=True)

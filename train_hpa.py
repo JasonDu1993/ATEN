@@ -21,15 +21,15 @@ lr = 1e-3
 
 
 class trainConfig(HPAConfig):
-    NAME = "hpa_20191204a"
-    # NAME = "hpa_debug"
+    # NAME = "hpa_20191204a"
+    NAME = "hpa_debug"
     GPU_COUNT = 1
-    IMAGES_PER_GPU = 4
-    # IMAGES_PER_GPU = 1
-    STEPS_PER_EPOCH = 2000
-    # STEPS_PER_EPOCH = 2
-    VALIDATION_STEPS = 100
-    # VALIDATION_STEPS = 1
+    # IMAGES_PER_GPU = 4
+    IMAGES_PER_GPU = 1
+    # STEPS_PER_EPOCH = 2000
+    STEPS_PER_EPOCH = 2
+    # VALIDATION_STEPS = 100
+    VALIDATION_STEPS = 1
     SAVE_MODEL_PERIOD = 1
 
 
@@ -46,9 +46,9 @@ DEFAULT_LOGS_DIR = "./outputs"
 if MACHINE_NAME == "Jason":
     # win
     PRETRAIN_MODEL_PATH = os.path.join(ROOT_DIR, "checkpoints", "parsing_rcnn.h5")
-    DEFAULT_DATASET_DIR = "D:\dataset\VIP_tiny"
-    pre_image_train_dir = "D:\dataset\VIP_tiny"
-    pre_image_val_dir = "D:\dataset\VIP_tiny"
+    DEFAULT_DATASET_DIR = "E:\dataset\VIP_tiny"
+    pre_image_train_dir = "E:\dataset\VIP_tiny"
+    pre_image_val_dir = "E:\dataset\VIP_tiny"
 else:
     # PRETRAIN_MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/mfp_20191028b/checkpoints" + "/" + \
     #                       "parsing_rcnn_mfp_20191028b_epoch003_loss1.366_valloss1.006.h5"

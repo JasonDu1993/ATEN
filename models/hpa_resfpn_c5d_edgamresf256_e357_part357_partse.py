@@ -2526,9 +2526,9 @@ class HPANet(object):
             model = ParallelModel(model, config.GPU_COUNT)
         import platform
         sys = platform.system()
-        print("model........................")
+        # print("model........................")
         # print(model.summary())
-        print("model flops:", get_flops(model))
+        # print("model flops:", get_flops(model))
         if sys == "Windows":
             if self.mode == "training":
                 plot_model(model, "mfp_training.jpg")

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-# @Time    : 2019/5/17 16:35
+# @Time    : 2020/2/27 19:51
 # @Author  : Jason
 # @Email   : 1358681631@qq.com
-# @File    : test_video.py
+# @File    : test_video_hpanet.py
 # @Software: PyCharm
 import os
 import tensorflow as tf
