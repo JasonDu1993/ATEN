@@ -41,6 +41,23 @@ def save_video_frame(mode):
         print("save:", video_name, "frame:", idx, "time:", time() - t0, "s")
 
 
+def extract_video_frame(read_video_path, save_dir, name):
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    t0 = time()
+    # save all keyframes as image
+    cap = cv2.VideoCapture(str(read_video_path))
+    success, frame = cap.read()
+    idx = 1
+    while success:
+        save_path = '%s/%s_%012d.jpg' % (save_dir, name, idx)
+        cv2.imwrite(save_path, frame)
+        idx = idx + 1
+        success, frame = cap.read()
+    cap.release()
+    print("frame:", idx, "time:", time() - t0, "s")
+
+
 def save_video_id(mode):
     video_dir = "/home/sk49/workspace/dataset/VIP/videos/" + mode + "_videos_frames"
     video_ids = os.listdir(video_dir)
@@ -55,6 +72,9 @@ if __name__ == "__main__":
     # Video path of the source file
     t = time()
     # save_video_frame(mode="test")
-
-    save_video_id("test")
+    read_video_path = r"C:\test_videos\VIP_test_videos\test_videos\videos106.avi"
+    save_dir = r"C:\test_videos\VIP_test_videos\test_videos\videos106"
+    name = "videos106"
+    extract_video_frame(read_video_path, save_dir, name)
+    # save_video_id("test")
     print("total time:", time() - t, "s")

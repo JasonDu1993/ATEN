@@ -20,10 +20,11 @@ sys.path.insert(0, os.getcwd())
 
 from configs.vip import ParsingRCNNModelConfig
 
-# from models.parsing_rcnn_model import PARSING_RCNN
-from models.parsing_rcnn_model_dilated import PARSING_RCNN
+from models.parsing_rcnn_model import PARSING_RCNN
+# from models.parsing_rcnn_model_dilated import PARSING_RCNN
 from utils import visualize
-from time import time
+from time import time, strftime
+from utils.add_decoration import add_decoration
 
 t0 = time()
 # Root directory of the project
@@ -34,11 +35,16 @@ MODEL_DIR = os.path.join(ROOT_DIR, "outputs")
 
 if MACHINE_NAME == "Jason":
     # win
-    MODEL_PATH = r"C:\ATEN_weights\vip_singleframe_20190408a\checkpoints\parsing_rcnn_vip_singleframe_20190408a_epoch074_loss0.401_valloss0.389.h5"
+    # MODEL_PATH = r"C:\ATEN_weights\vip_singleframe_20190408a\checkpoints\parsing_rcnn_vip_singleframe_20190408a_epoch074_loss0.401_valloss0.389.h5"
+    MODEL_PATH = r"./checkpoints/parsing_rcnn.h5"
+    read_video_path = r"C:\test_videos\videos1.mp4"
 else:
     # linux
-    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190408a/checkpoints/" \
-                 "parsing_rcnn_vip_singleframe_20190408a_epoch073_loss0.401_valloss0.391.h5"
+    # MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/outputs/vip_singleframe_20190408a/checkpoints/" \
+    #              "parsing_rcnn_vip_singleframe_20190408a_epoch074_loss0.401_valloss0.389.h5"
+    MODEL_PATH = "/home/sk49/workspace/zhoudu/ATEN/checkpoints/" \
+                 "parsing_rcnn.h5"
+    read_video_path = "./utils/奔跑吧兄弟赵丽颖_3s.mp4"
 
 
 class InferenceConfig(ParsingRCNNModelConfig):
@@ -52,7 +58,6 @@ def main():
     global config
     config = InferenceConfig()
     config.display()
-    read_video_path = "./utils/videos1.mp4"
     vid = os.path.split(read_video_path)[-1].split(".")[0]
     print("vid:", vid)
     # Create model object in inference mode.
@@ -63,8 +68,8 @@ def main():
     print("load model", time() - s0, "s")
 
     cap = cv2.VideoCapture(read_video_path)
-    save_dir = os.path.join(os.path.dirname(read_video_path), vid)
-
+    save_dir = os.path.join(os.path.dirname(read_video_path), vid + "_" + strftime("%Y_%m%d_%H%M%S"))
+    print("save images in", save_dir)
     success, frame = cap.read()
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -103,9 +108,12 @@ def main():
         #                            r['scores'])
         t4 = time()
         # print("vis_insts", t3 - t2)
-        global_parsing_map, color_map = visualize.write_inst_part_result(video_floder, color_floder, image.shape[0],
-                                                                         image.shape[1], image_id, r['boxes'],
-                                                                         r['masks'], r['scores'], r['global_parsing'])
+        global_parsing_map, color_map, part_inst_maps = visualize.write_inst_part_result(video_floder, color_floder,
+                                                                                         image.shape[0], image.shape[1],
+                                                                                         image_id, r['boxes'],
+                                                                                         r['masks'], r['scores'],
+                                                                                         r['global_parsing'])
+        image_add_decoration = add_decoration(image, part_inst_maps[:,:,])
         vis_global_image = cv2.addWeighted(masked_image, 1, global_parsing_map, 0.4, 0)
         vis_global_path = os.path.join(save_dir, "vis", "vis_global_%s.png" % image_id)
         if not os.path.exists(os.path.dirname(vis_global_path)):

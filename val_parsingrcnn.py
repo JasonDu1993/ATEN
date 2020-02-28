@@ -80,8 +80,10 @@ for line in rfp.readlines():
     # Visualize results
     r = results[0]
     visualize.vis_insts(image, video_floder, image_id, r['boxes'], r['masks'], r['class_ids'], r['scores'])
-    global_parsing_map, color_map=visualize.write_inst_part_result(video_floder, image.shape[0], image.shape[1], image_id, r['boxes'], r['masks'],
-                                     r['scores'], r['global_parsing'])
+    global_parsing_map, color_map, part_inst_maps = visualize.write_inst_part_result(video_floder, image.shape[0],
+                                                                                     image.shape[1], image_id,
+                                                                                     r['boxes'], r['masks'],
+                                                                                     r['scores'], r['global_parsing'])
     print("visualize results", time() - t2, "s")
 
 print("total", time() - t0, "s")

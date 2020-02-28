@@ -23,7 +23,7 @@ from models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_image_dk33f1 import MFP
 # from models.parsing_rcnn_model import PARSING_RCNN
 from models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_image_dk33f1 import MFPNet
 from utils import visualize
-from time import time
+from time import time, strftime
 
 t0 = time()
 # Root directory of the project
@@ -45,6 +45,7 @@ if MACHINE_NAME == "Jason":
     IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
     PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
     PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
+    read_video_path = r"C:\test_videos\videos1.mp4"
 else:
     DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
     # modified 3
@@ -58,6 +59,7 @@ else:
     IMAGE_LIST = DATASET_DIR + "/lists/val_id.txt"
     PRE_IMAGE_DIR = r"/home/sk49/workspace/dataset/VIP"
     PRE_PREDICT_DATA_DIR = r"/home/sk49/workspace/zhoudu/ATEN/vis/origin_val_vip_singleframe_parsing_rcnn"
+    read_video_path = "./utils/videos1.mp4"
 
 
 class InferenceConfig(MFPConfig):
@@ -82,8 +84,8 @@ def main():
     print("load model", time() - s0, "s")
 
     cap = cv2.VideoCapture(read_video_path)
-    save_dir = os.path.join(os.path.dirname(read_video_path), vid)
-
+    save_dir = os.path.join(os.path.dirname(read_video_path), vid + "_mfpnet_" + strftime("%Y_%m%d_%H%M%S"))
+    print("save images in", save_dir)
     success, frame = cap.read()
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -122,9 +124,11 @@ def main():
         #                            r['scores'])
         t4 = time()
         # print("vis_insts", t3 - t2)
-        global_parsing_map, color_map = visualize.write_inst_part_result(video_floder, color_floder, image.shape[0],
-                                                                         image.shape[1], image_id, r['boxes'],
-                                                                         r['masks'], r['scores'], r['global_parsing'])
+        global_parsing_map, color_map, part_inst_maps = visualize.write_inst_part_result(video_floder, color_floder,
+                                                                                         image.shape[0], image.shape[1],
+                                                                                         image_id, r['boxes'],
+                                                                                         r['masks'], r['scores'],
+                                                                                         r['global_parsing'])
         vis_global_image = cv2.addWeighted(masked_image, 1, global_parsing_map, 0.4, 0)
         vis_global_path = os.path.join(save_dir, "vis", "vis_global_%s.png" % image_id)
         if not os.path.exists(os.path.dirname(vis_global_path)):

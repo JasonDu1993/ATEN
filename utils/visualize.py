@@ -552,8 +552,12 @@ def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, m
     print("        B. write_inst_result:", t2 - t1)
     # C. combine inst and part, need `global_parsing`, `global_parsing_max_prob`, `inst_map`, `inst_scores`
 
-    # inst_part_map:shape [height, width], the value is counter used label, every person every part have different label
-    inst_part_map = np.zeros_like(inst_map)  # shape [height, width], will save the result into picture
+    # inst_part_map:shape [height, width], the value is counter used label,0-n, 0 is bg, 1-n is every person every part
+    # have different label, inst_part_map will save the result into instance_parsing dir
+    inst_part_map = np.zeros_like(inst_map)
+    # part_inst_maps: shape [height, width, class_num=20], the value is 0-num_instance,
+    # 0 is bg, the value is the person label with the same part label
+    part_inst_maps = np.zeros(shape=[height, width, class_num])
     if not is_combine_inst_part:
         return global_parsing_map, color_map
     floder = os.path.join(res_dir, 'instance_parsing')
@@ -567,7 +571,9 @@ def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, m
         cur_counter = counter
         inst_part_prob_map = {}  # dict, key is counter(every person every part have different label), value is float
         cls_indices = (global_parsing == k).astype(np.uint8)  # shape [height, width]
-        part_inst_map = cls_indices * inst_map  # the person inst with the same part label
+        # part_inst_map: shape [height, width], the value is the person label with the same part label
+        part_inst_map = cls_indices * inst_map
+        part_inst_maps[:, :, k] = part_inst_map
         inst_ids = np.unique(part_inst_map)  # for example [0 2 3], 0 is bg, 2 inst person label, 3 is the same to 2
         tt0 = time()
         for i in inst_ids:
@@ -597,7 +603,7 @@ def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, m
         cv2.imwrite(img_instance_parsing_path, inst_part_map)
     t4 = time()
     print("        C. combine every person and every part:", t4 - t3, "s")
-    return global_parsing_map, color_map
+    return global_parsing_map, color_map, part_inst_maps
 
 
 def vis_inst_parsings(image, res_dir, image_id, boxes, parts, class_ids,

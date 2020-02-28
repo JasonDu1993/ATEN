@@ -18,8 +18,9 @@ from utils.util_load_mfp_data import get_scale, load_pre_image_names, load_pre_i
 import tensorflow as tf
 import importlib
 
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # modified 1
-name = "models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_image_3d3"
+name = "models.mfp_resfpn_c5d_edgamf256_e357_part357_partse_image_dk33f1"
 module = importlib.import_module(name)
 sys.path.insert(0, os.getcwd())
 
@@ -38,7 +39,7 @@ class InferenceConfig(module.MFPConfig):
     # modified 2
     PROCESS_NAME = "val_mfp_20191212b_epoch052"  # for tmp tested image name
     GPU_COUNT = 1  # only 1
-    PROCESS_COUNT = 3
+    PROCESS_COUNT = 1
     IMAGES_PER_GPU = 1  # only 1
     BATCH_SIZE = 1  # only 1
     # whether save the predicted visualized image
@@ -54,17 +55,17 @@ class InferenceConfig(module.MFPConfig):
 # linux
 if MACHINE_NAME == "Jason":
     # win
-    DATASET_DIR = r"D:\dataset\VIP_tiny"
+    DATASET_DIR = r"E:\dataset\VIP_tiny"
     # modified 3
-    MODEL_PATH = "outputs/mfp_20191116a/checkpoints/parsing_rcnn_mfp_20191116a_epoch003_loss0.741_valloss0.753.h5"
+    MODEL_PATH = r"C:\ATEN_weights\mfp_20191208d\checkpoints\parsing_rcnn_mfp_20191208d_epoch042_loss0.596_valloss1.173.h5"
     # modified 4
-    RES_DIR = "./vis_mfp/val_mfp_20191116a_epoch003"
+    RES_DIR = "./vis_mfp/traintiny_mfp_20191208d_epoch042"
     # modified 5
     gpus = ["0"]
     IMAGE_DIR = DATASET_DIR + "/Images"
     IMAGE_LIST = DATASET_DIR + "/lists/traintiny_id.txt"
-    PRE_IMAGE_DIR = r"D:\dataset\VIP_tiny"
-    PRE_PREDICT_DATA_DIR = r"D:\dataset\VIP_tiny"
+    PRE_IMAGE_DIR = r"E:\dataset\VIP_tiny"
+    PRE_PREDICT_DATA_DIR = r"E:\dataset\VIP_tiny"
 else:
     DATASET_DIR = "/home/sk49/workspace/dataset/VIP"
     # modified 3
@@ -157,10 +158,12 @@ def worker(images, infer_config, gpu_id, tested_images_set, tested_path):
             #                       r['class_ids'], r['scores'])
         t4 = time.time()
         print("  2 (1)vis_insts:", t4 - t3)
-        global_parsing_map, color_map = visualize.write_inst_part_result(video_floder, color_floder, image.shape[0],
-                                                                         image.shape[1], image_id, r['boxes'],
-                                                                         r['masks'], r['scores'], r['global_parsing'],
-                                                                         iscolor=iscolor)
+        global_parsing_map, color_map, part_inst_maps = visualize.write_inst_part_result(video_floder, color_floder,
+                                                                                         image.shape[0], image.shape[1],
+                                                                                         image_id, r['boxes'],
+                                                                                         r['masks'], r['scores'],
+                                                                                         r['global_parsing'],
+                                                                                         iscolor=iscolor)
         if iscolor:
             vis_global_image = cv2.addWeighted(masked_image, 1, global_parsing_map, 0.4, 0)
             cv2.imwrite(os.path.join(color_floder, "color", "vis_global_%s.png" % image_id), vis_global_image)
