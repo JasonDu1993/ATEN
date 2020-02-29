@@ -2958,7 +2958,7 @@ class HPANet(object):
     def detect(self, images, pre_images, pre_masks, pre_parts, verbose=0, isopencv=False):
         """Runs the detection pipeline.
         Args:
-            images: List of images, potentially of different sizes.
+            images: List of images, potentially of different sizes. bgr
 
         Returns a list of dicts, one dict per image. The dict contains:
             rois: [N, (y1, x1, y2, x2)] detection bounding boxes

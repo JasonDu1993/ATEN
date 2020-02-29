@@ -526,7 +526,10 @@ def write_inst_part_result(res_dir, color_dir, height, width, image_id, boxes, m
         is_combine_inst_part: bool, default True, for test, need save the instance parsing result
 
     Returns:
-        global_parsing_map, color_map
+        global_parsing_map: shape [height, width, 3], which is used for visualized, 3 represent rgb,
+        color_map: [height, width, 3], the inst result will save in "color_results/videoid/color/inst_imageid.png"
+        part_inst_maps: shape [height, width, class_num=20], the value is 0-num_instance,
+            0 is bg, the value is the person label with the same part label
     """
     t0 = time()
     # global_parsing: shape [height, width], the value in [0-19],0 represent the background,
@@ -765,7 +768,7 @@ def vis_insts_opencv(image, color_dir, image_id, boxes, masks, class_ids,
     """write a bounding box for every person and contour, the image saves in RES_DIR/color_results/videoid/vis_%s.png
 
    Args:
-       image: numpy.ndarray, shape=[height, width, num_instance] (720, 1280, 3), dtype=uint8,3 represent rgb,
+       image: numpy.ndarray, shape=[height, width, num_instance] (720, 1280, 3), dtype=uint8,3 represent bgr,
        color_dir: str, save the os.path.join(RES_DIR, "color_results", videoid) such as RES_DIR/color_results/videos45
        image_id: str, for example '000000000176'
        boxes: numpy.ndarray, shape=[num_instance, (y1, x1, y2, x2)] in image coordinates.

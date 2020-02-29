@@ -7,6 +7,7 @@
 import os
 import tensorflow as tf
 import platform
+import numpy as np
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 config = tf.ConfigProto()
@@ -24,7 +25,7 @@ from models.parsing_rcnn_model import PARSING_RCNN
 # from models.parsing_rcnn_model_dilated import PARSING_RCNN
 from utils import visualize
 from time import time, strftime
-from utils.add_decoration import add_decoration
+from utils.function import add_decoration
 
 t0 = time()
 # Root directory of the project
@@ -91,7 +92,7 @@ def main():
         video_floder = os.path.join(save_dir, "vp_results")
         color_floder = os.path.join(save_dir, "color_results")
 
-        image = frame[:, :, ::-1]
+        image = frame[:, :, ::-1]  # frame bgr, image is rgb
         # image = cv2.imread(os.path.join(IMAGE_DIR, vid, image_id) + '.jpg')
         # Run detection
         # results = model.detect([image[:, :, ::-1]])
@@ -113,7 +114,12 @@ def main():
                                                                                          image_id, r['boxes'],
                                                                                          r['masks'], r['scores'],
                                                                                          r['global_parsing'])
-        image_add_decoration = add_decoration(image, part_inst_maps[:,:,])
+        face_index = 13  # detail is in the function load_part of in configs/vip.py or configs/vipdataset_for_mfp.py
+        image_add_decoration = add_decoration(frame, part_inst_maps[:, :, face_index])
+        add_decoration_path = os.path.join(save_dir, "add_decoration", "add_%s.png" % image_id)
+        if not os.path.exists(os.path.dirname(add_decoration_path)):
+            os.makedirs(os.path.dirname(add_decoration_path))
+        cv2.imwrite(add_decoration_path, image_add_decoration)
         vis_global_image = cv2.addWeighted(masked_image, 1, global_parsing_map, 0.4, 0)
         vis_global_path = os.path.join(save_dir, "vis", "vis_global_%s.png" % image_id)
         if not os.path.exists(os.path.dirname(vis_global_path)):

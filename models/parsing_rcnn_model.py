@@ -2697,7 +2697,7 @@ class PARSING_RCNN():
     def detect(self, images, verbose=0):
         """Runs the detection pipeline.
         Args:
-            images: List of images, potentially of different sizes.
+            images: List of images, potentially of different sizes. rgb
 
         Returns a list of dicts, one dict per image. The dict contains:
             rois: [N, (y1, x1, y2, x2)] detection bounding boxes

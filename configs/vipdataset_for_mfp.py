@@ -548,7 +548,10 @@ class VIPDatasetForMFP(Dataset):
         in the form of a category_id map [height, width].
 
         Returns:
-        parts: A uint8 array of shape [height, width].
+            parts: A uint8 array of shape [height, width].the value is 0-19, 0 is bg 1-19 is person part label
+        (1, "hat")(2, "hair")(3, "gloves")(4, "sun-glasses")(5, "upper-clothes")(6, "dress")(7, "coat")(8, "socks")
+        (9, "pants")(10, "torso-skin")(11, "scarf")(12, "skirt")(13, "face")(14, "left-arm")(15, "right-arm")
+        (16, "left-leg")(17, "right-leg")(18, "left-shoe")(19, "right-shoe")
         """
         image_info = self.image_info[image_index]
         gt_part_data = cv2.imread(image_info["part_anno"],

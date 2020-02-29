@@ -107,7 +107,7 @@ def main():
         video_floder = os.path.join(save_dir, "vp_results")
         color_floder = os.path.join(save_dir, "color_results")
 
-        image = frame[:, :, ::-1]
+        image = frame  # mfpnet need bgr
         # image = cv2.imread(os.path.join(IMAGE_DIR, vid, image_id) + '.jpg')
         # Run detection
         # results = model.detect([image[:, :, ::-1]])
